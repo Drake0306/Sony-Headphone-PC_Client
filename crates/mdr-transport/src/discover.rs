@@ -30,5 +30,8 @@ pub fn connect(address: &str) -> io::Result<Box<dyn Transport>> {
 
 #[cfg(not(target_os = "macos"))]
 fn unsupported() -> io::Error {
-    io::Error::new(io::ErrorKind::Unsupported, "Bluetooth transport is only implemented on macOS in this phase")
+    io::Error::new(
+        io::ErrorKind::Unsupported,
+        "Bluetooth transport is only implemented on macOS in this phase",
+    )
 }

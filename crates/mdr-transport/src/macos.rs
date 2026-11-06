@@ -15,8 +15,8 @@ use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, NSObject, NSObjectProtocol};
 use objc2::{define_class, msg_send, AllocAnyThread, DefinedClass, MainThreadMarker};
 use objc2_io_bluetooth::{
-    BluetoothRFCOMMChannelID, IOBluetoothDevice, IOBluetoothRFCOMMChannel, IOBluetoothRFCOMMChannelDelegate,
-    IOBluetoothSDPUUID,
+    BluetoothRFCOMMChannelID, IOBluetoothDevice, IOBluetoothRFCOMMChannel,
+    IOBluetoothRFCOMMChannelDelegate, IOBluetoothSDPUUID,
 };
 
 use crate::{Candidate, Transport, V2_SERVICE_UUID};
@@ -106,7 +106,11 @@ fn paired_devices() -> Vec<Retained<IOBluetoothDevice>> {
     let Some(array) = (unsafe { IOBluetoothDevice::pairedDevices() }) else {
         return Vec::new();
     };
-    array.to_vec().into_iter().filter_map(|obj| obj.downcast::<IOBluetoothDevice>().ok()).collect()
+    array
+        .to_vec()
+        .into_iter()
+        .filter_map(|obj| obj.downcast::<IOBluetoothDevice>().ok())
+        .collect()
 }
 
 fn string(s: Option<Retained<objc2_foundation::NSString>>) -> String {
@@ -142,10 +146,19 @@ pub fn connect(address: &str) -> io::Result<Box<dyn Transport>> {
         let device = paired_devices()
             .into_iter()
             .find(|d| string(unsafe { d.addressString() }).eq_ignore_ascii_case(address))
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, format!("no paired device {address}")))?;
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("no paired device {address}"),
+                )
+            })?;
         // SAFETY: IOBluetooth calls on the main queue with valid arguments.
-        let record = unsafe { device.getServiceRecordForUUID(Some(&uuid)) }
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "device does not expose the v2 service"))?;
+        let record = unsafe { device.getServiceRecordForUUID(Some(&uuid)) }.ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                "device does not expose the v2 service",
+            )
+        })?;
         let mut channel_id: BluetoothRFCOMMChannelID = 0;
         let ret = unsafe { record.getRFCOMMChannelID(&mut channel_id) };
         if ret != 0 {
@@ -155,7 +168,11 @@ pub fn connect(address: &str) -> io::Result<Box<dyn Transport>> {
         let delegate_obj: &AnyObject = &delegate;
         let mut channel = None;
         let ret = unsafe {
-            device.openRFCOMMChannelSync_withChannelID_delegate(Some(&mut channel), channel_id, Some(delegate_obj))
+            device.openRFCOMMChannelSync_withChannelID_delegate(
+                Some(&mut channel),
+                channel_id,
+                Some(delegate_obj),
+            )
         };
         if ret != 0 {
             if let Some(channel) = channel {
@@ -168,10 +185,15 @@ pub fn connect(address: &str) -> io::Result<Box<dyn Transport>> {
             }
             return Err(io_err("openRFCOMMChannelSync", ret));
         }
-        let channel = channel.ok_or_else(|| io::Error::other("openRFCOMMChannelSync returned no channel"))?;
+        let channel =
+            channel.ok_or_else(|| io::Error::other("openRFCOMMChannelSync returned no channel"))?;
         Ok(MainOnly((channel, delegate)))
     })?;
-    Ok(Box::new(MacTransport { link: Some(link), rx, closed: false }))
+    Ok(Box::new(MacTransport {
+        link: Some(link),
+        rx,
+        closed: false,
+    }))
 }
 
 struct MacTransport {
@@ -187,7 +209,11 @@ fn broken_pipe() -> io::Error {
 
 impl Transport for MacTransport {
     fn write(&mut self, bytes: &[u8]) -> io::Result<()> {
-        let link = self.link.as_ref().filter(|_| !self.closed).ok_or_else(broken_pipe)?;
+        let link = self
+            .link
+            .as_ref()
+            .filter(|_| !self.closed)
+            .ok_or_else(broken_pipe)?;
         on_main(|| {
             let channel = &link.0 .0;
             // SAFETY: state query on the main queue.
@@ -197,7 +223,8 @@ impl Transport for MacTransport {
             for chunk in bytes.chunks(WRITE_CHUNK) {
                 let mut buf = chunk.to_vec();
                 // SAFETY: `buf` is valid for `len` bytes for the duration of the call; len <= 512.
-                let ret = unsafe { channel.writeSync_length(buf.as_mut_ptr().cast(), buf.len() as u16) };
+                let ret =
+                    unsafe { channel.writeSync_length(buf.as_mut_ptr().cast(), buf.len() as u16) };
                 if ret != 0 {
                     // A write that fails because the remote closed is link loss.
                     if !unsafe { channel.isOpen() } {

@@ -38,7 +38,11 @@ pub fn current_output_device_name() -> Option<String> {
 
     let mut device: u32 = 0;
     let mut size = size_of::<u32>() as u32;
-    let address = PropertyAddress { selector: DEFAULT_OUTPUT_DEVICE, scope: SCOPE_GLOBAL, element: ELEMENT_MAIN };
+    let address = PropertyAddress {
+        selector: DEFAULT_OUTPUT_DEVICE,
+        scope: SCOPE_GLOBAL,
+        element: ELEMENT_MAIN,
+    };
     // SAFETY: `device` is a u32 and `size` says so; CoreAudio writes at most `size` bytes.
     let status = unsafe {
         AudioObjectGetPropertyData(
@@ -56,7 +60,11 @@ pub fn current_output_device_name() -> Option<String> {
 
     let mut name: CFStringRef = std::ptr::null();
     let mut size = size_of::<CFStringRef>() as u32;
-    let address = PropertyAddress { selector: OBJECT_NAME, scope: SCOPE_GLOBAL, element: ELEMENT_MAIN };
+    let address = PropertyAddress {
+        selector: OBJECT_NAME,
+        scope: SCOPE_GLOBAL,
+        element: ELEMENT_MAIN,
+    };
     // SAFETY: the property is a CFStringRef the caller owns (create rule); `size` matches.
     let status = unsafe {
         AudioObjectGetPropertyData(

@@ -106,12 +106,16 @@ impl Session {
         let mut events = Vec::new();
         if let Some((group, step)) = self.handshake.on_timeout(now_ms) {
             self.refuse(group);
-            events.push(Event::Log(format!("handshake read for {group:?} got no reply; skipped")));
+            events.push(Event::Log(format!(
+                "handshake read for {group:?} got no reply; skipped"
+            )));
             events.push(Event::StateChanged);
             self.follow_handshake(step, &mut events);
         }
-        let (expired, waiting) =
-            self.awaiting_reply.drain(..).partition::<Vec<_>, _>(|&(_, acked)| now_ms >= acked + REPLY_TIMEOUT_MS);
+        let (expired, waiting) = self
+            .awaiting_reply
+            .drain(..)
+            .partition::<Vec<_>, _>(|&(_, acked)| now_ms >= acked + REPLY_TIMEOUT_MS);
         self.awaiting_reply = waiting;
         if !expired.is_empty() {
             for (group, _) in expired {
@@ -126,8 +130,16 @@ impl Session {
     }
 
     pub fn next_timeout_ms(&self) -> Option<u64> {
-        let replies = self.awaiting_reply.iter().map(|&(_, acked)| acked + REPLY_TIMEOUT_MS);
-        self.arq.deadline().into_iter().chain(self.handshake.deadline()).chain(replies).min()
+        let replies = self
+            .awaiting_reply
+            .iter()
+            .map(|&(_, acked)| acked + REPLY_TIMEOUT_MS);
+        self.arq
+            .deadline()
+            .into_iter()
+            .chain(self.handshake.deadline())
+            .chain(replies)
+            .min()
     }
 
     /// Sends a request after the deny-list and capability checks; marks its group Pending.
@@ -146,7 +158,13 @@ impl Session {
 
     /// Changes only the ULT level, keeping the device's current preset and bands.
     pub fn set_ult(&mut self, ult: UltLevel) -> Result<(), SessionError> {
-        let Some(mut eq) = self.state.eq_ult.value.clone().filter(|eq| !eq.bands.is_empty()) else {
+        let Some(mut eq) = self
+            .state
+            .eq_ult
+            .value
+            .clone()
+            .filter(|eq| !eq.bands.is_empty())
+        else {
             return Err(SessionError::Busy);
         };
         eq.ult = ult;
@@ -189,16 +207,24 @@ impl Session {
             return Err(SessionError::Unavailable(id));
         }
         if let Some(status) = self.state.status_mut(req.group) {
-            *status = Status::Pending { since_ms: self.last_now_ms };
+            *status = Status::Pending {
+                since_ms: self.last_now_ms,
+            };
         }
-        let timer = if refetch(req.group).is_some() { ReplyTimer::Request } else { ReplyTimer::None };
+        let timer = if refetch(req.group).is_some() {
+            ReplyTimer::Request
+        } else {
+            ReplyTimer::None
+        };
         self.arq.enqueue(req, timer);
         Ok(())
     }
 
     fn refuse(&mut self, group: Group) {
         if let Some(status) = self.state.status_mut(group) {
-            *status = Status::Refused { reason: "no reply".into() };
+            *status = Status::Refused {
+                reason: "no reply".into(),
+            };
         }
     }
 
@@ -236,13 +262,17 @@ impl Session {
 
     /// False once a reply for the group has already arrived (it can beat the ACK).
     fn still_pending(&mut self, group: Group) -> bool {
-        self.state.status_mut(group).is_none_or(|s| matches!(s, Status::Pending { .. }))
+        self.state
+            .status_mut(group)
+            .is_none_or(|s| matches!(s, Status::Pending { .. }))
     }
 
     fn dispatch(&mut self, table: Table, payload: &[u8], events: &mut Vec<Event>) {
         let (_kind, msg) = decode(table, payload);
         if let Message::Unknown { .. } = msg {
-            events.push(Event::Log(format!("unhandled {table:?} payload {payload:02X?}")));
+            events.push(Event::Log(format!(
+                "unhandled {table:?} payload {payload:02X?}"
+            )));
         }
         match self.state.apply(table, msg) {
             Applied::Value(group) => {
@@ -255,7 +285,9 @@ impl Session {
         if !self.handshake.is_active() {
             return;
         }
-        let step = self.handshake.on_reply(table, payload, &self.state.capabilities_t1);
+        let step = self
+            .handshake
+            .on_reply(table, payload, &self.state.capabilities_t1);
         self.follow_handshake(step, events);
     }
 

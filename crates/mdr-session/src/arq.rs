@@ -86,7 +86,11 @@ impl Arq {
             Some(_) => None,
             None => {
                 let Outgoing { request, timer } = self.queue.pop_front()?;
-                let frame = Frame { frame_type: frame_type(request.table), seq: self.next_seq, payload: request.bytes };
+                let frame = Frame {
+                    frame_type: frame_type(request.table),
+                    seq: self.next_seq,
+                    payload: request.bytes,
+                };
                 let bytes = encode(&frame);
                 self.in_flight = Some(InFlight {
                     bytes: bytes.clone(),
@@ -104,8 +108,14 @@ impl Arq {
     /// Handles an ACK from the device. Returns what it settled, if it matched the frame in flight.
     pub fn on_ack(&mut self, seq: u8) -> Option<Acked> {
         // An ACK whose seq does not match the frame in flight is stale; ignore it.
-        let f = self.in_flight.as_ref().filter(|f| f.sent_at.is_some() && seq == f.seq ^ 1)?;
-        let acked = Acked { group: f.group, timer: f.timer };
+        let f = self
+            .in_flight
+            .as_ref()
+            .filter(|f| f.sent_at.is_some() && seq == f.seq ^ 1)?;
+        let acked = Acked {
+            group: f.group,
+            timer: f.timer,
+        };
         self.in_flight = None;
         self.next_seq ^= 1;
         Some(acked)
@@ -127,7 +137,10 @@ impl Arq {
         if self.deadline().is_none_or(|d| now_ms < d) {
             return Timeout::None;
         }
-        let f = self.in_flight.as_mut().expect("deadline implies a frame in flight");
+        let f = self
+            .in_flight
+            .as_mut()
+            .expect("deadline implies a frame in flight");
         f.timeouts += 1;
         if f.timeouts >= ACK_RETRIES {
             return Timeout::GiveUp;

@@ -5,7 +5,11 @@ use mdr_frame::{encode, Decoder, Frame, FrameType};
 use mdr_session::Session;
 
 pub fn frame(t: FrameType, seq: u8, p: &[u8]) -> Vec<u8> {
-    encode(&Frame { frame_type: t, seq, payload: p.to_vec() })
+    encode(&Frame {
+        frame_type: t,
+        seq,
+        payload: p.to_vec(),
+    })
 }
 
 pub fn drain(s: &mut Session) -> Vec<Vec<u8>> {
@@ -53,7 +57,9 @@ pub fn scripted_reply(t: FrameType, req: &[u8], t1_caps: &[u8]) -> Option<Vec<u8
         (_, [0x22, 0x00]) => vec![0x23, 0x00, 0x43, 0x00],
         (_, [0x66, 0x17]) => vec![0x67, 0x17, 0x01, 0x01, 0x01, 0x01, 0x0E],
         (_, [0x50, 0x03]) => vec![0x51, 0x03, 0x06, 0x15, 0x0A, 0x00],
-        (_, [0x56, 0x03]) => vec![0x57, 0x03, 0x00, 0x01, 0x06, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A],
+        (_, [0x56, 0x03]) => vec![
+            0x57, 0x03, 0x00, 0x01, 0x06, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A,
+        ],
         (_, [0x12, 0x02]) => vec![0x13, 0x02, 0x10],
         (_, [0xD0, 0xD1]) => [&[0xD1, 0xD1, 0x00, 0x00, 0x0A][..], b"MULTIPOINT", &[0x00]].concat(),
         (_, [0xD6, 0xD1]) => vec![0xD7, 0xD1, 0x00, 0x00],
@@ -68,7 +74,11 @@ pub fn connected_session_with_caps(t1: &[u8]) -> Session {
     let mut t = 0;
     loop {
         let out = drain(&mut s);
-        let Some(req) = out.iter().map(|b| decode_one(b)).find(|f| f.frame_type != FrameType::Ack) else {
+        let Some(req) = out
+            .iter()
+            .map(|b| decode_one(b))
+            .find(|f| f.frame_type != FrameType::Ack)
+        else {
             break;
         };
         let reply = scripted_reply(req.frame_type, &req.payload, t1)

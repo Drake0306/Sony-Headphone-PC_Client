@@ -78,5 +78,9 @@ pub fn encode(frame: &Frame) -> Vec<u8> {
 }
 
 pub fn ack_for(received_seq: u8) -> Frame {
-    Frame { frame_type: FrameType::Ack, seq: received_seq ^ 1, payload: Vec::new() }
+    Frame {
+        frame_type: FrameType::Ack,
+        seq: received_seq ^ 1,
+        payload: Vec::new(),
+    }
 }

@@ -15,7 +15,9 @@ pub struct Broker(pub Sender<BrokerCmd>);
 
 impl Broker {
     fn send(&self, cmd: BrokerCmd) -> Result<(), String> {
-        self.0.send(cmd).map_err(|_| "the broker has stopped".to_string())
+        self.0
+            .send(cmd)
+            .map_err(|_| "the broker has stopped".to_string())
     }
 }
 
@@ -25,7 +27,12 @@ pub fn get_state(state: State<'_, Mutex<DeviceState>>) -> DeviceState {
 }
 
 #[tauri::command]
-pub fn set_nc(broker: State<'_, Broker>, mode: String, level: u8, voice_focus: bool) -> Result<(), String> {
+pub fn set_nc(
+    broker: State<'_, Broker>,
+    mode: String,
+    level: u8,
+    voice_focus: bool,
+) -> Result<(), String> {
     let mode = match mode.as_str() {
         "off" => NcMode::Off,
         "nc" => NcMode::NoiseCancelling,
@@ -35,7 +42,11 @@ pub fn set_nc(broker: State<'_, Broker>, mode: String, level: u8, voice_focus: b
     if !(1..=20).contains(&level) {
         return Err(format!("ambient level {level} is outside 1..=20"));
     }
-    broker.send(BrokerCmd::SetNc(NcAsmState { mode, level, voice_focus }))
+    broker.send(BrokerCmd::SetNc(NcAsmState {
+        mode,
+        level,
+        voice_focus,
+    }))
 }
 
 #[tauri::command]

@@ -1,7 +1,8 @@
 //! Device state as the UI sees it, and how decoded messages update it.
 
 use mdr_proto::{
-    Charging, Codec, DeviceInfo, EqUltCapability, EqUltState, GsCapability, Group, Message, NcAsmState, Table,
+    Charging, Codec, DeviceInfo, EqUltCapability, EqUltState, Group, GsCapability, Message,
+    NcAsmState, Table,
 };
 use serde::{Deserialize, Serialize};
 
@@ -24,11 +25,17 @@ pub struct Tracked<T> {
 
 impl<T> Tracked<T> {
     pub fn unavailable() -> Self {
-        Tracked { value: None, status: Status::Unavailable }
+        Tracked {
+            value: None,
+            status: Status::Unavailable,
+        }
     }
 
     pub fn pending(now_ms: u64) -> Self {
-        Tracked { value: None, status: Status::Pending { since_ms: now_ms } }
+        Tracked {
+            value: None,
+            status: Status::Pending { since_ms: now_ms },
+        }
     }
 
     fn confirm(&mut self, value: T) {
@@ -121,9 +128,16 @@ impl DeviceState {
                 Applied::Info
             }
             Message::GsCapability(c) => {
-                match self.gs.iter_mut().find(|g| g.capability.setting == c.setting) {
+                match self
+                    .gs
+                    .iter_mut()
+                    .find(|g| g.capability.setting == c.setting)
+                {
                     Some(g) => g.capability = c,
-                    None => self.gs.push(GsSetting { capability: c, current: None }),
+                    None => self.gs.push(GsSetting {
+                        capability: c,
+                        current: None,
+                    }),
                 }
                 Applied::Info
             }
@@ -151,7 +165,10 @@ impl DeviceState {
                 self.auto_power_off.confirm(current);
                 Applied::Value(Group::AutoPowerOff)
             }
-            Message::GsBool { setting: GS_MULTIPOINT, on } => {
+            Message::GsBool {
+                setting: GS_MULTIPOINT,
+                on,
+            } => {
                 self.multipoint.confirm(on);
                 Applied::Value(Group::GeneralSetting(GS_MULTIPOINT))
             }

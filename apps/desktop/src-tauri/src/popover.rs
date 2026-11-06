@@ -58,12 +58,18 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
 }
 
 pub fn toggle(app: &AppHandle) {
-    let Some(window) = app.get_webview_window(LABEL) else { return };
+    let Some(window) = app.get_webview_window(LABEL) else {
+        return;
+    };
     if window.is_visible().unwrap_or(false) {
         hide(app);
         return;
     }
-    let just_hidden = HIDDEN_AT.lock().ok().and_then(|at| *at).is_some_and(|t| t.elapsed() < REOPEN_GUARD);
+    let just_hidden = HIDDEN_AT
+        .lock()
+        .ok()
+        .and_then(|at| *at)
+        .is_some_and(|t| t.elapsed() < REOPEN_GUARD);
     if !just_hidden {
         show(app, &window);
     }
@@ -105,9 +111,10 @@ pub fn open_main_window(app: &AppHandle) -> tauri::Result<()> {
         window.show()?;
         return window.set_focus();
     }
-    let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html?view=main".into()))
-        .title("Hairline")
-        .inner_size(880.0, 560.0)
-        .build()?;
+    let window =
+        WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html?view=main".into()))
+            .title("Hairline")
+            .inner_size(880.0, 560.0)
+            .build()?;
     window.set_focus()
 }

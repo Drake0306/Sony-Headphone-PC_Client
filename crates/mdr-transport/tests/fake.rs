@@ -57,7 +57,12 @@ fn fake_device_completes_handshake_through_session() {
 fn fake_device_echoes_nc_set_as_ntfy() {
     let mut t = FakeDevice::ult_wear();
     let (mut s, mut now) = connected(&mut t);
-    s.set_nc(NcAsmState { mode: NcMode::Off, level: 10, voice_focus: false }).unwrap();
+    s.set_nc(NcAsmState {
+        mode: NcMode::Off,
+        level: 10,
+        voice_focus: false,
+    })
+    .unwrap();
     assert!(matches!(s.state().nc.status, Status::Pending { .. }));
     for _ in 0..50 {
         now += 5;
@@ -86,7 +91,12 @@ fn silent_opcode_leads_to_refused() {
     assert!(matches!(s.state().eq_ult.status, Status::Pending { .. }));
     now += REPLY_TIMEOUT_MS + 1;
     s.handle_timeout(now);
-    assert_eq!(s.state().eq_ult.status, Status::Refused { reason: "no reply".into() });
+    assert_eq!(
+        s.state().eq_ult.status,
+        Status::Refused {
+            reason: "no reply".into()
+        }
+    );
 }
 
 #[test]
@@ -99,5 +109,8 @@ fn dropped_link_fails_reads_and_writes() {
     t.write(&first).unwrap();
     let err = t.recv_timeout(Duration::from_millis(10)).unwrap_err();
     assert_eq!(err.kind(), std::io::ErrorKind::BrokenPipe);
-    assert_eq!(t.write(&first).unwrap_err().kind(), std::io::ErrorKind::BrokenPipe);
+    assert_eq!(
+        t.write(&first).unwrap_err().kind(),
+        std::io::ErrorKind::BrokenPipe
+    );
 }

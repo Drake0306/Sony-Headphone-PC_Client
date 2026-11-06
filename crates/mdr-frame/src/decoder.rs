@@ -63,7 +63,14 @@ fn parse(inner: &[u8]) -> Result<Frame, FrameError> {
     let (body, sum) = inner.split_at(inner.len() - 1);
     let expected = checksum(body);
     if expected != sum[0] {
-        return Err(FrameError::BadChecksum { expected, got: sum[0] });
+        return Err(FrameError::BadChecksum {
+            expected,
+            got: sum[0],
+        });
     }
-    Ok(Frame { frame_type: FrameType::from_u8(inner[0]), seq: inner[1], payload: inner[6..inner.len() - 1].to_vec() })
+    Ok(Frame {
+        frame_type: FrameType::from_u8(inner[0]),
+        seq: inner[1],
+        payload: inner[6..inner.len() - 1].to_vec(),
+    })
 }

@@ -34,7 +34,9 @@ fn reply(frame_type: FrameType, req: &[u8]) -> Option<Vec<u8>> {
         (_, [0x22, 0x00]) => vec![0x23, 0x00, 0x43, 0x00],
         (_, [0x66, 0x17]) => vec![0x67, 0x17, 0x01, 0x01, 0x01, 0x01, 0x0E],
         (_, [0x50, 0x03]) => vec![0x51, 0x03, 0x06, 0x15, 0x0A, 0x00],
-        (_, [0x56, 0x03]) => vec![0x57, 0x03, 0x00, 0x01, 0x06, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A],
+        (_, [0x56, 0x03]) => vec![
+            0x57, 0x03, 0x00, 0x01, 0x06, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A,
+        ],
         (_, [0x12, 0x02]) => vec![0x13, 0x02, 0x10],
         (_, [0xD0, 0xD1]) => [&[0xD1, 0xD1, 0x00, 0x00, 0x0A][..], b"MULTIPOINT", &[0x00]].concat(),
         (_, [0xD6, 0xD1]) => vec![0xD7, 0xD1, 0x00, 0x00],
@@ -112,7 +114,10 @@ impl FakeDevice {
             }
             FrameType::Command1 | FrameType::Command2 => {
                 self.acks.push_back(encode(&ack_for(frame.seq)));
-                let silenced = frame.payload.first().is_some_and(|op| self.silent.contains(op));
+                let silenced = frame
+                    .payload
+                    .first()
+                    .is_some_and(|op| self.silent.contains(op));
                 if let Some(r) = reply(frame.frame_type, &frame.payload).filter(|_| !silenced) {
                     self.data.push_back((frame.frame_type, r));
                 }
@@ -122,10 +127,13 @@ impl FakeDevice {
     }
 
     fn queue_battery_ntfy_if_due(&mut self) {
-        let due = self.first_write.is_some_and(|t| t.elapsed() >= BATTERY_NTFY_AFTER);
+        let due = self
+            .first_write
+            .is_some_and(|t| t.elapsed() >= BATTERY_NTFY_AFTER);
         if due && !self.battery_sent {
             self.battery_sent = true;
-            self.data.push_back((FrameType::Command1, BATTERY_NTFY.to_vec()));
+            self.data
+                .push_back((FrameType::Command1, BATTERY_NTFY.to_vec()));
         }
     }
 
@@ -141,7 +149,11 @@ impl FakeDevice {
         let seq = self.next_seq;
         self.next_seq ^= 1;
         self.in_flight = Some(InFlight { seq, acked: false });
-        Some(encode(&Frame { frame_type, seq, payload }))
+        Some(encode(&Frame {
+            frame_type,
+            seq,
+            payload,
+        }))
     }
 
     /// Time left until the battery NTFY is due, if it is still to come.

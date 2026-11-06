@@ -13,7 +13,8 @@ use tauri::Manager;
 
 /// `--fake-device` or `HAIRLINE_FAKE=1` selects the scripted fake headphones.
 fn wants_fake_device() -> bool {
-    std::env::args().any(|a| a == "--fake-device") || std::env::var("HAIRLINE_FAKE").is_ok_and(|v| v == "1")
+    std::env::args().any(|a| a == "--fake-device")
+        || std::env::var("HAIRLINE_FAKE").is_ok_and(|v| v == "1")
 }
 
 pub fn run() {

@@ -14,8 +14,12 @@ pub fn denied(table: Table, bytes: &[u8]) -> Option<&'static str> {
     }
     let op = *bytes.first()?;
     match op {
-        t1::SYSTEM_SET_PARAM if bytes.get(1) == Some(&SYSTEM_RESET_SETTINGS) => Some("factory reset"),
-        t1::ALERT_SET_PARAM if bytes.get(2) != Some(&ALERT_MULTIPOINT_TAIL) => Some("system control"),
+        t1::SYSTEM_SET_PARAM if bytes.get(1) == Some(&SYSTEM_RESET_SETTINGS) => {
+            Some("factory reset")
+        }
+        t1::ALERT_SET_PARAM if bytes.get(2) != Some(&ALERT_MULTIPOINT_TAIL) => {
+            Some("system control")
+        }
         t1::POWER_SET_STATUS => Some("power off (needs confirmation)"),
         t1::LOG_SET_STATUS => Some("log dump"),
         t1::UPDT_EXTRA | t1::UPDT_FIRST..=t1::UPDT_LAST => Some("firmware update"),

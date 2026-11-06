@@ -10,20 +10,40 @@ pub enum Kind {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Message {
-    ProtocolInfo { version: u32, table1: bool, table2: bool },
+    ProtocolInfo {
+        version: u32,
+        table1: bool,
+        table2: bool,
+    },
     SupportFunctions(Vec<SupportFunction>),
     DeviceInfo(DeviceInfo),
-    Battery { level: u8, charging: Charging },
+    Battery {
+        level: u8,
+        charging: Charging,
+    },
     NcAsm(NcAsmState),
     EqUlt(EqUltState),
     EqUltCapability(EqUltCapability),
     Codec(Codec),
     Volume(u8),
     GsCapability(GsCapability),
-    GsBool { setting: u8, on: bool },
-    GsList { setting: u8, index: u8 },
-    AutoPowerOff { current: u8, last: u8 },
-    Unknown { table: Table, opcode: u8, payload: Vec<u8> },
+    GsBool {
+        setting: u8,
+        on: bool,
+    },
+    GsList {
+        setting: u8,
+        index: u8,
+    },
+    AutoPowerOff {
+        current: u8,
+        last: u8,
+    },
+    Unknown {
+        table: Table,
+        opcode: u8,
+        payload: Vec<u8>,
+    },
 }
 
 /// Byte cursor that returns `None` instead of panicking on short input.
@@ -74,14 +94,21 @@ pub fn decode(table: Table, payload: &[u8]) -> (Kind, Message) {
 }
 
 fn unknown(table: Table, opcode: u8, payload: &[u8]) -> Message {
-    Message::Unknown { table, opcode, payload: payload.to_vec() }
+    Message::Unknown {
+        table,
+        opcode,
+        payload: payload.to_vec(),
+    }
 }
 
 fn support_functions(r: &mut Reader) -> Option<Message> {
     let n = r.u8()?;
     let mut list = Vec::new();
     for _ in 0..n {
-        list.push(SupportFunction { id: r.u8()?, priority: r.u8()? });
+        list.push(SupportFunction {
+            id: r.u8()?,
+            priority: r.u8()?,
+        });
     }
     Some(Message::SupportFunctions(list))
 }
@@ -103,13 +130,20 @@ fn decode_t1(opcode: u8, payload: &[u8]) -> Option<Message> {
             let v = r.take(4)?;
             let version = u32::from_be_bytes([v[0], v[1], v[2], v[3]]);
             // libmdr EnableDisable: ENABLE = 0x00, DISABLE = 0x01, so 0x00 means enabled.
-            Some(Message::ProtocolInfo { version, table1: r.u8()? == 0, table2: r.u8()? == 0 })
+            Some(Message::ProtocolInfo {
+                version,
+                table1: r.u8()? == 0,
+                table2: r.u8()? == 0,
+            })
         }
         t1::CONNECT_RET_SUPPORT_FUNCTION => support_functions(&mut r),
         t1::CONNECT_RET_DEVICE_INFO => match sub {
             0x01 => Some(Message::DeviceInfo(DeviceInfo::ModelName(r.string()?))),
             0x02 => Some(Message::DeviceInfo(DeviceInfo::Firmware(r.string()?))),
-            0x03 => Some(Message::DeviceInfo(DeviceInfo::SeriesAndColor { series: r.u8()?, color: r.u8()? })),
+            0x03 => Some(Message::DeviceInfo(DeviceInfo::SeriesAndColor {
+                series: r.u8()?,
+                color: r.u8()?,
+            })),
             _ => None,
         },
         t1::POWER_RET_STATUS | t1::POWER_NTFY_STATUS if sub == inquired::BATTERY_SINGLE => {
@@ -123,9 +157,14 @@ fn decode_t1(opcode: u8, payload: &[u8]) -> Option<Message> {
             Some(Message::Battery { level, charging })
         }
         t1::POWER_RET_PARAM | t1::POWER_NTFY_PARAM if sub == inquired::AUTO_POWER_OFF => {
-            Some(Message::AutoPowerOff { current: r.u8()?, last: r.u8()? })
+            Some(Message::AutoPowerOff {
+                current: r.u8()?,
+                last: r.u8()?,
+            })
         }
-        t1::NCASM_RET_PARAM | t1::NCASM_NTFY_PARAM if sub == inquired::NC_ASM_DUAL_NC_SWITCH_AND_ASM_SEAMLESS => {
+        t1::NCASM_RET_PARAM | t1::NCASM_NTFY_PARAM
+            if sub == inquired::NC_ASM_DUAL_NC_SWITCH_AND_ASM_SEAMLESS =>
+        {
             let _value_change = r.u8()?;
             let total = r.u8()?;
             let ambient = r.u8()? == 1;
@@ -136,7 +175,11 @@ fn decode_t1(opcode: u8, payload: &[u8]) -> Option<Message> {
                 (_, false) => NcMode::NoiseCancelling,
                 (_, true) => NcMode::Ambient,
             };
-            Some(Message::NcAsm(NcAsmState { mode, level, voice_focus }))
+            Some(Message::NcAsm(NcAsmState {
+                mode,
+                level,
+                voice_focus,
+            }))
         }
         t1::EQEBB_RET_PARAM | t1::EQEBB_NTFY_PARAM if sub == inquired::PRESET_EQ_AND_ULT_MODE => {
             let preset = r.u8()?;
@@ -147,7 +190,11 @@ fn decode_t1(opcode: u8, payload: &[u8]) -> Option<Message> {
                 _ => return None,
             };
             let n = usize::from(r.u8()?);
-            Some(Message::EqUlt(EqUltState { preset, ult, bands: r.take(n)?.to_vec() }))
+            Some(Message::EqUlt(EqUltState {
+                preset,
+                ult,
+                bands: r.take(n)?.to_vec(),
+            }))
         }
         t1::EQEBB_RET_CAPABILITY if sub == inquired::PRESET_EQ_AND_ULT_MODE => {
             let (bands, steps, ult2_additional_step) = (r.u8()?, r.u8()?, r.u8()?);
@@ -156,7 +203,12 @@ fn decode_t1(opcode: u8, payload: &[u8]) -> Option<Message> {
             for _ in 0..n {
                 presets.push((r.u8()?, r.string()?));
             }
-            Some(Message::EqUltCapability(EqUltCapability { bands, steps, ult2_additional_step, presets }))
+            Some(Message::EqUltCapability(EqUltCapability {
+                bands,
+                steps,
+                ult2_additional_step,
+                presets,
+            }))
         }
         t1::COMMON_RET_STATUS | t1::COMMON_NTFY_STATUS if sub == inquired::CODEC => {
             Some(Message::Codec(match r.u8()? {
@@ -168,7 +220,9 @@ fn decode_t1(opcode: u8, payload: &[u8]) -> Option<Message> {
                 other => Codec::Other(other),
             }))
         }
-        t1::PLAY_RET_PARAM | t1::PLAY_NTFY_PARAM if sub == inquired::VOLUME => Some(Message::Volume(r.u8()?)),
+        t1::PLAY_RET_PARAM | t1::PLAY_NTFY_PARAM if sub == inquired::VOLUME => {
+            Some(Message::Volume(r.u8()?))
+        }
         t1::GS_RET_CAPABILITY => {
             let kind = match r.u8()? {
                 inquired::GS_BOOLEAN => GsKind::Boolean,
@@ -185,15 +239,27 @@ fn decode_t1(opcode: u8, payload: &[u8]) -> Option<Message> {
                     elements.push((r.string()?, r.string()?));
                 }
             }
-            Some(Message::GsCapability(GsCapability { setting: sub, kind, subject, summary, elements }))
+            Some(Message::GsCapability(GsCapability {
+                setting: sub,
+                kind,
+                subject,
+                summary,
+                elements,
+            }))
         }
         t1::GS_RET_PARAM | t1::GS_NTFY_PARAM => {
             let kind = r.u8()?;
             let value = r.u8()?;
             match kind {
                 // Inverted enum: 0x00 is ON.
-                inquired::GS_BOOLEAN => Some(Message::GsBool { setting: sub, on: value == 0 }),
-                inquired::GS_LIST => Some(Message::GsList { setting: sub, index: value }),
+                inquired::GS_BOOLEAN => Some(Message::GsBool {
+                    setting: sub,
+                    on: value == 0,
+                }),
+                inquired::GS_LIST => Some(Message::GsList {
+                    setting: sub,
+                    index: value,
+                }),
                 _ => None,
             }
         }

@@ -52,7 +52,9 @@ fn capability_reads(caps: &[u8]) -> impl Iterator<Item = Request> + '_ {
     }
     reads.push(request::auto_power_off_get());
     reads.push(request::volume_get());
-    reads.into_iter().filter(|r| r.capability.is_none_or(|c| caps.contains(&c)))
+    reads
+        .into_iter()
+        .filter(|r| r.capability.is_none_or(|c| caps.contains(&c)))
 }
 
 impl Handshake {

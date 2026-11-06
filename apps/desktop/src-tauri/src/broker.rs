@@ -111,7 +111,10 @@ pub fn run_broker<E: Fn(&DeviceState)>(
         }
         if gave_up {
             transport.close();
-            return Err(io::Error::new(io::ErrorKind::TimedOut, "device stopped acknowledging"));
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "device stopped acknowledging",
+            ));
         }
     }
 }
@@ -143,7 +146,10 @@ fn paired_devices() -> Vec<PairedDevice> {
         return Vec::new();
     }
     let playing = current_output_device_name().is_some_and(|n| n.contains("ULT WEAR"));
-    vec![PairedDevice { name: "This Mac".into(), playing }]
+    vec![PairedDevice {
+        name: "This Mac".into(),
+        playing,
+    }]
 }
 
 /// Starts the broker thread: connects (or uses the fake device), runs the
@@ -169,7 +175,10 @@ pub fn spawn_broker(app: AppHandle, fake: bool) -> Sender<BrokerCmd> {
                 let next = match result {
                     Ok(()) => wait_for_connect(&rx, None),
                     Err(e) => {
-                        eprintln!("hairline: no link ({e}); retrying in {}s", RECONNECT_EVERY.as_secs());
+                        eprintln!(
+                            "hairline: no link ({e}); retrying in {}s",
+                            RECONNECT_EVERY.as_secs()
+                        );
                         wait_for_connect(&rx, Some(RECONNECT_EVERY))
                     }
                 };
@@ -209,6 +218,11 @@ fn open_transport(fake: bool) -> io::Result<Box<dyn Transport>> {
         .iter()
         .find(|c| c.name.contains("ULT WEAR") || c.name.contains("Sony ULT"))
         .or(candidates.first())
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "no paired device exposes the v2 service"))?;
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                "no paired device exposes the v2 service",
+            )
+        })?;
     connect(&pick.address)
 }

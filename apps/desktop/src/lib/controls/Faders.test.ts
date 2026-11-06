@@ -102,4 +102,67 @@ describe("Faders", () => {
     });
     expect(container.querySelector(".faders")).toHaveAttribute("title", "no reply");
   });
+
+  it("faders_do_not_commit_while_pending", async () => {
+    const oncommit = vi.fn();
+    const { container, getAllByRole, rerender } = render(Faders, {
+      bands: flat(),
+      labels,
+      status: "Confirmed",
+      oncommit,
+    });
+    const rail = container.querySelectorAll(".rail")[1];
+    await fireEvent.pointerDown(rail, { clientY: yFor(10), pointerId: 1 });
+    await fireEvent.pointerMove(rail, { clientY: yFor(14), pointerId: 1 });
+    // Another write (ULT from the popover, say) goes pending mid-drag.
+    await rerender({ status: { Pending: { since_ms: 0 } } });
+    await fireEvent.pointerUp(rail, { clientY: yFor(14), pointerId: 1 });
+    expect(oncommit).not.toHaveBeenCalled();
+    expect(getAllByRole("slider")[1]).toHaveAttribute("aria-valuenow", "14");
+    // Once the status settles the queued draft goes out, exactly once.
+    await rerender({ status: "Confirmed" });
+    expect(oncommit).toHaveBeenCalledTimes(1);
+    expect(oncommit).toHaveBeenCalledWith([10, 14, 10, 10, 10, 10]);
+  });
+
+  it("faders_drop_the_draft_when_unavailable", async () => {
+    const oncommit = vi.fn();
+    const { container, getAllByRole, rerender } = render(Faders, {
+      bands: flat(),
+      labels,
+      status: "Confirmed",
+      oncommit,
+    });
+    const rail = container.querySelectorAll(".rail")[1];
+    await fireEvent.pointerDown(rail, { clientY: yFor(10), pointerId: 1 });
+    await fireEvent.pointerMove(rail, { clientY: yFor(14), pointerId: 1 });
+    await rerender({ status: "Unavailable" });
+    await fireEvent.pointerUp(rail, { clientY: yFor(14), pointerId: 1 });
+    expect(oncommit).not.toHaveBeenCalled();
+    expect(getAllByRole("slider")[1]).toHaveAttribute("aria-valuenow", "10");
+  });
+
+  it("faders_draft_held_while_pending", async () => {
+    vi.useFakeTimers();
+    const oncommit = vi.fn();
+    const { container, getAllByRole, rerender } = render(Faders, {
+      bands: flat(),
+      labels,
+      status: "Confirmed",
+      oncommit,
+    });
+    const rail = container.querySelectorAll(".rail")[1];
+    await fireEvent.pointerDown(rail, { clientY: yFor(10), pointerId: 1 });
+    await fireEvent.pointerMove(rail, { clientY: yFor(15), pointerId: 1 });
+    await fireEvent.pointerUp(rail, { clientY: yFor(15), pointerId: 1 });
+    expect(oncommit).toHaveBeenCalledTimes(1);
+    await rerender({ status: { Pending: { since_ms: 0 } } });
+    // Well past the 2 s hold: still pending, so the draft stays drawn.
+    vi.advanceTimersByTime(5000);
+    await rerender({ status: { Pending: { since_ms: 0 } } });
+    expect(getAllByRole("slider")[1]).toHaveAttribute("aria-valuenow", "15");
+    // The write settles without the bands moving; only now does the draft give way.
+    await rerender({ status: "Confirmed" });
+    expect(getAllByRole("slider")[1]).toHaveAttribute("aria-valuenow", "10");
+  });
 });

@@ -3,10 +3,13 @@
   (centre max/2) and read as -10..+10. A drag keeps a local draft (the handle
   and its value follow the pointer) and commits once on release; ↑/↓ on a
   focused handle step by one and commit 150 ms after the last key. Pending:
-  faded and inert. Refused: the reason is the container's tooltip.
-  Unavailable or disabled: faded and inert.
+  faded and inert; a commit that lands while pending is queued and sent once
+  the status settles, and a sent draft is held for as long as it stays
+  pending. Refused: the reason is the container's tooltip. Unavailable or
+  disabled: faded and inert, and a commit then drops the draft.
 -->
 <script lang="ts">
+  import { untrack } from "svelte";
   import { isPending, refusedReason, type Status } from "../state";
 
   interface Props {
@@ -39,6 +42,8 @@
   let keyTimer: ReturnType<typeof setTimeout> | undefined;
   let holdTimer: ReturnType<typeof setTimeout> | undefined;
   let sentPending = false;
+  /** A commit arrived while pending; send it once the status leaves Pending. */
+  let queued = false;
 
   const shown = $derived(draft ?? bands);
   const count = $derived(bands?.length ?? labels.length);
@@ -59,6 +64,10 @@
     const p = busy;
     const r = reason;
     if (draft === null || dragging !== null || keyTimer !== undefined) return;
+    if (queued) {
+      if (!p) untrack(commit);
+      return;
+    }
     if (same(draft, b) || r !== null || (sentPending && !p)) release();
     else if (p) sentPending = true;
   });
@@ -73,7 +82,15 @@
     clearTimeout(holdTimer);
     holdTimer = undefined;
     sentPending = false;
+    queued = false;
     draft = null;
+  }
+
+  // The hold never lets go while a write is still pending; the effect above
+  // releases the draft once the device answers.
+  function holdExpired() {
+    holdTimer = busy || queued ? setTimeout(holdExpired, DRAFT_HOLD_MS) : undefined;
+    if (holdTimer === undefined) release();
   }
 
   function set(i: number, v: number) {
@@ -89,13 +106,18 @@
 
   function commit() {
     if (draft === null) return;
-    if (same(draft, bands)) {
+    if (off || bands === null || same(draft, bands)) {
       release();
       return;
     }
+    if (busy) {
+      queued = true;
+      return;
+    }
+    queued = false;
     sentPending = false;
     clearTimeout(holdTimer);
-    holdTimer = setTimeout(release, DRAFT_HOLD_MS);
+    holdTimer = setTimeout(holdExpired, DRAFT_HOLD_MS);
     oncommit([...draft]);
   }
 

@@ -24,13 +24,17 @@ The Hairline design: off-white paper, one-pixel rules, dot-matrix numerals, boxe
   </tr>
 </table>
 
-The popover ships in Phase 1 and is validated on real hardware; the window screens are being built in Phase 2 from these mockups (`docs/research/reports/Hairline design screens.html`).
+The popover shipped in Phase 1 and is validated on real hardware; the window screens arrive in Phase 2, built from these mockups (`docs/research/reports/Hairline design screens.html`). Scenes is still a placeholder.
 
 ## Status
 
-Phase 1: a macOS menu-bar popover for the WH-ULT900N with battery level, noise control, ambient sound level and ULT level. Windows and Linux are planned.
+Phase 1: a macOS menu-bar popover for the WH-ULT900N with battery level, noise control, ambient sound level and ULT level.
 
-The popover is validated on a real WH-ULT900N (firmware 2.1.4) on macOS 27.2; see `docs/hardware-validation.md`. Use `--fake-device` (below) to run without headphones.
+Phase 2: the full window, opened from the popover footer (it loads the app with `?view=main`). It has five screens: Overview, Sound (a draggable six-band equalizer, presets, ULT, codec and DSEE), Noise, Devices and Settings. It also adds Paper, Ink and System themes and launch at login. By default Hairline shows a Dock icon only while the window is open (Settings can keep it there).
+
+Next: the modes module (Scenes). Windows and Linux come after that.
+
+The popover is validated on a real WH-ULT900N (firmware 2.1.4) on macOS 27.2; see `docs/hardware-validation.md`. The Phase 2 screens are verified against the fake device and still need a session with the real headphones. Use `--fake-device` (below) to run without headphones; a fake run says `FAKE` in the popover and the window so it is never mistaken for the real thing.
 
 ## Run it
 
@@ -55,7 +59,7 @@ HAIRLINE_FAKE=1 pnpm tauri dev
 ```
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
-cd apps/desktop && pnpm check
+cd apps/desktop && pnpm check && pnpm test
 ```
 
 ## Debugging

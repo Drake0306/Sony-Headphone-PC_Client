@@ -1,6 +1,6 @@
 # ULT WEAR desktop app and MDR protocol library — design
 
-Date: 2026-11-07. Author: Roy. Status: approved to build; stack choice is Claude's call and is flagged below.
+Date: 2026-11-07. Author: Roy. Status: approved to build; stack choice is the assistant's call and is flagged below.
 
 ## Intent
 
@@ -35,7 +35,7 @@ Background research lives in `docs/research/` (reports as HTML, notes as Markdow
 - Promotion, accounts, telemetry, large installs. Target well under 30 MB and no network access except what Bluetooth needs.
 - Bricking or crashing headphones. Hard deny-list for destructive opcodes, read-modify-write for EQ, no writes to undeclared capabilities without an explicit "Advanced" override.
 - Anything named "Sony" or "Sound Connect" in the product name. Working codename: **Hairline** (Roy may rename).
-- Any Claude attribution in commits, files or metadata.
+- Any AI attribution in commits, files or metadata.
 
 ## Constraints
 
@@ -59,7 +59,7 @@ Background research lives in `docs/research/` (reports as HTML, notes as Markdow
 
 ### Stack (assistant's call, flagged for veto)
 
-Earlier in the conversation Claude proposed native SwiftUI on Mac plus a separate WinUI app. The chosen design (Hairline) uses no system materials and must look identical on all three platforms, Roy wants one new library he owns, and one person is building. So:
+An earlier draft proposed native SwiftUI on Mac plus a separate WinUI app. The chosen design (Hairline) uses no system materials and must look identical on all three platforms, Roy wants one new library he owns, and one person is building. So:
 
 - **Core: Rust workspace.** Crates `mdr-frame` (framing, escaping, checksum, ARQ; `no_std` + alloc), `mdr-proto` (typed opcodes, inquired types, payload codecs; data-driven so a new opcode is an enum entry plus a codec), `mdr-session` (sans-IO state machine: handshake, capability discovery on both tables, request/reply correlation, state cache, notify dispatch, deny-list and capability gating), `mdr-transport` (platform RFCOMM: macOS via `objc2-io-bluetooth`, Windows via `windows` crate Winsock `AF_BTH`/`BTHPROTO_RFCOMM` with `serviceClassId`, Linux via `bluer`; plus a scripted fake transport for tests and UI work), `mdr-cli` (later).
 - **App: Tauri 2 + Svelte 5 + TypeScript + Vite.** The Rust side of the Tauri app owns the single Bluetooth connection (the broker) and exposes commands and events over Tauri IPC. The frontend is the Hairline mockups made real: same tokens, same controls. Fonts (Instrument Sans, Doto, DM Mono) are bundled, not fetched.
@@ -133,4 +133,4 @@ A fresh reviewer read this document and asked five questions. Resolutions:
 2. **Deny-list granularity.** Keyed on opcode plus inquired sub-id. `98 00 16 …` (reboot) and the other destructive entries are denied; `98 00 06 01` is allowed only as the tail of the multipoint-toggle sequence, which is therefore an ordinary control, not a confirmed action. Power off (`24 03 01`) and reset (`F8 09 …`) stay behind explicit confirmation.
 3. **Codec box values.** Codec comes from the wire (`12 02` / `13 02`) in Phase 1. Sample rate, bitrate and "negotiated with" come from the macOS audio stack (CoreAudio / IORegistry) in Phase 2, macOS only; Windows and Linux show blank until a platform module exists. "Time left" needs battery history (Phase 4) and shows blank before that. Blank, never invented.
 4. **Hero image.** Our own illustration (the SVG silhouette from the mockups, tinted by the reported colourway), shipped in the repo under MIT. No Sony renders. The Overview layout must hold without the image.
-5. **Commit attribution.** Encoded in `CLAUDE.md` at the repo root: no Co-Authored-By or "Generated with" lines, no Claude credits anywhere in the repo. Commits are authored by Roy's identity only.
+5. **Commit attribution.** Encoded in `CLAUDE.md` at the repo root: no Co-Authored-By or "Generated with" lines, no AI credits anywhere in the repo. Commits are authored by Roy's identity only.

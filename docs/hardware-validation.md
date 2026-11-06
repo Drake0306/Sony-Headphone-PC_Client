@@ -52,8 +52,26 @@ Frame-level: every device data frame carried the expected sequence alternation a
 | T1 `F6 04` (voice assistant) | `F7 04 FF` | No function assigned |
 | T1 `F6 0D` (Quick Access) | `F7 0D 02 00 00` | Two slots, nothing assigned |
 
-## 4. Not yet done
+## 4. Controls from the popover (owner-driven, app build at commit 3598ee6)
 
-- Controls from the popover (NC → Ambient → Off, level, voice focus, ULT 0/1/2) and the EQ-type experiment (`58 03` vs `58 00`) are write tests and wait for the owner's go-ahead; the current preset (0xA2, bands above) is recorded here so it can be restored.
+Clicked by the owner in the running app; frames from `captures/local/2026-11-06-213050.log`. Every SET was ACKed and followed by the matching NTFY within about 250–350 ms, and the popover showed the striped pending state and then the confirmed state.
+
+| Action | SET sent | NTFY received | Result |
+|---|---|---|---|
+| Noise cancelling, level 1 | `68 17 01 01 00 00 01` | `69 17 01 01 00 00 01` | Confirmed |
+| Off | `68 17 01 00 00 00 01` | `69 17 01 00 01 00 01` | Confirmed (device reports mode byte 0x01 while total effect is off) |
+| Noise cancelling again | `68 17 01 01 00 00 01` | `69 17 01 01 00 00 01` | Confirmed |
+| Ambient, level 20 | `68 17 01 01 01 00 14` | `69 17 01 01 01 00 14` | Confirmed |
+| Noise cancelling, level 20 kept | `68 17 01 01 00 00 14` | `69 17 01 01 00 00 14` | Confirmed |
+| ULT 2 | `58 03 A2 02 06 0A 0D 0A 0E 14 0C` | `59 03 A2 02 06 0A 0D 0A 0E 14 0C` | Confirmed; preset and bands preserved (read-modify-write works) |
+| ULT 1 | `58 03 A2 01 06 0A 0D 0A 0E 14 0C` | `59 03 A2 01 06 0A 0D 0A 0E 14 0C` | Confirmed |
+| Ambient, level 20, voice focus on | `68 17 01 01 01 01 14` | `69 17 01 01 01 01 14` | Confirmed |
+| Voice focus off | `68 17 01 01 01 00 14` | `69 17 01 01 01 00 14` | Confirmed |
+
+Menu bar: the owner reports the tray icon and popover look right ("looks good").
+
+## 5. Not yet done
+
+- EQ-type experiment (`58 03` vs `58 00` for changing the preset); waits for the owner's go-ahead. Current preset 0xA2 with bands `0A 0D 0A 0E 14 0C` is recorded above for restoration.
 - Phone-contention test (requires the phone).
-- Menu-bar items that need eyes on the screen: tray icon, popover placement, hide on focus loss.
+- Hide-on-focus-loss and popover placement in dark mode: to be confirmed by the owner.

@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 use mdr_proto::{request, NcAsmState, UltLevel};
 use mdr_session::{DeviceState, Event, PairedDevice, Session, SessionError};
-use mdr_transport::{connect, discover, FakeDevice, Transport};
+use mdr_transport::{connect, discover, is_ult_wear_name, FakeDevice, Transport};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::audio_macos::current_output_device_name;
@@ -17,7 +17,9 @@ use crate::audio_macos::current_output_device_name;
 /// General setting id of multipoint.
 const GS_MULTIPOINT: u8 = 0xD1;
 const RECV_TIMEOUT: Duration = Duration::from_millis(10);
-const RECONNECT_EVERY: Duration = Duration::from_secs(5);
+/// First wait, in seconds, after a failed connect; it doubles up to the maximum.
+const BACKOFF_START_S: u64 = 5;
+const BACKOFF_MAX_S: u64 = 60;
 /// How often the host's default audio output is re-read.
 const DEVICES_EVERY_MS: u64 = 1000;
 
@@ -153,8 +155,15 @@ fn paired_devices() -> Vec<PairedDevice> {
     }]
 }
 
+/// Seconds to wait before the next connect attempt, given the previous wait
+/// (0 after a successful connect): 5, 10, 20, 40, then 60 for good.
+pub fn next_backoff(prev: u64) -> u64 {
+    prev.saturating_mul(2).clamp(BACKOFF_START_S, BACKOFF_MAX_S)
+}
+
 /// Starts the broker thread: connects (or uses the fake device), runs the
-/// session, and retries every five seconds after a lost link.
+/// session, and retries with an exponential back-off after a failed connect or
+/// a lost link. A `Connect` command cuts the wait short.
 pub fn spawn_broker(app: AppHandle, fake: bool) -> Sender<BrokerCmd> {
     let (tx, rx) = channel();
     std::thread::Builder::new()
@@ -168,19 +177,21 @@ pub fn spawn_broker(app: AppHandle, fake: bool) -> Sender<BrokerCmd> {
                 }
                 let _ = app.emit("state", state);
             };
+            let mut backoff = 0;
             loop {
                 let result = match open_transport(fake) {
-                    Ok(t) => run_broker(t, &rx, emit, clock),
+                    Ok(t) => {
+                        backoff = 0;
+                        run_broker(t, &rx, emit, clock)
+                    }
                     Err(e) => Err(e),
                 };
                 let next = match result {
                     Ok(()) => wait_for_connect(&rx, None),
                     Err(e) => {
-                        eprintln!(
-                            "hairline: no link ({e}); retrying in {}s",
-                            RECONNECT_EVERY.as_secs()
-                        );
-                        wait_for_connect(&rx, Some(RECONNECT_EVERY))
+                        backoff = next_backoff(backoff);
+                        eprintln!("hairline: no link ({e}); retrying in {backoff}s");
+                        wait_for_connect(&rx, Some(Duration::from_secs(backoff)))
                     }
                 };
                 if next.is_err() {
@@ -214,15 +225,20 @@ fn open_transport(fake: bool) -> io::Result<Box<dyn Transport>> {
     if fake {
         return Ok(Box::new(FakeDevice::ult_wear()));
     }
-    let candidates = discover()?;
+    // Only a device already connected to this computer is tried, so a
+    // reconnect attempt never pages headphones that are elsewhere.
+    let candidates: Vec<_> = discover()?
+        .into_iter()
+        .filter(|c| c.connected_audio)
+        .collect();
     let pick = candidates
         .iter()
-        .find(|c| c.name.contains("ULT WEAR") || c.name.contains("Sony ULT"))
+        .find(|c| is_ult_wear_name(&c.name))
         .or(candidates.first())
         .ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::NotFound,
-                "no paired device exposes the v2 service",
+                "no connected device exposes the v2 service",
             )
         })?;
     connect(&pick.address)

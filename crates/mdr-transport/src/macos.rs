@@ -8,7 +8,7 @@
 use std::ffi::c_void;
 use std::io;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use dispatch2::DispatchQueue;
 use objc2::rc::Retained;
@@ -16,13 +16,17 @@ use objc2::runtime::{AnyObject, NSObject, NSObjectProtocol};
 use objc2::{define_class, msg_send, AllocAnyThread, DefinedClass, MainThreadMarker};
 use objc2_io_bluetooth::{
     BluetoothRFCOMMChannelID, IOBluetoothDevice, IOBluetoothRFCOMMChannel,
-    IOBluetoothRFCOMMChannelDelegate, IOBluetoothSDPUUID,
+    IOBluetoothRFCOMMChannelDelegate, IOBluetoothSDPServiceRecord, IOBluetoothSDPUUID,
 };
 
-use crate::{Candidate, Transport, V2_SERVICE_UUID};
+use crate::{is_ult_wear_name, normalise_address, Candidate, Transport, V2_SERVICE_UUID};
 
 /// Largest single `writeSync` call; larger writes are split.
 const WRITE_CHUNK: usize = 512;
+/// Interval between checks for the v2 record after an SDP query.
+const SDP_POLL: Duration = Duration::from_millis(200);
+/// How long an SDP query may take to produce the v2 record.
+const SDP_WAIT: Duration = Duration::from_secs(6);
 
 define_class!(
     /// Forwards received RFCOMM data into a channel; an empty `Vec` signals closure.
@@ -61,11 +65,19 @@ impl Delegate {
 
 /// Holds an Objective-C object that is only used inside main-queue closures.
 struct MainOnly<T>(T);
+
 // SAFETY: the wrapped objects are only messaged on the main queue (see `on_main`);
 // retain/release are thread-safe.
 unsafe impl<T> Send for MainOnly<T> {}
 // SAFETY: as above; shared references are only dereferenced on the main queue.
 unsafe impl<T> Sync for MainOnly<T> {}
+
+impl<T> MainOnly<T> {
+    /// Only call inside an `on_main` closure.
+    fn get(&self) -> &T {
+        &self.0
+    }
+}
 
 /// Runs `f` on the main queue, directly if already on the main thread.
 fn on_main<R: Send>(f: impl FnOnce() -> R + Send) -> R {
@@ -117,58 +129,129 @@ fn string(s: Option<Retained<objc2_foundation::NSString>>) -> String {
     s.map(|s| s.to_string()).unwrap_or_default()
 }
 
-pub fn discover() -> io::Result<Vec<Candidate>> {
+type Device = MainOnly<Retained<IOBluetoothDevice>>;
+type Record = MainOnly<Retained<IOBluetoothSDPServiceRecord>>;
+
+// Each helper below makes one IOBluetooth call in its own main-queue hop, so
+// the main queue is never held across several calls.
+
+fn paired() -> Vec<Device> {
+    on_main(|| paired_devices().into_iter().map(MainOnly).collect())
+}
+
+fn address_of(device: &Device) -> String {
+    // SAFETY: property read on the main queue.
+    on_main(|| string(unsafe { device.get().addressString() }))
+}
+
+fn name_of(device: &Device) -> String {
+    // SAFETY: property read on the main queue.
+    on_main(|| string(unsafe { device.get().nameOrAddress() }))
+}
+
+fn is_connected(device: &Device) -> bool {
+    // SAFETY: state query on the main queue.
+    on_main(|| unsafe { device.get().isConnected() })
+}
+
+/// The cached v2 service record, if the device has one.
+fn v2_record(device: &Device) -> io::Result<Option<Record>> {
     on_main(|| {
         let uuid = v2_uuid()?;
-        let candidates = paired_devices()
-            .into_iter()
-            // SAFETY: plain IOBluetoothDevice queries on the main queue.
-            .filter(|device| unsafe { device.getServiceRecordForUUID(Some(&uuid)) }.is_some())
-            .map(|device| unsafe {
-                Candidate {
-                    name: string(device.nameOrAddress()),
-                    address: string(device.addressString()),
-                    connected_audio: device.isConnected(),
-                }
-            })
-            .collect();
-        Ok(candidates)
+        // SAFETY: cached-record lookup on the main queue with a valid UUID.
+        let record = unsafe { device.get().getServiceRecordForUUID(Some(&uuid)) };
+        Ok(record.map(MainOnly))
     })
+}
+
+pub fn discover() -> io::Result<Vec<Candidate>> {
+    let mut candidates = Vec::new();
+    for device in paired() {
+        let connected = is_connected(&device);
+        let name = name_of(&device);
+        if (connected && is_ult_wear_name(&name)) || v2_record(&device)?.is_some() {
+            candidates.push(Candidate {
+                name,
+                address: address_of(&device),
+                connected_audio: connected,
+            });
+        }
+    }
+    Ok(candidates)
 }
 
 /// Channel and delegate of an open link.
 type Link = MainOnly<(Retained<IOBluetoothRFCOMMChannel>, Retained<Delegate>)>;
 
 pub fn connect(address: &str) -> io::Result<Box<dyn Transport>> {
-    let (tx, rx) = mpsc::channel();
-    let link: Link = on_main(move || {
-        let uuid = v2_uuid()?;
-        let device = paired_devices()
-            .into_iter()
-            .find(|d| string(unsafe { d.addressString() }).eq_ignore_ascii_case(address))
-            .ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!("no paired device {address}"),
-                )
-            })?;
-        // SAFETY: IOBluetooth calls on the main queue with valid arguments.
-        let record = unsafe { device.getServiceRecordForUUID(Some(&uuid)) }.ok_or_else(|| {
+    let wanted = normalise_address(address);
+    let device = paired()
+        .into_iter()
+        .find(|d| normalise_address(&address_of(d)) == wanted)
+        .ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::NotFound,
-                "device does not expose the v2 service",
+                format!("no paired device {address}"),
             )
         })?;
-        let mut channel_id: BluetoothRFCOMMChannelID = 0;
-        let ret = unsafe { record.getRFCOMMChannelID(&mut channel_id) };
-        if ret != 0 {
-            return Err(io_err("getRFCOMMChannelID", ret));
+    if !is_connected(&device) {
+        return Err(io::Error::new(
+            io::ErrorKind::NotConnected,
+            "headphones not connected to this Mac",
+        ));
+    }
+    let record = match v2_record(&device)? {
+        Some(record) => record,
+        None => query_v2_record(&device)?,
+    };
+    open_channel(&device, &record)
+}
+
+/// Asks the device for its SDP records and waits for the v2 one to appear.
+///
+/// The query completes on the main run loop, so the wait sleeps on this
+/// (worker) thread between short main-queue polls.
+fn query_v2_record(device: &Device) -> io::Result<Record> {
+    // SAFETY: starts an asynchronous query on the main queue; no target object.
+    let ret = on_main(|| unsafe { device.get().performSDPQuery(None) });
+    if ret != 0 {
+        return Err(io_err("performSDPQuery", ret));
+    }
+    let not_found = || {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            "device does not expose the v2 service",
+        )
+    };
+    // On the main thread the run loop cannot advance while we wait.
+    if MainThreadMarker::new().is_some() {
+        return Err(not_found());
+    }
+    let deadline = Instant::now() + SDP_WAIT;
+    while Instant::now() < deadline {
+        std::thread::sleep(SDP_POLL);
+        if let Some(record) = v2_record(device)? {
+            return Ok(record);
         }
+    }
+    Err(not_found())
+}
+
+fn open_channel(device: &Device, record: &Record) -> io::Result<Box<dyn Transport>> {
+    let mut channel_id: BluetoothRFCOMMChannelID = 0;
+    // SAFETY: record query on the main queue; `channel_id` outlives the call.
+    let ret = on_main(|| unsafe { record.get().getRFCOMMChannelID(&mut channel_id) });
+    if ret != 0 {
+        return Err(io_err("getRFCOMMChannelID", ret));
+    }
+    let (tx, rx) = mpsc::channel();
+    let link: Link = on_main(move || {
         let delegate = Delegate::new(tx);
         let delegate_obj: &AnyObject = &delegate;
         let mut channel = None;
+        // SAFETY: IOBluetooth call on the main queue with valid arguments.
         let ret = unsafe {
-            device.openRFCOMMChannelSync_withChannelID_delegate(
+            device.get().openRFCOMMChannelSync_withChannelID_delegate(
                 Some(&mut channel),
                 channel_id,
                 Some(delegate_obj),

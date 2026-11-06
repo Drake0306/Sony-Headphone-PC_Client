@@ -4,7 +4,8 @@ use std::io;
 
 use crate::{Candidate, Transport};
 
-/// Paired devices whose SDP records expose the v2 service.
+/// Paired devices that are connected and named like the headphones, or whose
+/// cached SDP records expose the v2 service.
 pub fn discover() -> io::Result<Vec<Candidate>> {
     #[cfg(target_os = "macos")]
     return crate::macos::discover();
@@ -12,7 +13,10 @@ pub fn discover() -> io::Result<Vec<Candidate>> {
     return Err(unsupported());
 }
 
-/// Opens the v2 RFCOMM channel to the paired device with this address.
+/// Opens the v2 RFCOMM channel to the paired device with this address (any
+/// notation). Fails with `NotConnected` if the device has no connection to this
+/// computer; on macOS a missing v2 record triggers an SDP query and a wait of
+/// up to six seconds.
 ///
 /// On macOS the IOBluetooth calls are dispatched onto the main queue and the
 /// received data arrives on the main run loop, so call this and use the

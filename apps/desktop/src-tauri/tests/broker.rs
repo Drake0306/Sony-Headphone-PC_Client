@@ -5,7 +5,7 @@ use std::sync::mpsc::{channel, Receiver};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
-use hairline_lib::broker::{run_broker, BrokerCmd};
+use hairline_lib::broker::{next_backoff, run_broker, BrokerCmd};
 use mdr_proto::UltLevel;
 use mdr_session::{DeviceState, Status};
 use mdr_transport::FakeDevice;
@@ -87,4 +87,16 @@ fn disconnect_marks_all_unavailable() {
         assert_eq!(status, &Status::Unavailable);
     }
     assert!(handle.join().unwrap().is_err());
+}
+
+#[test]
+fn reconnect_backoff_doubles_from_five_to_sixty_seconds() {
+    let mut wait = 0;
+    let seq: Vec<u64> = (0..7)
+        .map(|_| {
+            wait = next_backoff(wait);
+            wait
+        })
+        .collect();
+    assert_eq!(seq, [5, 10, 20, 40, 60, 60, 60]);
 }

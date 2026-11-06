@@ -88,3 +88,22 @@ pub struct GsCapability {
     pub summary: String,
     pub elements: Vec<(String, String)>,
 }
+
+/// Name of an EQ preset id (the device itself sends empty names).
+pub fn preset_name(id: u8) -> &'static str {
+    match id {
+        0x00 => "Off",
+        0x10 => "Bright",
+        0x11 => "Excited",
+        0x12 => "Mellow",
+        0x13 => "Relaxed",
+        0x14 => "Vocal",
+        0x15 => "Treble Boost",
+        0x16 => "Bass Boost",
+        0x17 => "Speech",
+        0xA0 => "Manual",
+        0xA1 => "Custom 1",
+        0xA2 => "Custom 2",
+        _ => "Unknown",
+    }
+}

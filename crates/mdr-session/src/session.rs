@@ -53,6 +53,14 @@ fn refetch(group: Group) -> Option<Request> {
         Group::Volume => Some(request::volume_get()),
         Group::AutoPowerOff => Some(request::auto_power_off_get()),
         Group::Battery => Some(request::battery_get()),
+        Group::Dsee => Some(request::dsee_status_get()),
+        Group::DseeAutoOff => Some(request::dsee_auto_off_get()),
+        Group::ConnectionMode => Some(request::connection_mode_get()),
+        Group::WearPause => Some(request::wear_pause_get()),
+        Group::VoiceAssistant => Some(request::voice_assistant_get()),
+        Group::QuickAccess => Some(request::quick_access_get()),
+        Group::VoiceGuide => Some(request::voice_guide_volume_get()),
+        Group::Playback => Some(request::playback_status_get()),
         Group::Connect | Group::Codec | Group::Power | Group::Raw => None,
     }
 }

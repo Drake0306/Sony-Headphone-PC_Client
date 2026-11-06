@@ -12,6 +12,14 @@ pub enum Group {
     GeneralSetting(u8),
     AutoPowerOff,
     Power,
+    Dsee,
+    DseeAutoOff,
+    ConnectionMode,
+    WearPause,
+    VoiceAssistant,
+    QuickAccess,
+    VoiceGuide,
+    Playback,
     /// A hand-written debug request: not tracked, its reply is only logged.
     Raw,
 }
@@ -213,4 +221,152 @@ pub fn power_off() -> Request {
         inquired::POWER_OFF_USER,
     ];
     t1_req(bytes, Some(function::POWER_OFF), Group::Power)
+}
+
+pub fn dsee_status_get() -> Request {
+    Request {
+        table: Table::T1,
+        bytes: vec![t1::COMMON_GET_STATUS, inquired::DSEE_INDICATOR],
+        capability: Some(function::DSEE_INDICATOR),
+        group: Group::Dsee,
+    }
+}
+
+pub fn dsee_auto_off_get() -> Request {
+    Request {
+        table: Table::T1,
+        bytes: vec![t1::AUDIO_GET_PARAM, inquired::UPSCALING],
+        capability: Some(function::UPSCALING),
+        group: Group::DseeAutoOff,
+    }
+}
+
+pub fn dsee_auto_off_set(auto: bool) -> Request {
+    Request {
+        table: Table::T1,
+        bytes: vec![t1::AUDIO_SET_PARAM, inquired::UPSCALING, u8::from(auto)],
+        capability: Some(function::UPSCALING),
+        group: Group::DseeAutoOff,
+    }
+}
+
+pub fn connection_mode_get() -> Request {
+    Request {
+        table: Table::T1,
+        bytes: vec![t1::AUDIO_GET_PARAM, inquired::CONNECTION_MODE_LDAC],
+        capability: Some(function::CONNECTION_MODE),
+        group: Group::ConnectionMode,
+    }
+}
+
+pub fn connection_mode_set(value: u8) -> Request {
+    Request {
+        table: Table::T1,
+        bytes: vec![t1::AUDIO_SET_PARAM, inquired::CONNECTION_MODE_LDAC, value],
+        capability: Some(function::CONNECTION_MODE),
+        group: Group::ConnectionMode,
+    }
+}
+
+pub fn wear_pause_get() -> Request {
+    Request {
+        table: Table::T1,
+        bytes: vec![t1::SYSTEM_GET_PARAM, inquired::PLAYBACK_CONTROL_BY_WEARING],
+        capability: Some(function::PLAYBACK_CONTROL_BY_WEARING),
+        group: Group::WearPause,
+    }
+}
+
+/// Inverted enum: 0x00 is ON.
+pub fn wear_pause_set(on: bool) -> Request {
+    Request {
+        table: Table::T1,
+        bytes: vec![
+            t1::SYSTEM_SET_PARAM,
+            inquired::PLAYBACK_CONTROL_BY_WEARING,
+            u8::from(!on),
+        ],
+        capability: Some(function::PLAYBACK_CONTROL_BY_WEARING),
+        group: Group::WearPause,
+    }
+}
+
+pub fn voice_assistant_get() -> Request {
+    Request {
+        table: Table::T1,
+        bytes: vec![t1::SYSTEM_GET_PARAM, inquired::VOICE_ASSISTANT],
+        capability: Some(function::VOICE_ASSISTANT),
+        group: Group::VoiceAssistant,
+    }
+}
+
+pub fn voice_assistant_set(value: u8) -> Request {
+    Request {
+        table: Table::T1,
+        bytes: vec![t1::SYSTEM_SET_PARAM, inquired::VOICE_ASSISTANT, value],
+        capability: Some(function::VOICE_ASSISTANT),
+        group: Group::VoiceAssistant,
+    }
+}
+
+pub fn quick_access_get() -> Request {
+    Request {
+        table: Table::T1,
+        bytes: vec![t1::SYSTEM_GET_PARAM, inquired::QUICK_ACCESS],
+        capability: Some(function::QUICK_ACCESS),
+        group: Group::QuickAccess,
+    }
+}
+
+pub fn quick_access_set(functions: &[u8]) -> Request {
+    debug_assert!(functions.len() <= 255);
+    let mut bytes = vec![
+        t1::SYSTEM_SET_PARAM,
+        inquired::QUICK_ACCESS,
+        functions.len() as u8,
+    ];
+    bytes.extend_from_slice(functions);
+    t1_req(bytes, Some(function::QUICK_ACCESS), Group::QuickAccess)
+}
+
+pub fn voice_guide_volume_get() -> Request {
+    Request {
+        table: Table::T2,
+        bytes: vec![t2::VOICE_GUIDANCE_GET_PARAM, t2::VOICE_GUIDANCE_VOLUME],
+        capability: Some(function::VOICE_GUIDANCE_VOLUME),
+        group: Group::VoiceGuide,
+    }
+}
+
+pub fn voice_guide_volume_set(v: i8) -> Request {
+    Request {
+        table: Table::T2,
+        bytes: vec![
+            t2::VOICE_GUIDANCE_SET_PARAM,
+            t2::VOICE_GUIDANCE_VOLUME,
+            v as u8,
+        ],
+        capability: Some(function::VOICE_GUIDANCE_VOLUME),
+        group: Group::VoiceGuide,
+    }
+}
+
+pub fn playback_status_get() -> Request {
+    Request {
+        table: Table::T1,
+        bytes: vec![t1::PLAY_GET_STATUS, inquired::PLAYBACK_STATUS],
+        capability: Some(function::PLAYBACK_CONTROLLER),
+        group: Group::Playback,
+    }
+}
+
+/// The only `ALERT_SET_PARAM` payload the deny-list allows (multipoint commit).
+pub fn multipoint_commit() -> Request {
+    let mut bytes = vec![t1::ALERT_SET_PARAM];
+    bytes.extend_from_slice(&inquired::MULTIPOINT_COMMIT);
+    t1_req(
+        bytes,
+        Some(function::MULTIPOINT),
+        Group::GeneralSetting(function::MULTIPOINT),
+    )
 }

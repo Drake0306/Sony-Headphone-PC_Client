@@ -106,7 +106,17 @@ impl DeviceState {
     /// Stores a decoded message. `Message::Unknown` is left to the caller.
     pub(crate) fn apply(&mut self, table: Table, msg: Message) -> Applied {
         match msg {
-            Message::ProtocolInfo { .. } | Message::Unknown { .. } => Applied::Ignored,
+            // Phase 2 messages are stored by a later task.
+            Message::ProtocolInfo { .. }
+            | Message::Unknown { .. }
+            | Message::Dsee { .. }
+            | Message::DseeAutoOff { .. }
+            | Message::ConnectionMode { .. }
+            | Message::WearPause { .. }
+            | Message::VoiceAssistant { .. }
+            | Message::QuickAccess { .. }
+            | Message::VoiceGuideVolume { .. }
+            | Message::Playback { .. } => Applied::Ignored,
             Message::SupportFunctions(list) => {
                 let ids = list.into_iter().map(|f| f.id).collect();
                 match table {
@@ -197,7 +207,18 @@ impl DeviceState {
             Group::Volume => &mut self.volume.status,
             Group::GeneralSetting(GS_MULTIPOINT) => &mut self.multipoint.status,
             Group::AutoPowerOff => &mut self.auto_power_off.status,
-            Group::GeneralSetting(_) | Group::Connect | Group::Power | Group::Raw => return None,
+            Group::GeneralSetting(_)
+            | Group::Connect
+            | Group::Power
+            | Group::Raw
+            | Group::Dsee
+            | Group::DseeAutoOff
+            | Group::ConnectionMode
+            | Group::WearPause
+            | Group::VoiceAssistant
+            | Group::QuickAccess
+            | Group::VoiceGuide
+            | Group::Playback => return None,
         })
     }
 

@@ -6,6 +6,8 @@ Hairline is a desktop client for Sony ULT WEAR (WH-ULT900N) headphones. It talks
 
 Phase 1: a macOS menu-bar popover for the WH-ULT900N with battery level, noise control, ambient sound level and ULT level. Windows and Linux are planned.
 
+The connection to real headphones has not been validated yet; use `--fake-device` (below) for now.
+
 ## Run it
 
 Prerequisites: Rust stable, Node 22, pnpm 10.
@@ -42,7 +44,7 @@ cd apps/desktop && pnpm check
 
 ## Safety
 
-Hairline never sends commands on the deny-list, and it only changes a setting the headphones declare as supported, outside the explicit Advanced panel flow. The details are in [docs/protocol-notes.md](docs/protocol-notes.md).
+Hairline never sends commands on the deny-list, and it only changes a setting the headphones declare as supported. No Advanced path exists yet: in this phase the deny-list cannot be bypassed, except for power off after the user confirms it. The details are in [docs/protocol-notes.md](docs/protocol-notes.md).
 
 ## Design
 

@@ -2,11 +2,35 @@
 
 Hairline is a desktop client for Sony ULT WEAR (WH-ULT900N) headphones. It talks to the headphones directly over Bluetooth, without the official phone app, and puts the everyday controls in a small menu-bar popover.
 
+## What it looks like
+
+The Hairline design: off-white paper, one-pixel rules, dot-matrix numerals, boxed switches, and orange only where something is live. The popover is what you use every day from the menu bar; the window is where you set everything else up.
+
+<table>
+  <tr>
+    <td align="center" width="50%"><img src="docs/screenshots/01-menu-bar-popover.png" alt="Menu-bar popover, connected and not connected" width="100%"><br><sub>Menu-bar popover</sub></td>
+    <td align="center" width="50%"><img src="docs/screenshots/02-overview.png" alt="Overview screen" width="100%"><br><sub>Overview</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/03-sound.png" alt="Sound screen with the fader equalizer" width="100%"><br><sub>Sound</sub></td>
+    <td align="center"><img src="docs/screenshots/04-noise.png" alt="Noise screen" width="100%"><br><sub>Noise</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/05-devices.png" alt="Devices screen" width="100%"><br><sub>Devices</sub></td>
+    <td align="center"><img src="docs/screenshots/06-scenes.png" alt="Scenes screen" width="100%"><br><sub>Scenes</sub></td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2"><img src="docs/screenshots/07-settings.png" alt="Settings screen" width="50%"><br><sub>Settings</sub></td>
+  </tr>
+</table>
+
+The popover ships in Phase 1 and is validated on real hardware; the window screens are being built in Phase 2 from these mockups (`docs/research/reports/Hairline design screens.html`).
+
 ## Status
 
 Phase 1: a macOS menu-bar popover for the WH-ULT900N with battery level, noise control, ambient sound level and ULT level. Windows and Linux are planned.
 
-The connection to real headphones has not been validated yet; use `--fake-device` (below) for now.
+The popover is validated on a real WH-ULT900N (firmware 2.1.4) on macOS 27.2; see `docs/hardware-validation.md`. Use `--fake-device` (below) to run without headphones.
 
 ## Run it
 

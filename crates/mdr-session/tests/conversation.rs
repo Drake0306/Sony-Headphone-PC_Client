@@ -456,3 +456,48 @@ fn playback_ntfy_updates_untracked_state() {
     assert!(ev.contains(&Event::StateChanged));
     assert_eq!(s.state().playback, Some(0x01));
 }
+
+#[test]
+fn t2_support_timeout_still_queues_reads() {
+    let caps = [0x20, 0x6B];
+    let mut s = Session::new(0);
+    s.start();
+    let (mut t, mut dev_seq, mut events) = (0, 0, vec![]);
+    let mut sent: Vec<(FrameType, Vec<u8>)> = vec![];
+    let mut timed_out = false;
+    while let Some(req) = next_request(&mut s, t) {
+        sent.push((req.frame_type, req.payload.clone()));
+        events.extend(s.handle_input(&frame(FrameType::Ack, 1 - req.seq, &[]), t));
+        if req.frame_type == FrameType::Command2 && req.payload == [0x06, 0x00] {
+            // Never answered: the T2 support-function read times out.
+            assert!(s.handle_timeout(t + REPLY_TIMEOUT_MS - 1).is_empty());
+            events.extend(s.handle_timeout(t + REPLY_TIMEOUT_MS + 100));
+            timed_out = true;
+            t += REPLY_TIMEOUT_MS + 110;
+            let next = next_request(&mut s, t).expect("handshake continues");
+            assert_eq!(next.payload, [0x04, 0x01], "first fixed step follows");
+            sent.push((next.frame_type, next.payload.clone()));
+            events.extend(s.handle_input(&frame(FrameType::Ack, 1 - next.seq, &[]), t));
+            let reply = scripted_reply(next.frame_type, &next.payload, &caps).unwrap();
+            events.extend(s.handle_input(&frame(next.frame_type, dev_seq, &reply), t + 1));
+        } else {
+            let reply = scripted_reply(req.frame_type, &req.payload, &caps)
+                .unwrap_or_else(|| panic!("no scripted reply for {:02X?}", req.payload));
+            events.extend(s.handle_input(&frame(req.frame_type, dev_seq, &reply), t + 1));
+        }
+        dev_seq ^= 1;
+        t += 10;
+    }
+    assert!(timed_out, "the T2 support-function read was sent");
+    let payloads: Vec<&[u8]> = sent.iter().map(|(_, p)| p.as_slice()).collect();
+    assert!(payloads.contains(&&[0x22, 0x00][..]), "battery read sent");
+    assert!(payloads.contains(&&[0x66, 0x17][..]), "NC/ASM read sent");
+    assert!(
+        !sent
+            .iter()
+            .any(|(ft, p)| *ft == FrameType::Command2 && p == &[0x46, 0x20]),
+        "no T2 voice guidance read without a T2 list"
+    );
+    assert!(events.contains(&Event::Connected));
+    assert!(s.state().connected);
+}

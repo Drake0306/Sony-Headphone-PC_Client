@@ -1,0 +1,19 @@
+[package]
+name = "mdr-transport"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+mdr-frame = { path = "../mdr-frame" }
+
+[dev-dependencies]
+mdr-session = { path = "../mdr-session" }
+mdr-proto = { path = "../mdr-proto" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSString", "NSData", "NSObject"] }
+objc2-io-bluetooth = { version = "0.3", default-features = false, features = ["std", "objc2", "objc2-foundation", "Bluetooth", "IOBluetoothObject", "IOBluetoothDevice", "IOBluetoothRFCOMMChannel", "IOBluetoothSDPUUID", "IOBluetoothSDPServiceRecord"] }
+dispatch2 = "0.3"

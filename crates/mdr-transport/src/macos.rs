@@ -33,9 +33,12 @@ const SDP_POLL: Duration = Duration::from_millis(200);
 const SDP_WAIT: Duration = Duration::from_secs(6);
 /// How long the asynchronous RFCOMM open may take to complete.
 const OPEN_TIMEOUT: Duration = Duration::from_secs(15);
-/// Open status reported when the channel closes before the open completes
-/// (kIOReturnNotOpen).
-const CLOSED_BEFORE_OPEN: i32 = 0xe00002cd_u32 as i32;
+/// How long to wait after `closeConnection` before reopening the baseband link.
+const RECONNECT_DELAY: Duration = Duration::from_millis(1500);
+/// Open status reported when the channel closes before the open completes.
+/// IOBluetooth never reports this value, so it cannot be mistaken for a real
+/// IOReturn.
+const CLOSED_BEFORE_OPEN: i32 = i32::MIN;
 
 /// Where the delegate forwards its callbacks.
 struct DelegateIvars {
@@ -215,6 +218,14 @@ pub fn discover() -> io::Result<Vec<Candidate>> {
 type Link = MainOnly<(Retained<IOBluetoothRFCOMMChannel>, Retained<Delegate>)>;
 
 pub fn connect(address: &str) -> io::Result<Box<dyn Transport>> {
+    // The SDP query and the RFCOMM open complete on the main run loop, which
+    // cannot advance while the main thread waits for them.
+    if MainThreadMarker::new().is_some() {
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "connect must be called from a worker thread",
+        ));
+    }
     let wanted = normalise_address(address);
     let device = paired()
         .into_iter()
@@ -241,7 +252,8 @@ pub fn connect(address: &str) -> io::Result<Box<dyn Transport>> {
 /// Asks the device for its SDP records and waits for the v2 one to appear.
 ///
 /// The query completes on the main run loop, so the wait sleeps on this
-/// (worker) thread between short main-queue polls.
+/// (worker) thread between short main-queue polls. `connect` guarantees it
+/// is not called on the main thread.
 fn query_v2_record(device: &Device) -> io::Result<Record> {
     // SAFETY: starts an asynchronous query on the main queue; no target object.
     let ret = on_main(|| unsafe { device.get().performSDPQuery(None) });
@@ -254,10 +266,6 @@ fn query_v2_record(device: &Device) -> io::Result<Record> {
             "device does not expose the v2 service",
         )
     };
-    // On the main thread the run loop cannot advance while we wait.
-    if MainThreadMarker::new().is_some() {
-        return Err(not_found());
-    }
     let deadline = Instant::now() + SDP_WAIT;
     while Instant::now() < deadline {
         std::thread::sleep(SDP_POLL);
@@ -268,15 +276,9 @@ fn query_v2_record(device: &Device) -> io::Result<Record> {
     Err(not_found())
 }
 
+/// Opens the v2 channel. `connect` guarantees this runs off the main thread,
+/// so the main run loop can deliver the open callback while we wait.
 fn open_channel(device: &Device, record: &Record) -> io::Result<Box<dyn Transport>> {
-    // The open completes on the main run loop, which cannot advance while the
-    // main thread waits for it.
-    if MainThreadMarker::new().is_some() {
-        return Err(io::Error::new(
-            io::ErrorKind::WouldBlock,
-            "RFCOMM open must be started off the main thread",
-        ));
-    }
     let mut channel_id: BluetoothRFCOMMChannelID = 0;
     // SAFETY: record query on the main queue; `channel_id` outlives the call.
     let ret = on_main(|| unsafe { record.get().getRFCOMMChannelID(&mut channel_id) });
@@ -302,6 +304,7 @@ fn open_channel(device: &Device, record: &Record) -> io::Result<Box<dyn Transpor
             )
         };
         if ret != 0 {
+            // The open never started, so the baseband link is left alone.
             if let Some(channel) = channel {
                 // SAFETY: the channel holds the delegate unretained; detach it before
                 // `delegate` is released at the end of this closure.
@@ -333,8 +336,11 @@ fn open_channel(device: &Device, record: &Record) -> io::Result<Box<dyn Transpor
         }
     };
     if let Some(err) = failure {
-        abandon_open(device, link);
-        return Err(err);
+        let timed_out = err.kind() == io::ErrorKind::TimedOut;
+        return Err(match abandon_open(device, link, timed_out) {
+            Some(note) => io::Error::new(err.kind(), format!("{err}; {note}")),
+            None => err,
+        });
     }
     Ok(Box::new(MacTransport {
         link: Some(link),
@@ -343,10 +349,17 @@ fn open_channel(device: &Device, record: &Record) -> io::Result<Box<dyn Transpor
     }))
 }
 
-/// Tears down a channel whose open failed or timed out. Closing the baseband
-/// connection clears a DLCI the device may have left half-open; the system
-/// reconnects audio by itself.
-fn abandon_open(device: &Device, link: Link) {
+/// Tears down a channel whose open failed or timed out.
+///
+/// A timeout (no UA, no DM) means the device may have left the DLCI
+/// half-open, so the baseband connection is closed to clear it. After
+/// `closeConnection` macOS does not re-establish the link on its own, so it is
+/// reopened with `openConnection` (about 1-2 s). Any other failure means the
+/// device answered and the DLCI is not stuck, so the link is left alone.
+///
+/// Returns a note on the link reset for the caller's error message, or `None`
+/// when no reset was made.
+fn abandon_open(device: &Device, link: Link, timed_out: bool) -> Option<String> {
     on_main(move || {
         let (channel, _delegate) = &link.0;
         // SAFETY: on the main queue. Detach the unretained delegate before the
@@ -354,10 +367,24 @@ fn abandon_open(device: &Device, link: Link) {
         unsafe {
             channel.setDelegate(None);
             channel.closeChannel();
-            device.get().closeConnection();
+            if timed_out {
+                device.get().closeConnection();
+            }
         }
         drop(link);
     });
+    if !timed_out {
+        return None;
+    }
+    // Wait on this worker thread so the main queue stays free.
+    std::thread::sleep(RECONNECT_DELAY);
+    // SAFETY: synchronous baseband open on the main queue.
+    let ret = on_main(|| unsafe { device.get().openConnection() });
+    Some(if ret == 0 {
+        "Bluetooth link reset and reconnected".to_owned()
+    } else {
+        format!("Bluetooth link reset but openConnection failed: IOReturn {ret:#010x}")
+    })
 }
 
 struct MacTransport {

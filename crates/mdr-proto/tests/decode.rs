@@ -84,3 +84,17 @@ fn gs_capability_list_with_two_elements() {
         })
     );
 }
+
+#[test]
+fn t2_support_functions_list() {
+    let (k, m) = decode(Table::T2, &[0x07, 0x00, 0x03, 0x42, 0x01, 0x50, 0x01, 0xF2, 0x01]);
+    assert_eq!(k, Kind::Ret);
+    assert_eq!(
+        m,
+        Message::SupportFunctions(vec![
+            SupportFunction { id: 0x42, priority: 1 },
+            SupportFunction { id: 0x50, priority: 1 },
+            SupportFunction { id: 0xF2, priority: 1 },
+        ])
+    );
+}

@@ -76,7 +76,10 @@ pub fn eq_ult_get() -> Request {
     t1_req(vec![t1::EQEBB_GET_PARAM, EQ_ULT], Some(function::PRESET_EQ_AND_ULT_MODE), Group::EqUlt)
 }
 
+/// Callers must validate `bands` (1..=255 entries); a malformed SET can corrupt
+/// the device's custom slot.
 pub fn eq_ult_set(s: &EqUltState) -> Request {
+    debug_assert!(!s.bands.is_empty() && s.bands.len() <= 255);
     let mut bytes = vec![t1::EQEBB_SET_PARAM, EQ_ULT, s.preset, s.ult as u8, s.bands.len() as u8];
     bytes.extend_from_slice(&s.bands);
     t1_req(bytes, Some(function::PRESET_EQ_AND_ULT_MODE), Group::EqUlt)

@@ -1,4 +1,4 @@
-use crate::opcode::{inquired, t1};
+use crate::opcode::{inquired, t1, t2};
 use crate::types::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,13 +68,31 @@ pub fn decode(table: Table, payload: &[u8]) -> (Kind, Message) {
     let kind = kind_of(opcode);
     let msg = match table {
         Table::T1 => decode_t1(opcode, payload),
-        Table::T2 => None,
+        Table::T2 => decode_t2(opcode, payload),
     };
     (kind, msg.unwrap_or_else(|| unknown(table, opcode, payload)))
 }
 
 fn unknown(table: Table, opcode: u8, payload: &[u8]) -> Message {
     Message::Unknown { table, opcode, payload: payload.to_vec() }
+}
+
+fn support_functions(r: &mut Reader) -> Option<Message> {
+    let n = r.u8()?;
+    let mut list = Vec::new();
+    for _ in 0..n {
+        list.push(SupportFunction { id: r.u8()?, priority: r.u8()? });
+    }
+    Some(Message::SupportFunctions(list))
+}
+
+fn decode_t2(opcode: u8, payload: &[u8]) -> Option<Message> {
+    let mut r = Reader(&payload[1..]);
+    let _sub = r.u8()?;
+    match opcode {
+        t2::CONNECT_RET_SUPPORT_FUNCTION => support_functions(&mut r),
+        _ => None,
+    }
 }
 
 fn decode_t1(opcode: u8, payload: &[u8]) -> Option<Message> {
@@ -87,14 +105,7 @@ fn decode_t1(opcode: u8, payload: &[u8]) -> Option<Message> {
             // libmdr EnableDisable: ENABLE = 0x00, DISABLE = 0x01, so 0x00 means enabled.
             Some(Message::ProtocolInfo { version, table1: r.u8()? == 0, table2: r.u8()? == 0 })
         }
-        t1::CONNECT_RET_SUPPORT_FUNCTION => {
-            let n = r.u8()?;
-            let mut list = Vec::new();
-            for _ in 0..n {
-                list.push(SupportFunction { id: r.u8()?, priority: r.u8()? });
-            }
-            Some(Message::SupportFunctions(list))
-        }
+        t1::CONNECT_RET_SUPPORT_FUNCTION => support_functions(&mut r),
         t1::CONNECT_RET_DEVICE_INFO => match sub {
             0x01 => Some(Message::DeviceInfo(DeviceInfo::ModelName(r.string()?))),
             0x02 => Some(Message::DeviceInfo(DeviceInfo::Firmware(r.string()?))),

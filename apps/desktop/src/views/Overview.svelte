@@ -15,7 +15,7 @@
     autoOffLabel,
     codecLabel,
     colourway,
-    isPlaying,
+    hostPlaying,
     modelNumber,
     presetName,
     type DeviceState,
@@ -50,8 +50,8 @@
   const links = $derived([
     {
       label: "This Mac",
-      value: !st.connected ? "--" : isPlaying(st.playback) ? "▶ Playing" : "Idle",
-      live: st.connected && isPlaying(st.playback),
+      value: !st.connected ? "--" : hostPlaying(st.devices) ? "▶ Playing" : "Idle",
+      live: st.connected && hostPlaying(st.devices),
     },
     { label: "Multipoint", value: onOff(st.multipoint.value) },
     { label: "Auto off", value: autoOffLabel(st.auto_power_off.value) || "--" },

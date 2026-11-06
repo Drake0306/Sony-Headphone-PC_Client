@@ -11,6 +11,8 @@ use crate::Transport;
 /// Elapsed time after the first write at which the battery NTFY is sent.
 const BATTERY_NTFY_AFTER: Duration = Duration::from_secs(30);
 const BATTERY_NTFY: &[u8] = &[0x25, 0x00, 0x42, 0x00];
+/// RFCOMM channel the ULT WEAR advertises for the v2 service.
+const CHANNEL: u8 = 18;
 
 /// T1 support functions the fake declares: battery, power off, EQ/ULT, NC/ASM,
 /// codec, multipoint, then DSEE, auto power-off, playback, upscaling,
@@ -260,4 +262,8 @@ impl Transport for FakeDevice {
     }
 
     fn close(&mut self) {}
+
+    fn channel(&self) -> Option<u8> {
+        Some(CHANNEL)
+    }
 }

@@ -219,6 +219,17 @@ fn disconnect_marks_all_unavailable() {
     assert!(matches!(s.state().nc.status, Status::Unavailable));
 }
 
+#[test]
+fn set_link_round_trip() {
+    let mut s = connected_session();
+    s.set_link(Some("A8:E6:E8:FE:D6:54".into()), Some(18));
+    assert_eq!(s.state().address.as_deref(), Some("A8:E6:E8:FE:D6:54"));
+    assert_eq!(s.state().channel, Some(18));
+    s.mark_disconnected();
+    assert_eq!(s.state().address, None);
+    assert_eq!(s.state().channel, None);
+}
+
 /// Next data frame the session hands out, draining any ACKs before it.
 fn next_request(s: &mut Session, now: u64) -> Option<Frame> {
     drain(s, now)

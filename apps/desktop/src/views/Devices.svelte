@@ -8,18 +8,18 @@
   import Toggle from "../lib/controls/Toggle.svelte";
   import { control } from "../lib/control.svelte";
   import { setMultipoint } from "../lib/ipc";
-  import { codecLabel, colourway, isPlaying, modelNumber, type DeviceState } from "../lib/state";
+  import { bluetoothLabel, codecLabel, colourway, hostPlaying, modelNumber, type DeviceState } from "../lib/state";
 
   let { st }: { st: DeviceState } = $props();
 
   const noop = () => {};
   const multipoint = control<boolean>(() => st.multipoint);
-  const playing = $derived(isPlaying(st.playback));
+  const playing = $derived(hostPlaying(st.devices));
   const meta = $derived([codecLabel(st.codec.value), "this Mac"].filter(Boolean).join(" · "));
   const facts = $derived([
     { label: "Model", value: modelNumber(st.model) },
     { label: "Firmware", value: st.firmware ?? "" },
-    { label: "Bluetooth", value: "5.2 · channel 18" },
+    { label: "Bluetooth", value: bluetoothLabel(st.channel, st.address) },
     { label: "Colourway", value: colourway(st.color) },
   ]);
 </script>

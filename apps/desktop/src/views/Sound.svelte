@@ -128,11 +128,12 @@
         <Row label="DSEE" note="Restores detail lost to compression">
           <Toggle readonly on={dsee} label="DSEE" />
         </Row>
-        <Row label="Turn DSEE off at low battery">
+        <!-- On is Auto, off is Off (UpscalingTypeAutoOff). -->
+        <Row label="DSEE Extreme" note="Auto applies upscaling when it helps">
           <Toggle
             on={dseeAutoOff.shown}
             status={dseeAutoOff.status}
-            label="Turn DSEE off at low battery"
+            label="DSEE Extreme"
             onpick={(on) => dseeAutoOff.request(on, () => setDseeAutoOff(on))}
           />
         </Row>

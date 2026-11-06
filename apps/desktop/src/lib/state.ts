@@ -65,6 +65,10 @@ export interface PairedDevice {
 
 export interface DeviceState {
   connected: boolean;
+  /** Bluetooth address of the linked headphones, as the transport reported it. */
+  address: string | null;
+  /** RFCOMM channel of the v2 service, when the transport exposes it. */
+  channel: number | null;
   model: string | null;
   firmware: string | null;
   color: number | null;
@@ -80,7 +84,7 @@ export interface DeviceState {
   multipoint: Tracked<boolean>;
   auto_power_off: Tracked<number>;
   dsee: Tracked<boolean>;
-  /** True when DSEE Extreme switches itself off automatically. */
+  /** DSEE Extreme upscaling mode: true is Auto (upscales when it helps), false is Off. */
   dsee_auto_off: Tracked<boolean>;
   connection_mode: Tracked<number>;
   wear_pause: Tracked<boolean>;
@@ -88,7 +92,7 @@ export interface DeviceState {
   quick_access: Tracked<number[]>;
   /** Voice guide volume, -2..=2. */
   voice_guide_volume: Tracked<number>;
-  /** Last reported `PlaybackStatus` (0x01 play, 0x02 pause, 0x03 stop); read-only. */
+  /** Last reported `PlaybackStatus` (0x01 play, 0x02 pause, 0x03 stop); read-only, not shown yet. */
   playback: number | null;
   touch_panel: Tracked<boolean>;
   sidetone: Tracked<boolean>;
@@ -121,6 +125,8 @@ const unavailable = <T>(): Tracked<T> => ({ value: null, status: "Unavailable" }
 export function emptyState(): DeviceState {
   return {
     connected: false,
+    address: null,
+    channel: null,
     model: null,
     firmware: null,
     color: null,
@@ -218,8 +224,12 @@ export const AUTO_POWER_OFF: { label: string; value: number; long: string }[] = 
 export const autoOffLabel = (value: number | null): string =>
   AUTO_POWER_OFF.find((o) => o.value === value)?.long ?? "";
 
-/** `PlaybackStatus` 0x01 is play; anything else reads as idle. */
-export const isPlaying = (playback: number | null) => playback === 0x01;
+/** Whether a host in the Link list is playing through the headphones (the broker's CoreAudio check). */
+export const hostPlaying = (devices: PairedDevice[]) => devices.some((d) => d.playing);
+
+/** The Bluetooth facts the transport reported: RFCOMM channel and address, or "--". */
+export const bluetoothLabel = (channel: number | null, address: string | null): string =>
+  [channel !== null ? `channel ${channel}` : "", address ?? ""].filter(Boolean).join(" · ") || "--";
 
 /** Prefixes `label` with "FAKE" on a `--fake-device` run, so it is never mistaken for the real headphones. */
 export const withFake = (label: string, fake: boolean): string =>

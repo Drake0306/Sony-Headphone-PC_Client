@@ -30,6 +30,11 @@ fn connected(t: &mut FakeDevice) -> (Session, u64) {
 }
 
 #[test]
+fn fake_device_reports_its_rfcomm_channel() {
+    assert_eq!(FakeDevice::ult_wear().channel(), Some(18));
+}
+
+#[test]
 fn fake_device_completes_handshake_through_session() {
     let mut t = FakeDevice::ult_wear();
     let mut s = Session::new(0);

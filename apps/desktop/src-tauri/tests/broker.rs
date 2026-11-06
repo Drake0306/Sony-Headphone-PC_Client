@@ -40,6 +40,8 @@ fn broker_connects_and_emits_state_then_applies_set_ult() {
     std::thread::spawn(move || run_broker(t, rx, |s| etx.send(s.clone()).unwrap(), monotonic_ms));
     let st = wait_for(&erx, |s| s.connected);
     assert_eq!(st.model.as_deref(), Some("ULT WEAR"));
+    assert_eq!(st.channel, Some(18));
+    assert_eq!(st.address, None);
     tx.send(BrokerCmd::SetUlt(UltLevel::Ult2)).unwrap();
     let st = wait_for(&erx, |s| {
         s.eq_ult.value.as_ref().map(|e| e.ult) == Some(UltLevel::Ult2)

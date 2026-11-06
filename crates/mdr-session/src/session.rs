@@ -310,6 +310,12 @@ impl Session {
         self.state.devices = devices;
     }
 
+    /// Records the Bluetooth link the transport opened; cleared on disconnect.
+    pub fn set_link(&mut self, address: Option<String>, channel: Option<u8>) {
+        self.state.address = address;
+        self.state.channel = channel;
+    }
+
     fn submit(&mut self, req: Request, confirmed: bool) -> Result<(), SessionError> {
         if !self.state.connected {
             return Err(SessionError::NotConnected);

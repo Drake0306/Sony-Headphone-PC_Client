@@ -77,6 +77,10 @@ pub struct PairedDevice {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct DeviceState {
     pub connected: bool,
+    /// Bluetooth address of the linked headphones, as the transport reported it.
+    pub address: Option<String>,
+    /// RFCOMM channel of the v2 service, when the transport exposes it.
+    pub channel: Option<u8>,
     pub model: Option<String>,
     pub firmware: Option<String>,
     pub color: Option<u8>,
@@ -92,7 +96,8 @@ pub struct DeviceState {
     pub multipoint: Tracked<bool>,
     pub auto_power_off: Tracked<u8>,
     pub dsee: Tracked<bool>,
-    /// True when DSEE Extreme switches itself off automatically.
+    /// DSEE Extreme upscaling mode: true is Auto (upscales when it helps),
+    /// false is Off (`UpscalingTypeAutoOff`).
     pub dsee_auto_off: Tracked<bool>,
     pub connection_mode: Tracked<u8>,
     pub wear_pause: Tracked<bool>,
@@ -273,6 +278,8 @@ impl DeviceState {
     /// Marks every tracked value unavailable and the device disconnected.
     pub(crate) fn mark_disconnected(&mut self) {
         self.connected = false;
+        self.address = None;
+        self.channel = None;
         self.playback = None;
         for status in [
             &mut self.battery.status,

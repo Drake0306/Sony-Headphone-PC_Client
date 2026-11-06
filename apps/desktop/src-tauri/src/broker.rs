@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 use mdr_proto::{request, Group, NcAsmState, Request, Table, UltLevel};
 use mdr_session::{DeviceState, Event, PairedDevice, Session, SessionError};
-use mdr_transport::{connect, discover, is_ult_wear_name, FakeDevice, Transport};
+use mdr_transport::{connect, discover, is_ult_wear_name, Candidate, FakeDevice, Transport};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::audio_macos::current_output_device_name;
@@ -89,18 +89,21 @@ pub fn run_broker<E: Fn(&DeviceState)>(
 }
 
 /// As `run_broker`, also writing every frame and log line to `log`.
-/// `device_name` is the Bluetooth name of the connected headphones, matched
-/// against the default audio output; without it the model name is used.
+/// `device` is the connected headphones as discovered: its Bluetooth name is
+/// matched against the default audio output (without it the model name is
+/// used) and its address is shown in the UI.
 pub fn run_broker_logged<E: Fn(&DeviceState)>(
     mut transport: Box<dyn Transport>,
     cmds: impl Borrow<Receiver<BrokerCmd>>,
     emit: E,
     mut clock: impl FnMut() -> u64,
     mut log: Option<&mut FrameLog>,
-    device_name: Option<&str>,
+    device: Option<&Candidate>,
 ) -> io::Result<()> {
     let cmds = cmds.borrow();
+    let device_name = device.map(|d| d.name.as_str());
     let mut session = Session::new(clock());
+    session.set_link(device.map(|d| d.address.clone()), transport.channel());
     session.start();
     let mut devices_checked_at: Option<u64> = None;
     loop {
@@ -274,9 +277,9 @@ pub fn spawn_broker(app: AppHandle, fake: bool) -> Sender<BrokerCmd> {
             let mut backoff = 0;
             loop {
                 let result = match open_transport(fake) {
-                    Ok((t, name)) => {
+                    Ok((t, device)) => {
                         backoff = 0;
-                        run_broker_logged(t, &rx, emit, clock, log.as_mut(), name.as_deref())
+                        run_broker_logged(t, &rx, emit, clock, log.as_mut(), device.as_ref())
                     }
                     Err(e) => Err(e),
                 };
@@ -318,8 +321,8 @@ fn wait_for_connect(rx: &Receiver<BrokerCmd>, timeout: Option<Duration>) -> Resu
     }
 }
 
-/// The transport and, for a real device, its Bluetooth name.
-fn open_transport(fake: bool) -> io::Result<(Box<dyn Transport>, Option<String>)> {
+/// The transport and, for a real device, the candidate it was opened to.
+fn open_transport(fake: bool) -> io::Result<(Box<dyn Transport>, Option<Candidate>)> {
     if fake {
         return Ok((Box::new(FakeDevice::ult_wear()), None));
     }
@@ -339,5 +342,5 @@ fn open_transport(fake: bool) -> io::Result<(Box<dyn Transport>, Option<String>)
                 "no connected device exposes the v2 service",
             )
         })?;
-    Ok((connect(&pick.address)?, Some(pick.name.clone())))
+    Ok((connect(&pick.address)?, Some(pick.clone())))
 }

@@ -148,7 +148,8 @@ button {
   opacity: 0.35;
 }
 
-.ticks button:disabled {
+.ticks button:disabled,
+.ticks.unavailable button {
   cursor: default;
 }
 

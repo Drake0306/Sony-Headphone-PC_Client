@@ -45,6 +45,8 @@
   const ncShown = $derived(isPending(st.nc.status) && wantNc ? wantNc : st.nc.value);
   const ultShown = $derived(isPending(st.eq_ult.status) && wantUlt ? wantUlt : (st.eq_ult.value?.ult ?? null));
   const ncOff = $derived(st.nc.status === "Unavailable");
+  // The level bar only applies in Ambient; elsewhere it shows the remembered level, inert.
+  const levelOff = $derived(ncOff || ncShown?.mode !== "Ambient");
   const ultOff = $derived(st.eq_ult.status === "Unavailable");
   const subtitle = $derived(
     [colourway(st.color), codecLabel(st.codec.value)].filter((part) => part !== "").join(" · "),
@@ -160,13 +162,14 @@
     </div>
     <div class="row">
       <span class="lab">Level {ncShown?.level ?? "--"}</span>
-      <div class="ticks" class:pending={isPending(st.nc.status)} class:unavailable={ncOff}>
+      <div class="ticks" class:pending={isPending(st.nc.status)} class:unavailable={levelOff}>
         {#each TICKS as level (level)}
           <button
             class:on={level <= (ncShown?.level ?? 0)}
             aria-label={`Ambient level ${level}`}
-            disabled={ncOff}
-            onclick={() => pickLevel(level)}
+            aria-disabled={levelOff}
+            tabindex={levelOff ? -1 : 0}
+            onclick={levelOff ? undefined : () => pickLevel(level)}
           ></button>
         {/each}
       </div>

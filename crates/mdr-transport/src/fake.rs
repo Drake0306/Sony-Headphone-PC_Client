@@ -40,11 +40,11 @@ fn support_reply(caps: &[u8]) -> Vec<u8> {
 }
 
 /// Reply for a request, or `None` if the fake has no answer.
-fn reply(frame_type: FrameType, req: &[u8]) -> Option<Vec<u8>> {
+fn reply(frame_type: FrameType, req: &[u8], t1_caps: &[u8]) -> Option<Vec<u8>> {
     let head = req.get(..2)?;
     let reply = match (frame_type, head) {
         (FrameType::Command1, [0x00, 0x00]) => vec![0x01, 0x00, 0x03, 0x00, 0x20, 0x02, 0x00, 0x00],
-        (FrameType::Command1, [0x06, 0x00]) => support_reply(T1_CAPS),
+        (FrameType::Command1, [0x06, 0x00]) => support_reply(t1_caps),
         (FrameType::Command2, [0x06, 0x00]) => support_reply(T2_CAPS),
         (FrameType::Command2, [0x46, 0x20]) => vec![0x47, 0x20, 0x02],
         // T2 voice guidance volume SET, confirmed by its NTFY.
@@ -125,6 +125,8 @@ pub struct FakeDevice {
     in_flight: Option<InFlight>,
     next_seq: u8,
     silent: Vec<u8>,
+    /// T1 support functions declared in the handshake.
+    t1_caps: Vec<u8>,
     first_write: Option<Instant>,
     battery_sent: bool,
     received: usize,
@@ -140,6 +142,7 @@ impl FakeDevice {
             in_flight: None,
             next_seq: 0,
             silent: Vec::new(),
+            t1_caps: T1_CAPS.to_vec(),
             first_write: None,
             battery_sent: false,
             received: 0,
@@ -150,6 +153,12 @@ impl FakeDevice {
     /// Stops replying (but still ACKs) to requests whose first byte is `opcode`.
     pub fn silent_on(&mut self, opcode: u8) {
         self.silent.push(opcode);
+    }
+
+    /// Leaves `id` out of the declared T1 support functions, as a model
+    /// without that feature would.
+    pub fn without_capability(&mut self, id: u8) {
+        self.t1_caps.retain(|&c| c != id);
     }
 
     /// Breaks the link once `n_frames` incoming frames have been received.
@@ -174,7 +183,9 @@ impl FakeDevice {
                     .payload
                     .first()
                     .is_some_and(|op| self.silent.contains(op));
-                if let Some(r) = reply(frame.frame_type, &frame.payload).filter(|_| !silenced) {
+                if let Some(r) =
+                    reply(frame.frame_type, &frame.payload, &self.t1_caps).filter(|_| !silenced)
+                {
                     self.data.push_back((frame.frame_type, r));
                 }
             }

@@ -5,7 +5,8 @@ use super::model::{Inputs, Scene, Trigger};
 /// Parses `H:MM` or `HH:MM` into minutes since midnight (`00:00`..=`23:59`).
 pub fn parse_hhmm(s: &str) -> Option<u16> {
     let (h, m) = s.trim().split_once(':')?;
-    if h.is_empty() || h.len() > 2 || m.len() != 2 {
+    let digits = |s: &str| s.bytes().all(|b| b.is_ascii_digit());
+    if h.is_empty() || h.len() > 2 || m.len() != 2 || !digits(h) || !digits(m) {
         return None;
     }
     let (h, m): (u16, u16) = (h.parse().ok()?, m.parse().ok()?);

@@ -51,3 +51,17 @@ fn corrupt_falls_back_to_seeds() {
     assert_eq!(scenes.len(), 4);
     assert!(scenes.iter().all(|s| !s.enabled));
 }
+
+#[test]
+fn frontmost_app_trigger_round_trips() {
+    let dir = temp_dir("frontmost");
+    let mut scenes = seed_scenes();
+    scenes[3].trigger = Trigger::FrontmostApp {
+        name: "zoom.us".into(),
+    };
+    save(&dir, &scenes).unwrap();
+    assert_eq!(load(&dir), scenes);
+    let text = std::fs::read_to_string(dir.join("scenes.json")).unwrap();
+    assert!(text.contains("\"kind\": \"frontmost_app\""), "{text}");
+    assert!(text.contains("\"name\": \"zoom.us\""), "{text}");
+}

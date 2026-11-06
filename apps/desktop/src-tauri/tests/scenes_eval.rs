@@ -114,6 +114,8 @@ fn bad_time_text_never_matches() {
     assert_eq!(parse_hhmm("24:00"), None);
     assert_eq!(parse_hhmm("12:60"), None);
     assert_eq!(parse_hhmm("noon"), None);
+    assert_eq!(parse_hhmm("+7:05"), None);
+    assert_eq!(parse_hhmm("07:+5"), None);
 }
 
 #[test]

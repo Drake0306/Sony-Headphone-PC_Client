@@ -84,7 +84,7 @@ fn decode_t1(opcode: u8, payload: &[u8]) -> Option<Message> {
         t1::CONNECT_RET_PROTOCOL_INFO => {
             let v = r.take(4)?;
             let version = u32::from_be_bytes([v[0], v[1], v[2], v[3]]);
-            // Observed reply carries 00 00 for "both tables enabled".
+            // libmdr EnableDisable: ENABLE = 0x00, DISABLE = 0x01, so 0x00 means enabled.
             Some(Message::ProtocolInfo { version, table1: r.u8()? == 0, table2: r.u8()? == 0 })
         }
         t1::CONNECT_RET_SUPPORT_FUNCTION => {
@@ -170,6 +170,7 @@ fn decode_t1(opcode: u8, payload: &[u8]) -> Option<Message> {
             let mut elements = Vec::new();
             if kind == GsKind::List {
                 for _ in 0..r.u8()? {
+                    let _element_string_format = r.u8()?;
                     elements.push((r.string()?, r.string()?));
                 }
             }

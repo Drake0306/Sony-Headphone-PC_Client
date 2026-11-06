@@ -63,3 +63,24 @@ fn short_and_unknown_payloads_do_not_panic() {
     assert!(matches!(decode(Table::T2, &[0x47, 0x20, 0xFF]).1, Message::Unknown { .. }));
     assert!(matches!(decode(Table::T1, &[]).1, Message::Unknown { .. }));
 }
+
+#[test]
+fn gs_capability_list_with_two_elements() {
+    let mut p = vec![0xD1, 0xD2, 0x01, 0x00, 0x05];
+    p.extend_from_slice(b"TOUCH");
+    p.extend_from_slice(&[0x00, 0x02, 0x00, 0x02]);
+    p.extend_from_slice(b"ON");
+    p.extend_from_slice(&[0x00, 0x00, 0x03]);
+    p.extend_from_slice(b"OFF");
+    p.push(0x00);
+    assert_eq!(
+        decode(Table::T1, &p).1,
+        Message::GsCapability(GsCapability {
+            setting: 0xD2,
+            kind: GsKind::List,
+            subject: "TOUCH".into(),
+            summary: "".into(),
+            elements: vec![("ON".into(), "".into()), ("OFF".into(), "".into())],
+        })
+    );
+}

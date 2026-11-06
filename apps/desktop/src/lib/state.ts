@@ -96,6 +96,13 @@ export interface DeviceState {
   devices: PairedDevice[];
 }
 
+/** `RuntimeInfo` (apps/desktop/src-tauri/src/commands.rs). */
+export interface RuntimeInfo {
+  /** True when the scripted fake headphones stand in for the real ones. */
+  fake: boolean;
+  version: string;
+}
+
 /** `AppSettings` (apps/desktop/src-tauri/src/settings.rs). */
 export type Theme = "paper" | "ink" | "system";
 
@@ -213,3 +220,11 @@ export const autoOffLabel = (value: number | null): string =>
 
 /** `PlaybackStatus` 0x01 is play; anything else reads as idle. */
 export const isPlaying = (playback: number | null) => playback === 0x01;
+
+/** Prefixes `label` with "FAKE" on a `--fake-device` run, so it is never mistaken for the real headphones. */
+export const withFake = (label: string, fake: boolean): string =>
+  fake ? ["FAKE", label].filter((part) => part !== "").join(" · ") : label;
+
+/** The main window's top-right status label. */
+export const statusLabel = (connected: boolean, firmware: string | null, fake: boolean): string =>
+  withFake(connected ? ["Connected", firmware ? `FW ${firmware}` : ""].filter(Boolean).join(" · ") : "Not connected", fake);

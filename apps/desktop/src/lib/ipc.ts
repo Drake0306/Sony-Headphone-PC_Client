@@ -2,9 +2,11 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { AppSettings, DeviceState } from "./state";
+import type { AppSettings, DeviceState, RuntimeInfo } from "./state";
 
 export type NcModeArg = "off" | "nc" | "ambient";
+
+export const getRuntimeInfo = () => invoke<RuntimeInfo>("runtime_info");
 
 export const getState = () => invoke<DeviceState>("get_state");
 

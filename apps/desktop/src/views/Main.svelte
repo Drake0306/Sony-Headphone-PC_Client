@@ -4,8 +4,8 @@
 -->
 <script lang="ts">
   import { onMount } from "svelte";
-  import { watchState } from "../lib/ipc";
-  import { emptyState, type DeviceState } from "../lib/state";
+  import { getRuntimeInfo, watchState } from "../lib/ipc";
+  import { emptyState, statusLabel, type DeviceState } from "../lib/state";
   import Devices from "./Devices.svelte";
   import Noise from "./Noise.svelte";
   import Overview from "./Overview.svelte";
@@ -27,15 +27,17 @@
 
   let tab = $state<Tab>(tabFromHash());
   let st = $state<DeviceState>(emptyState());
+  let fake = $state(false);
 
-  const status = $derived(
-    st.connected ? ["Connected", st.firmware ? `FW ${st.firmware}` : ""].filter(Boolean).join(" · ") : "Not connected",
-  );
+  const status = $derived(statusLabel(st.connected, st.firmware, fake));
 
   onMount(() => {
     const onHash = () => (tab = tabFromHash());
     window.addEventListener("hashchange", onHash);
     const stop = watchState((s) => (st = s));
+    getRuntimeInfo()
+      .then((info) => (fake = info.fake))
+      .catch((e) => console.error(e));
     return () => {
       window.removeEventListener("hashchange", onHash);
       stop();

@@ -5,6 +5,7 @@ use std::sync::Mutex;
 
 use mdr_proto::{NcAsmState, NcMode, UltLevel};
 use mdr_session::DeviceState;
+use serde::Serialize;
 use tauri::{AppHandle, State};
 
 use crate::broker::{parse_raw, BrokerCmd};
@@ -18,6 +19,27 @@ impl Broker {
         self.0
             .send(cmd)
             .map_err(|_| "the broker has stopped".to_string())
+    }
+}
+
+/// How this run was started, held in Tauri state.
+pub struct Runtime {
+    pub fake: bool,
+}
+
+/// What the UI needs to know about this run.
+#[derive(Debug, Clone, Serialize)]
+pub struct RuntimeInfo {
+    /// True when the scripted fake headphones stand in for the real ones.
+    pub fake: bool,
+    pub version: String,
+}
+
+#[tauri::command]
+pub fn runtime_info(app: AppHandle, runtime: State<'_, Runtime>) -> RuntimeInfo {
+    RuntimeInfo {
+        fake: runtime.fake,
+        version: app.package_info().version.to_string(),
     }
 }
 

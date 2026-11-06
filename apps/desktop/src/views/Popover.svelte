@@ -4,7 +4,7 @@
   import Boxes from "../lib/controls/Boxes.svelte";
   import LinkList from "../lib/controls/LinkList.svelte";
   import Ticks from "../lib/controls/Ticks.svelte";
-  import { connect, openMainWindow, setUlt, watchState } from "../lib/ipc";
+  import { connect, getRuntimeInfo, openMainWindow, setUlt, watchState } from "../lib/ipc";
   import * as noise from "../lib/noise";
   import { displayStatus, pending, shownValue } from "../lib/pending";
   import {
@@ -12,6 +12,7 @@
     colourway,
     emptyState,
     refusedReason,
+    withFake,
     type DeviceState,
     type NcAsmState,
     type NcMode,
@@ -41,6 +42,7 @@
   const ult = pending<UltLevel>();
   let lastSeen = $state<{ at: number; battery: number | null } | null>(null);
   let now = $state(Date.now());
+  let fake = $state(false);
 
   const ncShown = $derived(shownValue($nc, st.nc.status, st.nc.value));
   const ncStatus = $derived(displayStatus($nc, st.nc.status));
@@ -49,7 +51,7 @@
   // Voice focus never shows the refusal outline; the Noise switch carries it.
   const voiceStatus = $derived(refusedReason(ncStatus) !== null ? "Confirmed" : ncStatus);
   const subtitle = $derived(
-    [colourway(st.color), codecLabel(st.codec.value)].filter((part) => part !== "").join(" · "),
+    withFake([colourway(st.color), codecLabel(st.codec.value)].filter((part) => part !== "").join(" · "), fake),
   );
   const battery = $derived(st.battery.value?.[0] ?? null);
   const devices = $derived(
@@ -83,6 +85,9 @@
 
   onMount(() => {
     const stop = watchState(receive);
+    getRuntimeInfo()
+      .then((info) => (fake = info.fake))
+      .catch((e) => console.error(e));
     const clock = setInterval(() => (now = Date.now()), 30000);
     return () => {
       clearInterval(clock);
@@ -150,7 +155,7 @@
   </div>
 {:else}
   <div class="pop">
-    <div class="row"><span class="name">{st.model ?? "ULT WEAR"}</span><span class="lab">Not connected</span></div>
+    <div class="row"><span class="name">{st.model ?? "ULT WEAR"}</span><span class="lab">{withFake("Not connected", fake)}</span></div>
     {#if lastSeen}
       <div class="row">
         <span class="lab">Last seen</span>

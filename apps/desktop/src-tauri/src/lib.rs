@@ -31,6 +31,7 @@ type InvokeHandler = Box<dyn Fn(tauri::ipc::Invoke) -> bool + Send + Sync>;
 macro_rules! handler {
     ($($extra:path),*) => {
         Box::new(tauri::generate_handler![
+            commands::runtime_info,
             commands::get_state,
             commands::set_nc,
             commands::set_ult,
@@ -76,6 +77,7 @@ pub fn run() {
     let builder = builder.plugin(tauri_nspanel::init());
     builder
         .manage(Mutex::new(DeviceState::default()))
+        .manage(commands::Runtime { fake })
         .invoke_handler(invoke_handler(wants_debug()))
         .setup(move |app| {
             let app_settings = match settings::dir(app.handle()) {

@@ -12,8 +12,9 @@ pub fn frame(t: FrameType, seq: u8, p: &[u8]) -> Vec<u8> {
     })
 }
 
-pub fn drain(s: &mut Session) -> Vec<Vec<u8>> {
-    std::iter::from_fn(|| s.poll_output()).collect()
+/// Everything the session has to write at `now`.
+pub fn drain(s: &mut Session, now: u64) -> Vec<Vec<u8>> {
+    std::iter::from_fn(|| s.poll_output(now)).collect()
 }
 
 pub fn decode_one(bytes: &[u8]) -> Frame {
@@ -73,7 +74,7 @@ pub fn connected_session_with_caps(t1: &[u8]) -> Session {
     s.start();
     let mut t = 0;
     loop {
-        let out = drain(&mut s);
+        let out = drain(&mut s, t);
         let Some(req) = out
             .iter()
             .map(|b| decode_one(b))

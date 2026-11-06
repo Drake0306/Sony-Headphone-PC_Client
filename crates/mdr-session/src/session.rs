@@ -93,9 +93,11 @@ impl Session {
         events
     }
 
-    /// Next bytes to write, respecting one data frame in flight.
-    pub fn poll_output(&mut self) -> Option<Vec<u8>> {
-        self.arq.poll_output(self.last_now_ms)
+    /// Next bytes to write, respecting one data frame in flight. A data frame
+    /// handed out here is stamped with `now_ms` for its ACK deadline.
+    pub fn poll_output(&mut self, now_ms: u64) -> Option<Vec<u8>> {
+        self.last_now_ms = now_ms;
+        self.arq.poll_output(now_ms)
     }
 
     pub fn handle_timeout(&mut self, now_ms: u64) -> Vec<Event> {

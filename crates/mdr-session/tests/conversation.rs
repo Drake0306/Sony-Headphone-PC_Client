@@ -10,9 +10,9 @@ use mdr_session::*;
 fn handshake_sends_protocol_info_first_and_waits_for_ack() {
     let mut s = Session::new(0);
     s.start();
-    let out = drain(&mut s);
+    let out = drain(&mut s, 0);
     assert_eq!(out, vec![frame(FrameType::Command1, 0, &[0x00, 0x00])]);
-    assert!(s.poll_output().is_none(), "one frame in flight");
+    assert!(s.poll_output(0).is_none(), "one frame in flight");
     s.handle_input(&frame(FrameType::Ack, 1, &[]), 10);
     s.handle_input(
         &frame(
@@ -22,7 +22,7 @@ fn handshake_sends_protocol_info_first_and_waits_for_ack() {
         ),
         11,
     );
-    let out = drain(&mut s);
+    let out = drain(&mut s, 11);
     assert_eq!(
         out[0],
         frame(FrameType::Ack, 1, &[]),
@@ -82,7 +82,7 @@ fn full_handshake_reaches_connected_and_reads_initial_state() {
     let mut events = vec![];
     let mut t = 0;
     for (i, (expect, reply)) in script.iter().enumerate() {
-        let out = drain(&mut s);
+        let out = drain(&mut s, t);
         let req = out.last().unwrap();
         assert_eq!(&decode_payload(req), expect, "request #{i}");
         let seq = seq_of(req);
@@ -132,7 +132,7 @@ fn ntfy_without_request_updates_state() {
     assert!(ev.contains(&Event::StateChanged));
     assert_eq!(s.state().nc.value.unwrap().mode, NcMode::NoiseCancelling);
     assert!(matches!(s.state().nc.status, Status::Confirmed));
-    assert_eq!(drain(&mut s)[0], frame(FrameType::Ack, 0, &[]));
+    assert_eq!(drain(&mut s, 500)[0], frame(FrameType::Ack, 0, &[]));
 }
 
 #[test]
@@ -145,7 +145,7 @@ fn set_nc_marks_pending_then_confirmed_on_ntfy() {
     })
     .unwrap();
     assert!(matches!(s.state().nc.status, Status::Pending { .. }));
-    let req = drain(&mut s).pop().unwrap();
+    let req = drain(&mut s, 500).pop().unwrap();
     assert_eq!(
         decode_payload(&req),
         [0x68, 0x17, 0x01, 0x00, 0x00, 0x01, 0x0E]
@@ -168,7 +168,7 @@ fn set_nc_marks_pending_then_confirmed_on_ntfy() {
 fn set_ult_is_read_modify_write() {
     let mut s = connected_session();
     s.set_ult(UltLevel::Ult2).unwrap();
-    let req = drain(&mut s).pop().unwrap();
+    let req = drain(&mut s, 500).pop().unwrap();
     assert_eq!(
         decode_payload(&req),
         [0x58, 0x03, 0x00, 0x02, 0x06, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A]
@@ -179,25 +179,28 @@ fn set_ult_is_read_modify_write() {
 fn set_without_reply_becomes_refused_and_requeries() {
     let mut s = connected_session();
     s.set_ult(UltLevel::Off).unwrap();
-    let req = drain(&mut s).pop().unwrap();
+    let req = drain(&mut s, 500).pop().unwrap();
     let seq = seq_of(&req);
     s.handle_input(&frame(FrameType::Ack, 1 - seq, &[]), 1000);
     assert_eq!(s.next_timeout_ms(), Some(1000 + REPLY_TIMEOUT_MS));
     let ev = s.handle_timeout(2500);
     assert!(ev.contains(&Event::StateChanged));
     assert!(matches!(&s.state().eq_ult.status, Status::Refused { reason } if reason == "no reply"));
-    assert_eq!(decode_payload(&drain(&mut s).pop().unwrap()), [0x56, 0x03]);
+    assert_eq!(
+        decode_payload(&drain(&mut s, 2500).pop().unwrap()),
+        [0x56, 0x03]
+    );
 }
 
 #[test]
 fn unacked_frame_is_retransmitted_then_gives_up() {
     let mut s = Session::new(0);
     s.start();
-    let first = drain(&mut s).pop().unwrap();
+    let first = drain(&mut s, 0).pop().unwrap();
     for n in 1..=ACK_RETRIES {
         let ev = s.handle_timeout(n * ACK_TIMEOUT_MS);
         if n < ACK_RETRIES {
-            assert_eq!(drain(&mut s).pop().unwrap(), first);
+            assert_eq!(drain(&mut s, n * ACK_TIMEOUT_MS).pop().unwrap(), first);
         } else {
             assert!(ev.contains(&Event::Disconnected));
         }
@@ -215,8 +218,8 @@ fn disconnect_marks_all_unavailable() {
 }
 
 /// Next data frame the session hands out, draining any ACKs before it.
-fn next_request(s: &mut Session) -> Option<Frame> {
-    drain(s)
+fn next_request(s: &mut Session, now: u64) -> Option<Frame> {
+    drain(s, now)
         .iter()
         .map(|b| decode_one(b))
         .find(|f| f.frame_type != FrameType::Ack)
@@ -228,14 +231,14 @@ fn handshake_read_without_reply_continues() {
     let mut s = Session::new(0);
     s.start();
     let (mut t, mut dev_seq, mut events) = (0, 0, vec![]);
-    while let Some(req) = next_request(&mut s) {
+    while let Some(req) = next_request(&mut s, t) {
         events.extend(s.handle_input(&frame(FrameType::Ack, 1 - req.seq, &[]), t));
         if req.payload == [0x66, 0x17] {
             events.extend(s.handle_timeout(t + 1600));
             assert!(
                 matches!(&s.state().nc.status, Status::Refused { reason } if reason == "no reply")
             );
-            let next = next_request(&mut s).expect("handshake continues");
+            let next = next_request(&mut s, t + 1600).expect("handshake continues");
             assert_eq!(next.payload, [0x50, 0x03]);
             t += 1610;
             events.extend(s.handle_input(&frame(FrameType::Ack, 1 - next.seq, &[]), t));
@@ -251,4 +254,33 @@ fn handshake_read_without_reply_continues() {
     assert!(events.contains(&Event::Connected));
     assert!(s.state().connected);
     assert!(matches!(&s.state().nc.status, Status::Refused { .. }));
+}
+
+#[test]
+fn request_after_idle_is_not_retransmitted() {
+    let mut s = connected_session();
+    s.handle_timeout(5000);
+    s.set_ult(UltLevel::Off).unwrap();
+    assert!(s.poll_output(5000).is_some(), "the SET goes out");
+    s.handle_timeout(5500);
+    assert!(
+        s.poll_output(5500).is_none(),
+        "no retransmission 500 ms after sending"
+    );
+    assert_eq!(s.next_timeout_ms(), Some(6000));
+}
+
+#[test]
+fn request_is_stamped_with_the_poll_clock() {
+    // No timeout call between the handshake and the request: only
+    // `poll_output` tells the session the time.
+    let mut s = connected_session();
+    s.set_ult(UltLevel::Off).unwrap();
+    assert!(s.poll_output(5000).is_some(), "the SET goes out");
+    s.handle_timeout(5500);
+    assert!(
+        s.poll_output(5500).is_none(),
+        "no retransmission 500 ms after sending"
+    );
+    assert_eq!(s.next_timeout_ms(), Some(6000));
 }

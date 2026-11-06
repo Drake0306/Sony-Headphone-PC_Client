@@ -7,7 +7,7 @@ use mdr_transport::{FakeDevice, Transport};
 /// Writes everything the session has queued, then feeds it at most one frame from the device.
 /// Returns false when the device had nothing to send.
 fn pump_once(s: &mut Session, t: &mut FakeDevice, now: u64) -> (bool, Vec<Event>) {
-    while let Some(out) = s.poll_output() {
+    while let Some(out) = s.poll_output(now) {
         t.write(&out).unwrap();
     }
     match t.recv_timeout(Duration::from_millis(10)).unwrap() {
@@ -37,7 +37,7 @@ fn fake_device_completes_handshake_through_session() {
     let mut now = 0;
     let mut connected = false;
     for _ in 0..200 {
-        while let Some(out) = s.poll_output() {
+        while let Some(out) = s.poll_output(now) {
             t.write(&out).unwrap();
         }
         if let Some(bytes) = t.recv_timeout(Duration::from_millis(10)).unwrap() {
@@ -105,7 +105,7 @@ fn dropped_link_fails_reads_and_writes() {
     t.drop_link_after(1);
     let mut s = Session::new(0);
     s.start();
-    let first = s.poll_output().unwrap();
+    let first = s.poll_output(0).unwrap();
     t.write(&first).unwrap();
     let err = t.recv_timeout(Duration::from_millis(10)).unwrap_err();
     assert_eq!(err.kind(), std::io::ErrorKind::BrokenPipe);

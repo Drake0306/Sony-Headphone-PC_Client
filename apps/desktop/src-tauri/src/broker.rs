@@ -59,7 +59,8 @@ pub fn run_broker<E: Fn(&DeviceState)>(
             }
         }
 
-        while let Some(frame) = session.poll_output() {
+        let now = clock();
+        while let Some(frame) = session.poll_output(now) {
             if let Err(e) = transport.write(&frame) {
                 return Err(link_lost(&mut session, &emit, e));
             }

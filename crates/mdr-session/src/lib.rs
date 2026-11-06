@@ -7,5 +7,8 @@ mod session;
 mod state;
 
 pub use arq::{ACK_RETRIES, ACK_TIMEOUT_MS};
-pub use session::{Event, Session, SessionError, REPLY_TIMEOUT_MS};
-pub use state::{DeviceState, GsSetting, GsValue, PairedDevice, Status, Tracked, GS_MULTIPOINT};
+pub use session::{Event, Session, SessionError, REPLY_TIMEOUT_MS, VOLUME_MAX};
+pub use state::{
+    DeviceState, GsSetting, GsValue, PairedDevice, Status, Tracked, GS_MULTIPOINT, GS_SIDETONE,
+    GS_TOUCH_PANEL,
+};

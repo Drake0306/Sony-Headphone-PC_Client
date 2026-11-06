@@ -99,3 +99,16 @@ fn raw_request_reply_surfaces_as_log() {
     );
     assert_eq!(s.next_timeout_ms(), None, "no reply timer for raw requests");
 }
+
+#[test]
+fn phase2_setters_are_gated() {
+    let mut s = connected_session_with_caps(&[0x20]);
+    assert_eq!(
+        s.set_dsee_auto_off(true),
+        Err(SessionError::Unavailable(0xE2))
+    );
+    assert!(matches!(
+        s.state().dsee_auto_off.status,
+        Status::Unavailable
+    ));
+}

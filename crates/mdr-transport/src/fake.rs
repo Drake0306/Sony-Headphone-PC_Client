@@ -11,44 +11,100 @@ use crate::Transport;
 /// Elapsed time after the first write at which the battery NTFY is sent.
 const BATTERY_NTFY_AFTER: Duration = Duration::from_secs(30);
 const BATTERY_NTFY: &[u8] = &[0x25, 0x00, 0x42, 0x00];
+/// RFCOMM channel the ULT WEAR advertises for the v2 service.
+const CHANNEL: u8 = 18;
 
-/// T1 support functions the fake declares (battery, power off, EQ/ULT, NC/ASM, codec, multipoint).
-const T1_CAPS: &[u8] = &[0x20, 0x23, 0x53, 0x6B, 0x12, 0xD1];
+/// T1 support functions the fake declares: battery, power off, EQ/ULT, NC/ASM,
+/// codec, multipoint, then DSEE, auto power-off, playback, upscaling,
+/// connection mode, wear pause, voice assistant, quick access, touch panel and
+/// sidetone.
+const T1_CAPS: &[u8] = &[
+    0x20, 0x23, 0x53, 0x6B, 0x12, 0xD1, 0x13, 0x25, 0xA1, 0xE2, 0xE3, 0xF1, 0xF4, 0xFD, 0xD2, 0xD3,
+];
+
+/// T2 support functions, as the ULT WEAR declares them (voice guidance first).
+const T2_CAPS: &[u8] = &[0x42, 0x50, 0xF2];
+
+/// EQ preset ids the ULT WEAR reports (docs/hardware-validation.md).
+const PRESETS: [u8; 12] = [
+    0x00, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0xA0, 0xA1, 0xA2,
+];
+
+/// A support-function reply (`07 00 <n> (<id> <priority>)×n`).
+fn support_reply(caps: &[u8]) -> Vec<u8> {
+    let mut r = vec![0x07, 0x00, caps.len() as u8];
+    for &id in caps {
+        r.extend_from_slice(&[id, 0x01]);
+    }
+    r
+}
 
 /// Reply for a request, or `None` if the fake has no answer.
 fn reply(frame_type: FrameType, req: &[u8]) -> Option<Vec<u8>> {
     let head = req.get(..2)?;
     let reply = match (frame_type, head) {
         (FrameType::Command1, [0x00, 0x00]) => vec![0x01, 0x00, 0x03, 0x00, 0x20, 0x02, 0x00, 0x00],
-        (FrameType::Command1, [0x06, 0x00]) => {
-            let mut r = vec![0x07, 0x00, T1_CAPS.len() as u8];
-            for &id in T1_CAPS {
-                r.extend_from_slice(&[id, 0x01]);
-            }
-            r
-        }
-        (FrameType::Command2, [0x06, 0x00]) => vec![0x07, 0x00, 0x01, 0x42, 0x01],
+        (FrameType::Command1, [0x06, 0x00]) => support_reply(T1_CAPS),
+        (FrameType::Command2, [0x06, 0x00]) => support_reply(T2_CAPS),
+        (FrameType::Command2, [0x46, 0x20]) => vec![0x47, 0x20, 0x02],
+        // T2 voice guidance volume SET, confirmed by its NTFY.
+        (FrameType::Command2, [0x48, 0x20]) => echo(req),
         (_, [0x04, 0x01]) => [&[0x05, 0x01, 0x08][..], b"ULT WEAR"].concat(),
         (_, [0x04, 0x02]) => [&[0x05, 0x02, 0x05][..], b"2.1.0"].concat(),
         (_, [0x04, 0x03]) => vec![0x05, 0x03, 0x00, 0x08],
         (_, [0x22, 0x00]) => vec![0x23, 0x00, 0x43, 0x00],
         (_, [0x66, 0x17]) => vec![0x67, 0x17, 0x01, 0x01, 0x01, 0x01, 0x0E],
-        (_, [0x50, 0x03]) => vec![0x51, 0x03, 0x06, 0x15, 0x0A, 0x00],
+        // As the ULT WEAR answers: 6 bands, 21 steps, ULT2 step 10, then
+        // twelve preset ids with empty names.
+        (_, [0x50, 0x03]) => {
+            let mut r = vec![0x51, 0x03, 0x06, 0x15, 0x0A, PRESETS.len() as u8];
+            r.extend(PRESETS.iter().flat_map(|&id| [id, 0x00]));
+            r
+        }
         (_, [0x56, 0x03]) => vec![
             0x57, 0x03, 0x00, 0x01, 0x06, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A,
         ],
         (_, [0x12, 0x02]) => vec![0x13, 0x02, 0x10],
         (_, [0xD0, 0xD1]) => [&[0xD1, 0xD1, 0x00, 0x00, 0x0A][..], b"MULTIPOINT", &[0x00]].concat(),
         (_, [0xD6, 0xD1]) => vec![0xD7, 0xD1, 0x00, 0x00],
-        // SETs are confirmed by a NTFY carrying the new value.
-        (_, [0x68, 0x17] | [0x58, 0x03] | [0xD8, 0xD1]) => {
-            let mut r = req.to_vec();
-            r[0] += 1;
-            r
-        }
+        (_, [0xD0, 0xD2]) => [
+            &[0xD1, 0xD2, 0x00, 0x00, 0x13][..],
+            b"TOUCH_PANEL_SETTING",
+            &[0x00],
+        ]
+        .concat(),
+        (_, [0xD6, 0xD2]) => vec![0xD7, 0xD2, 0x00, 0x01],
+        (_, [0xD0, 0xD3]) => [
+            &[0xD1, 0xD3, 0x00, 0x00, 0x10][..],
+            b"SIDETONE_SETTING",
+            &[0x18],
+            b"SIDETONE_SETTING_SUMMARY",
+        ]
+        .concat(),
+        (_, [0xD6, 0xD3]) => vec![0xD7, 0xD3, 0x00, 0x00],
+        (_, [0x26, 0x05]) => vec![0x27, 0x05, 0x10, 0x11],
+        (_, [0xA6, 0x20]) => vec![0xA7, 0x20, 0x1C],
+        (_, [0x12, 0x03]) => vec![0x13, 0x03, 0x01, 0x01],
+        (_, [0xE6, 0x01]) => vec![0xE7, 0x01, 0x01],
+        (_, [0xE6, 0x02]) => vec![0xE7, 0x02, 0x00],
+        (_, [0xF6, 0x01]) => vec![0xF7, 0x01, 0x01],
+        (_, [0xF6, 0x04]) => vec![0xF7, 0x04, 0xFF],
+        (_, [0xF6, 0x0D]) => vec![0xF7, 0x0D, 0x02, 0x00, 0x00],
+        (_, [0xA2, 0x01]) => vec![0xA3, 0x01, 0x00, 0x02, 0x00],
+        // SETs are confirmed by a NTFY (the SET opcode + 1) carrying the new value:
+        // NC/ASM, EQ/ULT, general settings, upscaling and connection mode,
+        // system params, volume and auto power-off.
+        (FrameType::Command1, [0x68 | 0x58 | 0xD8 | 0xE8 | 0xF8 | 0xA8 | 0x28, _]) => echo(req),
         _ => return None,
     };
     Some(reply)
+}
+
+/// The NTFY for a SET: same payload, opcode + 1.
+fn echo(req: &[u8]) -> Vec<u8> {
+    let mut r = req.to_vec();
+    r[0] += 1;
+    r
 }
 
 /// A data frame of the fake's own, sent stop-and-wait.
@@ -206,4 +262,8 @@ impl Transport for FakeDevice {
     }
 
     fn close(&mut self) {}
+
+    fn channel(&self) -> Option<u8> {
+        Some(CHANNEL)
+    }
 }

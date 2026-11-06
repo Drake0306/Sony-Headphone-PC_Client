@@ -39,6 +39,30 @@ pub enum Message {
         current: u8,
         last: u8,
     },
+    Dsee {
+        on: bool,
+    },
+    DseeAutoOff {
+        auto: bool,
+    },
+    ConnectionMode {
+        value: u8,
+    },
+    WearPause {
+        on: bool,
+    },
+    VoiceAssistant {
+        value: u8,
+    },
+    QuickAccess {
+        functions: Vec<u8>,
+    },
+    VoiceGuideVolume {
+        value: i8,
+    },
+    Playback {
+        status: u8,
+    },
     Unknown {
         table: Table,
         opcode: u8,
@@ -118,6 +142,13 @@ fn decode_t2(opcode: u8, payload: &[u8]) -> Option<Message> {
     let _sub = r.u8()?;
     match opcode {
         t2::CONNECT_RET_SUPPORT_FUNCTION => support_functions(&mut r),
+        t2::VOICE_GUIDANCE_RET_PARAM | t2::VOICE_GUIDANCE_NTFY_PARAM
+            if _sub == t2::VOICE_GUIDANCE_VOLUME =>
+        {
+            Some(Message::VoiceGuideVolume {
+                value: r.u8()? as i8,
+            })
+        }
         _ => None,
     }
 }
@@ -222,6 +253,35 @@ fn decode_t1(opcode: u8, payload: &[u8]) -> Option<Message> {
         }
         t1::PLAY_RET_PARAM | t1::PLAY_NTFY_PARAM if sub == inquired::VOLUME => {
             Some(Message::Volume(r.u8()?))
+        }
+        t1::COMMON_RET_STATUS | t1::COMMON_NTFY_STATUS if sub == inquired::DSEE_INDICATOR => {
+            let _kind = r.u8()?;
+            Some(Message::Dsee { on: r.u8()? != 0 })
+        }
+        t1::AUDIO_RET_PARAM | t1::AUDIO_NTFY_PARAM if sub == inquired::UPSCALING => {
+            Some(Message::DseeAutoOff { auto: r.u8()? != 0 })
+        }
+        t1::AUDIO_RET_PARAM | t1::AUDIO_NTFY_PARAM if sub == inquired::CONNECTION_MODE_LDAC => {
+            Some(Message::ConnectionMode { value: r.u8()? })
+        }
+        t1::SYSTEM_RET_PARAM | t1::SYSTEM_NTFY_PARAM
+            if sub == inquired::PLAYBACK_CONTROL_BY_WEARING =>
+        {
+            // Inverted enum: 0x00 is ON.
+            Some(Message::WearPause { on: r.u8()? == 0 })
+        }
+        t1::SYSTEM_RET_PARAM | t1::SYSTEM_NTFY_PARAM if sub == inquired::VOICE_ASSISTANT => {
+            Some(Message::VoiceAssistant { value: r.u8()? })
+        }
+        t1::SYSTEM_RET_PARAM | t1::SYSTEM_NTFY_PARAM if sub == inquired::QUICK_ACCESS => {
+            let n = usize::from(r.u8()?);
+            Some(Message::QuickAccess {
+                functions: r.take(n)?.to_vec(),
+            })
+        }
+        t1::PLAY_RET_STATUS | t1::PLAY_NTFY_STATUS if sub == inquired::PLAYBACK_STATUS => {
+            let _ = r.u8()?;
+            Some(Message::Playback { status: r.u8()? })
         }
         t1::GS_RET_CAPABILITY => {
             let kind = match r.u8()? {

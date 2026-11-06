@@ -46,6 +46,10 @@ pub trait Transport: Send {
     /// Next chunk of received bytes; `Ok(None)` on timeout, `Err` on link loss.
     fn recv_timeout(&mut self, timeout: Duration) -> io::Result<Option<Vec<u8>>>;
     fn close(&mut self);
+    /// RFCOMM channel the link runs on, when the transport knows it.
+    fn channel(&self) -> Option<u8> {
+        None
+    }
 }
 
 #[cfg(test)]

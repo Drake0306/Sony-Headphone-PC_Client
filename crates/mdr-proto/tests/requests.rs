@@ -88,3 +88,129 @@ fn deny_list_is_keyed_on_opcode_and_sub_id() {
     assert!(denied(Table::T1, &[0x24, 0x03, 0x01]).is_some()); // power off needs session-level confirmation
     assert!(denied(Table::T1, &[0x68, 0x17, 0x01, 0x01, 0x01, 0x00, 0x05]).is_none());
 }
+
+#[test]
+fn phase2_builders_bytes() {
+    use request::*;
+    let check = |r: Request, t: Table, b: &[u8], c: Option<u8>, g: Group| {
+        assert_eq!(
+            (r.table, r.bytes.as_slice(), r.capability, r.group),
+            (t, b, c, g)
+        );
+    };
+    let t1 = Table::T1;
+    check(
+        dsee_status_get(),
+        t1,
+        &[0x12, 0x03],
+        Some(0x13),
+        Group::Dsee,
+    );
+    check(
+        dsee_auto_off_get(),
+        t1,
+        &[0xE6, 0x01],
+        Some(0xE2),
+        Group::DseeAutoOff,
+    );
+    check(
+        dsee_auto_off_set(true),
+        t1,
+        &[0xE8, 0x01, 1],
+        Some(0xE2),
+        Group::DseeAutoOff,
+    );
+    check(
+        connection_mode_get(),
+        t1,
+        &[0xE6, 0x02],
+        Some(0xE3),
+        Group::ConnectionMode,
+    );
+    check(
+        connection_mode_set(1),
+        t1,
+        &[0xE8, 0x02, 1],
+        Some(0xE3),
+        Group::ConnectionMode,
+    );
+    check(
+        wear_pause_get(),
+        t1,
+        &[0xF6, 0x01],
+        Some(0xF1),
+        Group::WearPause,
+    );
+    check(
+        wear_pause_set(true),
+        t1,
+        &[0xF8, 0x01, 0],
+        Some(0xF1),
+        Group::WearPause,
+    );
+    check(
+        wear_pause_set(false),
+        t1,
+        &[0xF8, 0x01, 1],
+        Some(0xF1),
+        Group::WearPause,
+    );
+    check(
+        voice_assistant_get(),
+        t1,
+        &[0xF6, 0x04],
+        Some(0xF4),
+        Group::VoiceAssistant,
+    );
+    check(
+        voice_assistant_set(0x31),
+        t1,
+        &[0xF8, 0x04, 0x31],
+        Some(0xF4),
+        Group::VoiceAssistant,
+    );
+    check(
+        quick_access_get(),
+        t1,
+        &[0xF6, 0x0D],
+        Some(0xFD),
+        Group::QuickAccess,
+    );
+    check(
+        quick_access_set(&[1, 2]),
+        t1,
+        &[0xF8, 0x0D, 2, 1, 2],
+        Some(0xFD),
+        Group::QuickAccess,
+    );
+    check(
+        voice_guide_volume_get(),
+        Table::T2,
+        &[0x46, 0x20],
+        Some(0x42),
+        Group::VoiceGuide,
+    );
+    check(
+        voice_guide_volume_set(-2),
+        Table::T2,
+        &[0x48, 0x20, 0xFE],
+        Some(0x42),
+        Group::VoiceGuide,
+    );
+    check(
+        playback_status_get(),
+        t1,
+        &[0xA2, 0x01],
+        Some(0xA1),
+        Group::Playback,
+    );
+    let m = multipoint_commit();
+    check(
+        m.clone(),
+        t1,
+        &[0x98, 0x00, 0x06, 0x01],
+        Some(0xD1),
+        Group::GeneralSetting(0xD1),
+    );
+    assert_eq!(denied(m.table, &m.bytes), None);
+}

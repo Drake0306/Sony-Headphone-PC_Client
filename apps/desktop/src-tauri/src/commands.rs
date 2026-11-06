@@ -5,6 +5,7 @@ use std::sync::Mutex;
 
 use mdr_proto::{NcAsmState, NcMode, UltLevel};
 use mdr_session::DeviceState;
+use serde::Serialize;
 use tauri::{AppHandle, State};
 
 use crate::broker::{parse_raw, BrokerCmd};
@@ -18,6 +19,27 @@ impl Broker {
         self.0
             .send(cmd)
             .map_err(|_| "the broker has stopped".to_string())
+    }
+}
+
+/// How this run was started, held in Tauri state.
+pub struct Runtime {
+    pub fake: bool,
+}
+
+/// What the UI needs to know about this run.
+#[derive(Debug, Clone, Serialize)]
+pub struct RuntimeInfo {
+    /// True when the scripted fake headphones stand in for the real ones.
+    pub fake: bool,
+    pub version: String,
+}
+
+#[tauri::command]
+pub fn runtime_info(app: AppHandle, runtime: State<'_, Runtime>) -> RuntimeInfo {
+    RuntimeInfo {
+        fake: runtime.fake,
+        version: app.package_info().version.to_string(),
     }
 }
 
@@ -65,6 +87,113 @@ pub fn set_multipoint(broker: State<'_, Broker>, on: bool) -> Result<(), String>
     broker.send(BrokerCmd::SetMultipoint(on))
 }
 
+/// EQ preset ids the device offers (Off, the eight named presets, Manual, Custom 1/2).
+const EQ_PRESETS: [u8; 12] = [
+    0x00, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0xA0, 0xA1, 0xA2,
+];
+const EQ_BANDS: usize = 6;
+const EQ_BAND_MAX: u8 = 20;
+const VOLUME_MAX: u8 = 30;
+/// Auto power-off: 5, 15, 30, 60, 180 min, when removed from ears, disabled.
+const AUTO_POWER_OFF_VALUES: [u8; 7] = [0x00, 0x04, 0x01, 0x02, 0x03, 0x10, 0x11];
+/// Voice assistant: phone default, Google, Alexa, Sony, none.
+const VOICE_ASSISTANTS: [u8; 5] = [0x30, 0x31, 0x32, 0x34, 0xFF];
+
+#[tauri::command]
+pub fn set_eq_preset(broker: State<'_, Broker>, preset: u8) -> Result<(), String> {
+    if !EQ_PRESETS.contains(&preset) {
+        return Err(format!("unknown EQ preset {preset:#04X}"));
+    }
+    broker.send(BrokerCmd::SetEqPreset(preset))
+}
+
+#[tauri::command]
+pub fn set_eq_bands(broker: State<'_, Broker>, bands: Vec<u8>) -> Result<(), String> {
+    check_bands(&bands)?;
+    broker.send(BrokerCmd::SetEqBands(bands))
+}
+
+fn check_bands(bands: &[u8]) -> Result<(), String> {
+    if bands.len() != EQ_BANDS {
+        return Err(format!("expected {EQ_BANDS} bands, got {}", bands.len()));
+    }
+    if let Some(b) = bands.iter().find(|&&b| b > EQ_BAND_MAX) {
+        return Err(format!("band level {b} is outside 0..={EQ_BAND_MAX}"));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_volume(broker: State<'_, Broker>, volume: u8) -> Result<(), String> {
+    if volume > VOLUME_MAX {
+        return Err(format!("volume {volume} is outside 0..={VOLUME_MAX}"));
+    }
+    broker.send(BrokerCmd::SetVolume(volume))
+}
+
+#[tauri::command]
+pub fn set_dsee_auto_off(broker: State<'_, Broker>, auto: bool) -> Result<(), String> {
+    broker.send(BrokerCmd::SetDseeAutoOff(auto))
+}
+
+#[tauri::command]
+pub fn set_connection_mode(broker: State<'_, Broker>, value: u8) -> Result<(), String> {
+    if value > 1 {
+        return Err(format!("connection mode {value} is not 0 or 1"));
+    }
+    broker.send(BrokerCmd::SetConnectionMode(value))
+}
+
+#[tauri::command]
+pub fn set_auto_power_off(broker: State<'_, Broker>, value: u8) -> Result<(), String> {
+    if !AUTO_POWER_OFF_VALUES.contains(&value) {
+        return Err(format!("unknown auto power-off value {value:#04X}"));
+    }
+    broker.send(BrokerCmd::SetAutoPowerOff(value))
+}
+
+#[tauri::command]
+pub fn set_wear_pause(broker: State<'_, Broker>, on: bool) -> Result<(), String> {
+    broker.send(BrokerCmd::SetWearPause(on))
+}
+
+#[tauri::command]
+pub fn set_voice_assistant(broker: State<'_, Broker>, value: u8) -> Result<(), String> {
+    if !VOICE_ASSISTANTS.contains(&value) {
+        return Err(format!("unknown voice assistant {value:#04X}"));
+    }
+    broker.send(BrokerCmd::SetVoiceAssistant(value))
+}
+
+#[tauri::command]
+pub fn set_quick_access(broker: State<'_, Broker>, functions: Vec<u8>) -> Result<(), String> {
+    if functions.len() > usize::from(u8::MAX) {
+        return Err(format!(
+            "{} quick access functions is too many",
+            functions.len()
+        ));
+    }
+    broker.send(BrokerCmd::SetQuickAccess(functions))
+}
+
+#[tauri::command]
+pub fn set_voice_guide_volume(broker: State<'_, Broker>, value: i8) -> Result<(), String> {
+    if !(-2..=2).contains(&value) {
+        return Err(format!("voice guide volume {value} is outside -2..=2"));
+    }
+    broker.send(BrokerCmd::SetVoiceGuideVolume(value))
+}
+
+#[tauri::command]
+pub fn set_touch_panel(broker: State<'_, Broker>, on: bool) -> Result<(), String> {
+    broker.send(BrokerCmd::SetTouchPanel(on))
+}
+
+#[tauri::command]
+pub fn set_sidetone(broker: State<'_, Broker>, on: bool) -> Result<(), String> {
+    broker.send(BrokerCmd::SetSidetone(on))
+}
+
 #[tauri::command]
 pub fn connect(broker: State<'_, Broker>) -> Result<(), String> {
     broker.send(BrokerCmd::Connect)
@@ -80,4 +209,16 @@ pub fn open_main_window(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn debug_raw(broker: State<'_, Broker>, table: String, hex: String) -> Result<(), String> {
     broker.send(parse_raw(&table, &hex)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::check_bands;
+
+    #[test]
+    fn bands_need_six_levels_within_range() {
+        assert!(check_bands(&[10, 13, 10, 14, 20, 0]).is_ok());
+        assert!(check_bands(&[10, 10, 10, 10, 10]).is_err());
+        assert!(check_bands(&[10, 10, 10, 10, 10, 21]).is_err());
+    }
 }

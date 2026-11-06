@@ -1,4 +1,4 @@
-//! The popover window (an NSPanel on macOS) and the main window placeholder.
+//! The popover window (an NSPanel on macOS) and the main window.
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -6,7 +6,11 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_positioner::{Position, WindowExt};
 
+use crate::dock::{self, ActivationPolicyKind};
+use crate::settings::AppSettings;
+
 const LABEL: &str = "popover";
+const MAIN: &str = "main";
 /// A tray click right after a focus-loss hide is the same click; don't reopen.
 const REOPEN_GUARD: Duration = Duration::from_millis(300);
 
@@ -104,17 +108,45 @@ fn hide(app: &AppHandle) {
     }
 }
 
-/// Focuses the main window, creating it on first use. Its screens arrive in Phase 2.
+/// Focuses the main window, creating it on first use, and brings the app
+/// forward. The Dock icon shows while the window exists.
 pub fn open_main_window(app: &AppHandle) -> tauri::Result<()> {
     hide(app);
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = app.get_webview_window(MAIN) {
+        bring_forward(app)?;
         window.show()?;
+        window.unminimize()?;
         return window.set_focus();
     }
     let window =
-        WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html?view=main".into()))
+        WebviewWindowBuilder::new(app, MAIN, WebviewUrl::App("index.html?view=main".into()))
             .title("Hairline")
             .inner_size(880.0, 560.0)
+            .min_inner_size(880.0, 560.0)
+            .resizable(true)
+            .visible(true)
             .build()?;
+    let handle = app.clone();
+    window.on_window_event(move |event| {
+        if let WindowEvent::Destroyed = event {
+            let hide_dock_icon = handle
+                .state::<Mutex<AppSettings>>()
+                .lock()
+                .map(|s| s.hide_dock_icon)
+                .unwrap_or(true);
+            dock::apply_for(&handle, false, hide_dock_icon);
+        }
+    });
+    // Only once the window exists, so a failed build leaves no Dock icon behind.
+    bring_forward(app)?;
     window.set_focus()
+}
+
+/// Switches to the Regular policy (Dock icon) and unhides the app, so the main
+/// window can come to the front.
+fn bring_forward(app: &AppHandle) -> tauri::Result<()> {
+    dock::apply(app, ActivationPolicyKind::Regular);
+    #[cfg(target_os = "macos")]
+    app.show()?;
+    Ok(())
 }

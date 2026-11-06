@@ -78,6 +78,8 @@ fn full_handshake_reaches_connected_and_reads_initial_state() {
             ],
         ),
         (&[0xD6, 0xD1], &[0xD7, 0xD1, 0x00, 0x00]),
+        // T2 voice guidance volume (T2 declares 0x42)
+        (&[0x46, 0x20], &[0x47, 0x20, 0x02]),
     ];
     let mut events = vec![];
     let mut t = 0;
@@ -87,7 +89,7 @@ fn full_handshake_reaches_connected_and_reads_initial_state() {
         assert_eq!(&decode_payload(req), expect, "request #{i}");
         let seq = seq_of(req);
         events.extend(s.handle_input(&frame(FrameType::Ack, 1 - seq, &[]), t));
-        let table = if i == 2 {
+        let table = if i == 2 || i == script.len() - 1 {
             FrameType::Command2
         } else {
             FrameType::Command1
@@ -119,8 +121,8 @@ fn full_handshake_reaches_connected_and_reads_initial_state() {
 
 #[test]
 fn ntfy_without_request_updates_state() {
-    let mut s = connected_session(); // helper: runs the script above
-                                     // The handshake's 13th and last device reply used seq 0, so the device's next frame is seq 1.
+    let mut s = connected_session(); // helper: runs the scripted device
+                                     // The handshake's last device reply used seq 0, so the device's next frame is seq 1.
     let ev = s.handle_input(
         &frame(
             FrameType::Command1,
@@ -217,6 +219,17 @@ fn disconnect_marks_all_unavailable() {
     assert!(matches!(s.state().nc.status, Status::Unavailable));
 }
 
+#[test]
+fn set_link_round_trip() {
+    let mut s = connected_session();
+    s.set_link(Some("A8:E6:E8:FE:D6:54".into()), Some(18));
+    assert_eq!(s.state().address.as_deref(), Some("A8:E6:E8:FE:D6:54"));
+    assert_eq!(s.state().channel, Some(18));
+    s.mark_disconnected();
+    assert_eq!(s.state().address, None);
+    assert_eq!(s.state().channel, None);
+}
+
 /// Next data frame the session hands out, draining any ACKs before it.
 fn next_request(s: &mut Session, now: u64) -> Option<Frame> {
     drain(s, now)
@@ -283,4 +296,219 @@ fn request_is_stamped_with_the_poll_clock() {
         "no retransmission 500 ms after sending"
     );
     assert_eq!(s.next_timeout_ms(), Some(6000));
+}
+
+#[test]
+fn handshake_reads_phase2_fields() {
+    let s = connected_session();
+    let st = s.state();
+    assert_eq!(st.dsee.value, Some(true));
+    assert_eq!(st.dsee_auto_off.value, Some(true));
+    assert_eq!(st.connection_mode.value, Some(0));
+    assert_eq!(st.wear_pause.value, Some(false));
+    assert_eq!(st.voice_assistant.value, Some(0xFF));
+    assert_eq!(st.quick_access.value, Some(vec![0, 0]));
+    assert_eq!(st.voice_guide_volume.value, Some(2));
+    assert_eq!(st.playback, Some(2));
+    assert_eq!(st.touch_panel.value, Some(false));
+    assert_eq!(st.sidetone.value, Some(true));
+    assert_eq!(st.auto_power_off.value, Some(0x10));
+    assert_eq!(st.volume.value, Some(28));
+    for (name, status) in [
+        ("dsee", &st.dsee.status),
+        ("dsee_auto_off", &st.dsee_auto_off.status),
+        ("connection_mode", &st.connection_mode.status),
+        ("wear_pause", &st.wear_pause.status),
+        ("voice_assistant", &st.voice_assistant.status),
+        ("quick_access", &st.quick_access.status),
+        ("voice_guide_volume", &st.voice_guide_volume.status),
+        ("touch_panel", &st.touch_panel.status),
+        ("sidetone", &st.sidetone.status),
+        ("auto_power_off", &st.auto_power_off.status),
+        ("multipoint", &st.multipoint.status),
+        ("volume", &st.volume.status),
+    ] {
+        assert_eq!(status, &Status::Confirmed, "{name}");
+    }
+}
+
+/// Puts the EQ state `A2 / Ult1 / [10,13,10,14,20,12]` into a connected session.
+fn session_with_custom_eq() -> Session {
+    let mut s = connected_session();
+    s.handle_input(
+        &frame(
+            FrameType::Command1,
+            1,
+            &[
+                0x59, 0x03, 0xA2, 0x01, 0x06, 0x0A, 0x0D, 0x0A, 0x0E, 0x14, 0x0C,
+            ],
+        ),
+        500,
+    );
+    drain(&mut s, 500); // the ACK for the NTFY
+    let eq = s.state().eq_ult.value.clone().unwrap();
+    assert_eq!(eq.preset, 0xA2);
+    assert_eq!(eq.ult, UltLevel::Ult1);
+    s
+}
+
+#[test]
+fn set_eq_preset_keeps_ult_and_bands() {
+    let mut s = session_with_custom_eq();
+    s.set_eq_preset(0x16).unwrap();
+    let req = next_request(&mut s, 600).unwrap();
+    assert_eq!(
+        req.payload,
+        [0x58, 0x03, 0x16, 0x01, 0x06, 0x0A, 0x0D, 0x0A, 0x0E, 0x14, 0x0C]
+    );
+}
+
+#[test]
+fn set_eq_bands_validates_length() {
+    let mut s = session_with_custom_eq();
+    assert_eq!(
+        s.set_eq_bands(vec![1, 2, 3, 4, 5]),
+        Err(SessionError::InvalidValue)
+    );
+    assert!(s.poll_output(600).is_none(), "nothing sent");
+    s.set_eq_bands(vec![1, 2, 3, 4, 5, 6]).unwrap();
+    let req = next_request(&mut s, 600).unwrap();
+    assert_eq!(
+        req.payload,
+        [0x58, 0x03, 0xA2, 0x01, 0x06, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06]
+    );
+}
+
+#[test]
+fn set_multipoint_sends_bool_then_commit() {
+    let mut s = connected_session();
+    s.set_multipoint(false).unwrap();
+    let out = drain(&mut s, 500);
+    assert_eq!(out.len(), 1, "one frame in flight");
+    let first = decode_one(&out[0]);
+    assert_eq!(first.payload, [0xD8, 0xD1, 0x00, 0x01]);
+    assert!(s.poll_output(510).is_none(), "commit waits for the ACK");
+    s.handle_input(&frame(FrameType::Ack, 1 - first.seq, &[]), 520);
+    let second = next_request(&mut s, 520).expect("commit after ACK");
+    assert_eq!(second.payload, [0x98, 0x00, 0x06, 0x01]);
+}
+
+#[test]
+fn set_multipoint_on_sends_wire_zero() {
+    let mut s = connected_session();
+    s.set_multipoint(true).unwrap();
+    let first = next_request(&mut s, 500).unwrap();
+    assert_eq!(first.payload, [0xD8, 0xD1, 0x00, 0x00]);
+}
+
+#[test]
+fn set_voice_guide_volume_t2() {
+    let mut s = connected_session();
+    s.set_voice_guide_volume(-2).unwrap();
+    let req = next_request(&mut s, 500).unwrap();
+    assert_eq!(req.frame_type, FrameType::Command2);
+    assert_eq!(req.payload, [0x48, 0x20, 0xFE]);
+    assert_eq!(s.set_voice_guide_volume(3), Err(SessionError::InvalidValue));
+}
+
+#[test]
+fn set_wear_pause_sends_inverted_enum() {
+    let mut s = connected_session();
+    s.set_wear_pause(true).unwrap();
+    assert!(matches!(
+        s.state().wear_pause.status,
+        Status::Pending { .. }
+    ));
+    let req = next_request(&mut s, 500).unwrap();
+    assert_eq!(req.payload, [0xF8, 0x01, 0x00]);
+}
+
+#[test]
+fn invalid_volume_rejected() {
+    let mut s = connected_session();
+    assert_eq!(s.set_volume(31), Err(SessionError::InvalidValue));
+    assert!(s.set_volume(30).is_ok());
+}
+
+#[test]
+fn invalid_auto_power_off_rejected() {
+    let mut s = connected_session();
+    assert_eq!(s.set_auto_power_off(0x05), Err(SessionError::InvalidValue));
+    s.set_auto_power_off(0x11).unwrap();
+    let req = next_request(&mut s, 500).unwrap();
+    assert_eq!(req.payload, [0x28, 0x05, 0x11, 0x11]);
+}
+
+#[test]
+fn touch_panel_and_sidetone_use_general_settings() {
+    let mut s = connected_session();
+    s.set_touch_panel(true).unwrap();
+    let req = next_request(&mut s, 500).unwrap();
+    assert_eq!(req.payload, [0xD8, 0xD2, 0x00, 0x00]);
+    s.handle_input(&frame(FrameType::Ack, 1 - req.seq, &[]), 510);
+    s.handle_input(
+        &frame(FrameType::Command1, 1, &[0xD9, 0xD2, 0x00, 0x00]),
+        520,
+    );
+    assert_eq!(s.state().touch_panel.value, Some(true));
+    assert_eq!(s.state().touch_panel.status, Status::Confirmed);
+    s.set_sidetone(false).unwrap();
+    let req = next_request(&mut s, 530).unwrap();
+    assert_eq!(req.payload, [0xD8, 0xD3, 0x00, 0x01]);
+}
+
+#[test]
+fn playback_ntfy_updates_untracked_state() {
+    let mut s = connected_session();
+    let ev = s.handle_input(
+        &frame(FrameType::Command1, 1, &[0xA5, 0x01, 0x00, 0x01, 0x00]),
+        500,
+    );
+    assert!(ev.contains(&Event::StateChanged));
+    assert_eq!(s.state().playback, Some(0x01));
+}
+
+#[test]
+fn t2_support_timeout_still_queues_reads() {
+    let caps = [0x20, 0x6B];
+    let mut s = Session::new(0);
+    s.start();
+    let (mut t, mut dev_seq, mut events) = (0, 0, vec![]);
+    let mut sent: Vec<(FrameType, Vec<u8>)> = vec![];
+    let mut timed_out = false;
+    while let Some(req) = next_request(&mut s, t) {
+        sent.push((req.frame_type, req.payload.clone()));
+        events.extend(s.handle_input(&frame(FrameType::Ack, 1 - req.seq, &[]), t));
+        if req.frame_type == FrameType::Command2 && req.payload == [0x06, 0x00] {
+            // Never answered: the T2 support-function read times out.
+            assert!(s.handle_timeout(t + REPLY_TIMEOUT_MS - 1).is_empty());
+            events.extend(s.handle_timeout(t + REPLY_TIMEOUT_MS + 100));
+            timed_out = true;
+            t += REPLY_TIMEOUT_MS + 110;
+            let next = next_request(&mut s, t).expect("handshake continues");
+            assert_eq!(next.payload, [0x04, 0x01], "first fixed step follows");
+            sent.push((next.frame_type, next.payload.clone()));
+            events.extend(s.handle_input(&frame(FrameType::Ack, 1 - next.seq, &[]), t));
+            let reply = scripted_reply(next.frame_type, &next.payload, &caps).unwrap();
+            events.extend(s.handle_input(&frame(next.frame_type, dev_seq, &reply), t + 1));
+        } else {
+            let reply = scripted_reply(req.frame_type, &req.payload, &caps)
+                .unwrap_or_else(|| panic!("no scripted reply for {:02X?}", req.payload));
+            events.extend(s.handle_input(&frame(req.frame_type, dev_seq, &reply), t + 1));
+        }
+        dev_seq ^= 1;
+        t += 10;
+    }
+    assert!(timed_out, "the T2 support-function read was sent");
+    let payloads: Vec<&[u8]> = sent.iter().map(|(_, p)| p.as_slice()).collect();
+    assert!(payloads.contains(&&[0x22, 0x00][..]), "battery read sent");
+    assert!(payloads.contains(&&[0x66, 0x17][..]), "NC/ASM read sent");
+    assert!(
+        !sent
+            .iter()
+            .any(|(ft, p)| *ft == FrameType::Command2 && p == &[0x46, 0x20]),
+        "no T2 voice guidance read without a T2 list"
+    );
+    assert!(events.contains(&Event::Connected));
+    assert!(s.state().connected);
 }

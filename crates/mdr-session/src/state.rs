@@ -8,6 +8,10 @@ use serde::{Deserialize, Serialize};
 
 /// General setting that drives `DeviceState::multipoint`.
 pub const GS_MULTIPOINT: u8 = 0xD1;
+/// General setting that drives `DeviceState::touch_panel`.
+pub const GS_TOUCH_PANEL: u8 = 0xD2;
+/// General setting that drives `DeviceState::sidetone`.
+pub const GS_SIDETONE: u8 = 0xD3;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Status {
@@ -73,6 +77,10 @@ pub struct PairedDevice {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct DeviceState {
     pub connected: bool,
+    /// Bluetooth address of the linked headphones, as the transport reported it.
+    pub address: Option<String>,
+    /// RFCOMM channel of the v2 service, when the transport exposes it.
+    pub channel: Option<u8>,
     pub model: Option<String>,
     pub firmware: Option<String>,
     pub color: Option<u8>,
@@ -87,6 +95,19 @@ pub struct DeviceState {
     pub volume: Tracked<u8>,
     pub multipoint: Tracked<bool>,
     pub auto_power_off: Tracked<u8>,
+    pub dsee: Tracked<bool>,
+    /// DSEE Extreme upscaling mode: true is Auto (upscales when it helps),
+    /// false is Off (`UpscalingTypeAutoOff`).
+    pub dsee_auto_off: Tracked<bool>,
+    pub connection_mode: Tracked<u8>,
+    pub wear_pause: Tracked<bool>,
+    pub voice_assistant: Tracked<u8>,
+    pub quick_access: Tracked<Vec<u8>>,
+    pub voice_guide_volume: Tracked<i8>,
+    /// Last reported `PlaybackStatus`; read-only, so not tracked.
+    pub playback: Option<u8>,
+    pub touch_panel: Tracked<bool>,
+    pub sidetone: Tracked<bool>,
     pub gs: Vec<GsSetting>,
     pub devices: Vec<PairedDevice>,
 }
@@ -94,7 +115,7 @@ pub struct DeviceState {
 /// What applying a message did to the state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Applied {
-    /// A tracked value of this group was stored and is now `Confirmed`.
+    /// A value of this group was stored (tracked ones are now `Confirmed`).
     Value(Group),
     /// Untracked information changed (model, capabilities, ...).
     Info,
@@ -107,6 +128,38 @@ impl DeviceState {
     pub(crate) fn apply(&mut self, table: Table, msg: Message) -> Applied {
         match msg {
             Message::ProtocolInfo { .. } | Message::Unknown { .. } => Applied::Ignored,
+            Message::Dsee { on } => {
+                self.dsee.confirm(on);
+                Applied::Value(Group::Dsee)
+            }
+            Message::DseeAutoOff { auto } => {
+                self.dsee_auto_off.confirm(auto);
+                Applied::Value(Group::DseeAutoOff)
+            }
+            Message::ConnectionMode { value } => {
+                self.connection_mode.confirm(value);
+                Applied::Value(Group::ConnectionMode)
+            }
+            Message::WearPause { on } => {
+                self.wear_pause.confirm(on);
+                Applied::Value(Group::WearPause)
+            }
+            Message::VoiceAssistant { value } => {
+                self.voice_assistant.confirm(value);
+                Applied::Value(Group::VoiceAssistant)
+            }
+            Message::QuickAccess { functions } => {
+                self.quick_access.confirm(functions);
+                Applied::Value(Group::QuickAccess)
+            }
+            Message::VoiceGuideVolume { value } => {
+                self.voice_guide_volume.confirm(value);
+                Applied::Value(Group::VoiceGuide)
+            }
+            Message::Playback { status } => {
+                self.playback = Some(status);
+                Applied::Value(Group::Playback)
+            }
             Message::SupportFunctions(list) => {
                 let ids = list.into_iter().map(|f| f.id).collect();
                 match table {
@@ -172,7 +225,15 @@ impl DeviceState {
                 self.multipoint.confirm(on);
                 Applied::Value(Group::GeneralSetting(GS_MULTIPOINT))
             }
-            Message::GsBool { setting, on } => self.set_gs(setting, GsValue::Bool(on)),
+            Message::GsBool { setting, on } => {
+                match setting {
+                    GS_TOUCH_PANEL => self.touch_panel.confirm(on),
+                    GS_SIDETONE => self.sidetone.confirm(on),
+                    _ => return self.set_gs(setting, GsValue::Bool(on)),
+                }
+                self.set_gs(setting, GsValue::Bool(on));
+                Applied::Value(Group::GeneralSetting(setting))
+            }
             Message::GsList { setting, index } => self.set_gs(setting, GsValue::Index(index)),
         }
     }
@@ -196,14 +257,30 @@ impl DeviceState {
             Group::Codec => &mut self.codec.status,
             Group::Volume => &mut self.volume.status,
             Group::GeneralSetting(GS_MULTIPOINT) => &mut self.multipoint.status,
+            Group::GeneralSetting(GS_TOUCH_PANEL) => &mut self.touch_panel.status,
+            Group::GeneralSetting(GS_SIDETONE) => &mut self.sidetone.status,
             Group::AutoPowerOff => &mut self.auto_power_off.status,
-            Group::GeneralSetting(_) | Group::Connect | Group::Power | Group::Raw => return None,
+            Group::Dsee => &mut self.dsee.status,
+            Group::DseeAutoOff => &mut self.dsee_auto_off.status,
+            Group::ConnectionMode => &mut self.connection_mode.status,
+            Group::WearPause => &mut self.wear_pause.status,
+            Group::VoiceAssistant => &mut self.voice_assistant.status,
+            Group::QuickAccess => &mut self.quick_access.status,
+            Group::VoiceGuide => &mut self.voice_guide_volume.status,
+            Group::GeneralSetting(_)
+            | Group::Connect
+            | Group::Power
+            | Group::Raw
+            | Group::Playback => return None,
         })
     }
 
     /// Marks every tracked value unavailable and the device disconnected.
     pub(crate) fn mark_disconnected(&mut self) {
         self.connected = false;
+        self.address = None;
+        self.channel = None;
+        self.playback = None;
         for status in [
             &mut self.battery.status,
             &mut self.nc.status,
@@ -212,6 +289,15 @@ impl DeviceState {
             &mut self.volume.status,
             &mut self.multipoint.status,
             &mut self.auto_power_off.status,
+            &mut self.dsee.status,
+            &mut self.dsee_auto_off.status,
+            &mut self.connection_mode.status,
+            &mut self.wear_pause.status,
+            &mut self.voice_assistant.status,
+            &mut self.quick_access.status,
+            &mut self.voice_guide_volume.status,
+            &mut self.touch_panel.status,
+            &mut self.sidetone.status,
         ] {
             *status = Status::Unavailable;
         }

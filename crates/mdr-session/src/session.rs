@@ -4,11 +4,13 @@
 use mdr_frame::{Decoder, Frame, FrameType};
 use mdr_proto::opcode::t1;
 use mdr_proto::request::{self, Group, Request};
-use mdr_proto::{decode, denied, Message, NcAsmState, Table, UltLevel};
+use mdr_proto::{decode, denied, EqUltState, Message, NcAsmState, Table, UltLevel};
 
 use crate::arq::{Arq, ReplyTimer, Timeout};
 use crate::handshake::{Handshake, Step};
-use crate::state::{Applied, DeviceState, PairedDevice, Status};
+use crate::state::{
+    Applied, DeviceState, PairedDevice, Status, GS_MULTIPOINT, GS_SIDETONE, GS_TOUCH_PANEL,
+};
 
 /// How long after the device ACKs a request its reply may take.
 pub const REPLY_TIMEOUT_MS: u64 = 1500;
@@ -30,7 +32,15 @@ pub enum SessionError {
     NotConnected,
     /// Not enough device state yet to build the request.
     Busy,
+    /// The value is outside what the device accepts for this setting.
+    InvalidValue,
 }
+
+/// Highest volume step the device accepts.
+pub const VOLUME_MAX: u8 = 30;
+
+/// Auto power-off element values (5, 15, 30, 60, 180 min, when removed, disabled).
+const AUTO_POWER_OFF_VALUES: [u8; 7] = [0x00, 0x04, 0x01, 0x02, 0x03, 0x10, 0x11];
 
 pub struct Session {
     state: DeviceState,
@@ -53,6 +63,14 @@ fn refetch(group: Group) -> Option<Request> {
         Group::Volume => Some(request::volume_get()),
         Group::AutoPowerOff => Some(request::auto_power_off_get()),
         Group::Battery => Some(request::battery_get()),
+        Group::Dsee => Some(request::dsee_status_get()),
+        Group::DseeAutoOff => Some(request::dsee_auto_off_get()),
+        Group::ConnectionMode => Some(request::connection_mode_get()),
+        Group::WearPause => Some(request::wear_pause_get()),
+        Group::VoiceAssistant => Some(request::voice_assistant_get()),
+        Group::QuickAccess => Some(request::quick_access_get()),
+        Group::VoiceGuide => Some(request::voice_guide_volume_get()),
+        Group::Playback => Some(request::playback_status_get()),
         Group::Connect | Group::Codec | Group::Power | Group::Raw => None,
     }
 }
@@ -172,17 +190,103 @@ impl Session {
 
     /// Changes only the ULT level, keeping the device's current preset and bands.
     pub fn set_ult(&mut self, ult: UltLevel) -> Result<(), SessionError> {
-        let Some(mut eq) = self
+        let mut eq = self.current_eq()?;
+        eq.ult = ult;
+        self.request(request::eq_ult_set(&eq))
+    }
+
+    /// Changes only the EQ preset, keeping the device's current ULT level and bands.
+    pub fn set_eq_preset(&mut self, preset: u8) -> Result<(), SessionError> {
+        let mut eq = self.current_eq()?;
+        eq.preset = preset;
+        self.request(request::eq_ult_set(&eq))
+    }
+
+    /// Changes only the band levels, keeping the device's current preset and ULT
+    /// level. The band count must match the device's EQ capability (6 if unknown).
+    pub fn set_eq_bands(&mut self, bands: Vec<u8>) -> Result<(), SessionError> {
+        let expected = self
             .state
+            .eq_capability
+            .as_ref()
+            .map_or(6, |c| usize::from(c.bands));
+        if bands.len() != expected {
+            return Err(SessionError::InvalidValue);
+        }
+        let mut eq = self.current_eq()?;
+        eq.bands = bands;
+        self.request(request::eq_ult_set(&eq))
+    }
+
+    pub fn set_volume(&mut self, v: u8) -> Result<(), SessionError> {
+        if v > VOLUME_MAX {
+            return Err(SessionError::InvalidValue);
+        }
+        self.request(request::volume_set(v))
+    }
+
+    pub fn set_dsee_auto_off(&mut self, auto: bool) -> Result<(), SessionError> {
+        self.request(request::dsee_auto_off_set(auto))
+    }
+
+    pub fn set_connection_mode(&mut self, v: u8) -> Result<(), SessionError> {
+        self.request(request::connection_mode_set(v))
+    }
+
+    /// `v` must be one of the auto power-off element values.
+    pub fn set_auto_power_off(&mut self, v: u8) -> Result<(), SessionError> {
+        if !AUTO_POWER_OFF_VALUES.contains(&v) {
+            return Err(SessionError::InvalidValue);
+        }
+        self.request(request::auto_power_off_set(v))
+    }
+
+    pub fn set_wear_pause(&mut self, on: bool) -> Result<(), SessionError> {
+        self.request(request::wear_pause_set(on))
+    }
+
+    pub fn set_voice_assistant(&mut self, v: u8) -> Result<(), SessionError> {
+        self.request(request::voice_assistant_set(v))
+    }
+
+    pub fn set_quick_access(&mut self, functions: Vec<u8>) -> Result<(), SessionError> {
+        if functions.len() > usize::from(u8::MAX) {
+            return Err(SessionError::InvalidValue);
+        }
+        self.request(request::quick_access_set(&functions))
+    }
+
+    /// Voice guidance volume, -2..=2.
+    pub fn set_voice_guide_volume(&mut self, v: i8) -> Result<(), SessionError> {
+        if !(-2..=2).contains(&v) {
+            return Err(SessionError::InvalidValue);
+        }
+        self.request(request::voice_guide_volume_set(v))
+    }
+
+    pub fn set_touch_panel(&mut self, on: bool) -> Result<(), SessionError> {
+        self.request(request::gs_set_bool(GS_TOUCH_PANEL, on))
+    }
+
+    pub fn set_sidetone(&mut self, on: bool) -> Result<(), SessionError> {
+        self.request(request::gs_set_bool(GS_SIDETONE, on))
+    }
+
+    /// Sets multipoint, then sends the commit the device needs to apply it. The
+    /// ARQ sends the commit only after the first frame is ACKed.
+    pub fn set_multipoint(&mut self, on: bool) -> Result<(), SessionError> {
+        self.request(request::gs_set_bool(GS_MULTIPOINT, on))?;
+        self.request(request::multipoint_commit())
+    }
+
+    /// The last EQ state the device reported, for read-modify-write.
+    fn current_eq(&self) -> Result<EqUltState, SessionError> {
+        self.state
             .eq_ult
             .value
             .clone()
             .filter(|eq| !eq.bands.is_empty())
-        else {
-            return Err(SessionError::Busy);
-        };
-        eq.ult = ult;
-        self.request(request::eq_ult_set(&eq))
+            .ok_or(SessionError::Busy)
     }
 
     pub fn mark_disconnected(&mut self) -> Vec<Event> {
@@ -204,6 +308,12 @@ impl Session {
 
     pub fn set_devices(&mut self, devices: Vec<PairedDevice>) {
         self.state.devices = devices;
+    }
+
+    /// Records the Bluetooth link the transport opened; cleared on disconnect.
+    pub fn set_link(&mut self, address: Option<String>, channel: Option<u8>) {
+        self.state.address = address;
+        self.state.channel = channel;
     }
 
     fn submit(&mut self, req: Request, confirmed: bool) -> Result<(), SessionError> {
@@ -304,9 +414,12 @@ impl Session {
         if !self.handshake.is_active() {
             return;
         }
-        let step = self
-            .handshake
-            .on_reply(table, payload, &self.state.capabilities_t1);
+        let step = self.handshake.on_reply(
+            table,
+            payload,
+            &self.state.capabilities_t1,
+            &self.state.capabilities_t2,
+        );
         self.follow_handshake(step, events);
     }
 

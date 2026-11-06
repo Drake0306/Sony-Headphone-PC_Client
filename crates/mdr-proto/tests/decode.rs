@@ -146,7 +146,7 @@ fn short_and_unknown_payloads_do_not_panic() {
         Message::Unknown { .. }
     ));
     assert!(matches!(
-        decode(Table::T2, &[0x47, 0x20, 0xFF]).1,
+        decode(Table::T2, &[0x47, 0x21, 0xFF]).1,
         Message::Unknown { .. }
     ));
     assert!(matches!(decode(Table::T1, &[]).1, Message::Unknown { .. }));
@@ -197,4 +197,81 @@ fn t2_support_functions_list() {
             },
         ])
     );
+}
+
+#[test]
+fn dsee_status_on() {
+    assert_eq!(
+        decode(Table::T1, &[0x13, 0x03, 0x01, 0x01]),
+        (Kind::Ret, Message::Dsee { on: true })
+    );
+}
+
+#[test]
+fn dsee_auto_off_value() {
+    assert_eq!(
+        decode(Table::T1, &[0xE7, 0x01, 0x01]).1,
+        Message::DseeAutoOff { auto: true }
+    );
+}
+
+#[test]
+fn connection_mode_value() {
+    assert_eq!(
+        decode(Table::T1, &[0xE7, 0x02, 0x00]).1,
+        Message::ConnectionMode { value: 0 }
+    );
+}
+
+#[test]
+fn wear_pause_off_is_one() {
+    assert_eq!(
+        decode(Table::T1, &[0xF7, 0x01, 0x01]).1,
+        Message::WearPause { on: false }
+    );
+}
+
+#[test]
+fn voice_assistant_none() {
+    assert_eq!(
+        decode(Table::T1, &[0xF7, 0x04, 0xFF]).1,
+        Message::VoiceAssistant { value: 0xFF }
+    );
+}
+
+#[test]
+fn quick_access_two_slots() {
+    assert_eq!(
+        decode(Table::T1, &[0xF7, 0x0D, 0x02, 0x00, 0x00]).1,
+        Message::QuickAccess {
+            functions: vec![0, 0]
+        }
+    );
+}
+
+#[test]
+fn voice_guide_volume_t2() {
+    assert_eq!(
+        decode(Table::T2, &[0x47, 0x20, 0x02]).1,
+        Message::VoiceGuideVolume { value: 2 }
+    );
+    assert_eq!(
+        decode(Table::T2, &[0x47, 0x20, 0xFE]).1,
+        Message::VoiceGuideVolume { value: -2 }
+    );
+}
+
+#[test]
+fn playback_paused() {
+    assert_eq!(
+        decode(Table::T1, &[0xA3, 0x01, 0x00, 0x02, 0x00]).1,
+        Message::Playback { status: 2 }
+    );
+}
+
+#[test]
+fn preset_names() {
+    assert_eq!(preset_name(0x16), "Bass Boost");
+    assert_eq!(preset_name(0xA2), "Custom 2");
+    assert_eq!(preset_name(0x05), "Unknown");
 }

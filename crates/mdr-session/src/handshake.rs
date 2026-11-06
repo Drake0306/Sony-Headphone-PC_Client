@@ -2,7 +2,7 @@
 
 use std::collections::VecDeque;
 
-use mdr_proto::opcode::t1;
+use mdr_proto::opcode::{t1, t2};
 use mdr_proto::request::{self, Request};
 use mdr_proto::{Group, Table};
 
@@ -35,10 +35,14 @@ struct Awaited {
 pub(crate) struct Handshake {
     steps: VecDeque<Request>,
     awaiting: Option<Awaited>,
+    /// T1 capabilities, kept from the T1 support-function reply until the T2
+    /// one (or its timeout) schedules the capability reads.
+    t1_caps: Option<Vec<u8>>,
 }
 
-/// Initial-state reads, in order, filtered to the declared T1 capabilities.
-fn capability_reads(caps: &[u8]) -> impl Iterator<Item = Request> + '_ {
+/// Initial-state reads, in order, filtered to the declared capabilities of
+/// each request's table.
+fn capability_reads<'a>(t1: &'a [u8], t2: &'a [u8]) -> impl Iterator<Item = Request> + 'a {
     let mut reads = vec![
         request::battery_get(),
         request::ncasm_get(),
@@ -50,11 +54,33 @@ fn capability_reads(caps: &[u8]) -> impl Iterator<Item = Request> + '_ {
         reads.push(request::gs_capability(setting));
         reads.push(request::gs_get(setting));
     }
-    reads.push(request::auto_power_off_get());
-    reads.push(request::volume_get());
-    reads
-        .into_iter()
-        .filter(|r| r.capability.is_none_or(|c| caps.contains(&c)))
+    reads.extend([
+        request::auto_power_off_get(),
+        request::volume_get(),
+        request::dsee_status_get(),
+        request::dsee_auto_off_get(),
+        request::connection_mode_get(),
+        request::wear_pause_get(),
+        request::voice_assistant_get(),
+        request::quick_access_get(),
+        request::voice_guide_volume_get(),
+        request::playback_status_get(),
+    ]);
+    reads.into_iter().filter(move |r| {
+        let caps = match r.table {
+            Table::T1 => t1,
+            Table::T2 => t2,
+        };
+        r.capability.is_none_or(|c| caps.contains(&c))
+    })
+}
+
+fn is_support_reply(a: &Awaited, table: Table) -> bool {
+    let op = match table {
+        Table::T1 => t1::CONNECT_RET_SUPPORT_FUNCTION,
+        Table::T2 => t2::CONNECT_RET_SUPPORT_FUNCTION,
+    };
+    (a.table, a.opcode, a.sub) == (table, op, 0x00)
 }
 
 impl Handshake {
@@ -78,16 +104,24 @@ impl Handshake {
         *self = Handshake::default();
     }
 
-    /// Offers a received payload. `t1_caps` must already reflect it, so that the
-    /// T1 support-function reply can schedule the capability reads.
-    pub fn on_reply(&mut self, table: Table, payload: &[u8], t1_caps: &[u8]) -> Step {
+    /// Offers a received payload. The capability lists must already reflect it,
+    /// so that the support-function replies can schedule the capability reads.
+    pub fn on_reply(
+        &mut self,
+        table: Table,
+        payload: &[u8],
+        t1_caps: &[u8],
+        t2_caps: &[u8],
+    ) -> Step {
         let Some(a) = self.awaiting.filter(|a| {
             matches!(payload, [op, sub, ..] if a.table == table && a.opcode == *op && a.sub == *sub)
         }) else {
             return Step::NotMine;
         };
-        if (a.table, a.opcode, a.sub) == (Table::T1, t1::CONNECT_RET_SUPPORT_FUNCTION, 0x00) {
-            self.steps.extend(capability_reads(t1_caps));
+        if is_support_reply(&a, Table::T1) {
+            self.t1_caps = Some(t1_caps.to_vec());
+        } else if is_support_reply(&a, Table::T2) {
+            self.schedule_reads(t2_caps);
         }
         self.advance()
     }
@@ -108,8 +142,20 @@ impl Handshake {
         if self.deadline().is_none_or(|d| now_ms < d) {
             return None;
         }
-        let group = self.awaiting?.group;
-        Some((group, self.advance()))
+        let a = self.awaiting?;
+        if is_support_reply(&a, Table::T2) {
+            // No T2 list: read only what T1 declares.
+            self.schedule_reads(&[]);
+        }
+        Some((a.group, self.advance()))
+    }
+
+    /// Queues the capability reads once both support-function lists are known.
+    /// Without a T1 reply (it timed out) nothing is declared, so nothing is read.
+    fn schedule_reads(&mut self, t2_caps: &[u8]) {
+        if let Some(t1_caps) = self.t1_caps.take() {
+            self.steps.extend(capability_reads(&t1_caps, t2_caps));
+        }
     }
 
     fn advance(&mut self) -> Step {

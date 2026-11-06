@@ -346,6 +346,7 @@ fn open_channel(device: &Device, record: &Record) -> io::Result<Box<dyn Transpor
         link: Some(link),
         rx,
         closed: false,
+        channel_id,
     }))
 }
 
@@ -392,6 +393,8 @@ struct MacTransport {
     link: Option<Link>,
     rx: Receiver<Vec<u8>>,
     closed: bool,
+    /// RFCOMM channel id from the v2 SDP record.
+    channel_id: BluetoothRFCOMMChannelID,
 }
 
 fn broken_pipe() -> io::Error {
@@ -460,6 +463,10 @@ impl Transport for MacTransport {
                 drop(link);
             });
         }
+    }
+
+    fn channel(&self) -> Option<u8> {
+        Some(self.channel_id)
     }
 }
 

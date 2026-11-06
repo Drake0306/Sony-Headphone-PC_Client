@@ -110,6 +110,9 @@ pub mod t2 {
     pub const VOICE_GUIDANCE_GET_PARAM: u8 = 0x46;
     pub const VOICE_GUIDANCE_RET_PARAM: u8 = 0x47;
     pub const VOICE_GUIDANCE_SET_PARAM: u8 = 0x48;
+    pub const VOICE_GUIDANCE_NTFY_PARAM: u8 = 0x49;
+    /// Inquired type: voice guidance volume.
+    pub const VOICE_GUIDANCE_VOLUME: u8 = 0x20;
 }
 
 /// Second-byte "inquired type" values used by the requests we send.
@@ -120,6 +123,22 @@ pub mod inquired {
     pub const AUTO_POWER_OFF: u8 = 0x05;
     pub const NC_ASM_DUAL_NC_SWITCH_AND_ASM_SEAMLESS: u8 = 0x17;
     pub const VOLUME: u8 = 0x20;
+    /// COMMON status: DSEE indicator.
+    pub const DSEE_INDICATOR: u8 = 0x03;
+    /// AUDIO param: upscaling (DSEE) auto/off.
+    pub const UPSCALING: u8 = 0x01;
+    /// AUDIO param: LDAC connection mode.
+    pub const CONNECTION_MODE_LDAC: u8 = 0x02;
+    /// SYSTEM param: pause playback when headphones are removed.
+    pub const PLAYBACK_CONTROL_BY_WEARING: u8 = 0x01;
+    /// SYSTEM param: voice assistant selection.
+    pub const VOICE_ASSISTANT: u8 = 0x04;
+    /// SYSTEM ext param: quick access functions.
+    pub const QUICK_ACCESS: u8 = 0x0D;
+    /// PLAY status: playback status.
+    pub const PLAYBACK_STATUS: u8 = 0x01;
+    /// ALERT set param: multipoint commit sequence.
+    pub const MULTIPOINT_COMMIT: [u8; 3] = [0x00, 0x06, 0x01];
     pub const POWER_OFF: u8 = 0x03;
     pub const POWER_OFF_USER: u8 = 0x01;
     /// General-setting value type: boolean.
@@ -137,4 +156,13 @@ pub mod function {
     pub const PRESET_EQ_AND_ULT_MODE: u8 = 0x53;
     pub const NC_ASM_DUAL_LEVEL_ADJUSTMENT: u8 = 0x6B;
     pub const PLAYBACK_CONTROLLER: u8 = 0xA1;
+    pub const DSEE_INDICATOR: u8 = 0x13;
+    pub const UPSCALING: u8 = 0xE2;
+    pub const CONNECTION_MODE: u8 = 0xE3;
+    pub const PLAYBACK_CONTROL_BY_WEARING: u8 = 0xF1;
+    pub const VOICE_ASSISTANT: u8 = 0xF4;
+    pub const QUICK_ACCESS: u8 = 0xFD;
+    pub const MULTIPOINT: u8 = 0xD1;
+    /// T2 FunctionType: voice guidance volume.
+    pub const VOICE_GUIDANCE_VOLUME: u8 = 0x42;
 }

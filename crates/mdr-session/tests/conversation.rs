@@ -4,6 +4,7 @@ use common::*;
 use mdr_frame::FrameType;
 use mdr_proto::{Charging, Codec, NcAsmState, NcMode, UltLevel};
 use mdr_session::*;
+use mdr_frame::Frame;
 
 #[test]
 fn handshake_sends_protocol_info_first_and_waits_for_ack() {
@@ -129,4 +130,38 @@ fn disconnect_marks_all_unavailable() {
     assert!(!s.state().connected);
     assert!(matches!(s.state().battery.status, Status::Unavailable));
     assert!(matches!(s.state().nc.status, Status::Unavailable));
+}
+
+/// Next data frame the session hands out, draining any ACKs before it.
+fn next_request(s: &mut Session) -> Option<Frame> {
+    drain(s).iter().map(|b| decode_one(b)).find(|f| f.frame_type != FrameType::Ack)
+}
+
+#[test]
+fn handshake_read_without_reply_continues() {
+    let caps = [0x20, 0x53, 0x6B, 0x12, 0xD1];
+    let mut s = Session::new(0);
+    s.start();
+    let (mut t, mut dev_seq, mut events) = (0, 0, vec![]);
+    while let Some(req) = next_request(&mut s) {
+        events.extend(s.handle_input(&frame(FrameType::Ack, 1 - req.seq, &[]), t));
+        if req.payload == [0x66, 0x17] {
+            events.extend(s.handle_timeout(t + 1600));
+            assert!(matches!(&s.state().nc.status, Status::Refused { reason } if reason == "no reply"));
+            let next = next_request(&mut s).expect("handshake continues");
+            assert_eq!(next.payload, [0x50, 0x03]);
+            t += 1610;
+            events.extend(s.handle_input(&frame(FrameType::Ack, 1 - next.seq, &[]), t));
+            let reply = scripted_reply(next.frame_type, &next.payload, &caps).unwrap();
+            events.extend(s.handle_input(&frame(next.frame_type, dev_seq, &reply), t + 1));
+        } else {
+            let reply = scripted_reply(req.frame_type, &req.payload, &caps).unwrap();
+            events.extend(s.handle_input(&frame(req.frame_type, dev_seq, &reply), t + 1));
+        }
+        dev_seq ^= 1;
+        t += 10;
+    }
+    assert!(events.contains(&Event::Connected));
+    assert!(s.state().connected);
+    assert!(matches!(&s.state().nc.status, Status::Refused { .. }));
 }

@@ -12,7 +12,7 @@ pub fn drain(s: &mut Session) -> Vec<Vec<u8>> {
     std::iter::from_fn(|| s.poll_output()).collect()
 }
 
-fn decode_one(bytes: &[u8]) -> Frame {
+pub fn decode_one(bytes: &[u8]) -> Frame {
     let mut frames = Decoder::new().push(bytes);
     assert_eq!(frames.len(), 1, "expected exactly one frame");
     frames.remove(0).expect("valid frame")
@@ -36,7 +36,7 @@ pub fn connected_session() -> Session {
 }
 
 /// Device reply for a handshake request, or `None` if the script has no answer.
-fn scripted_reply(t: FrameType, req: &[u8], t1_caps: &[u8]) -> Option<Vec<u8>> {
+pub fn scripted_reply(t: FrameType, req: &[u8], t1_caps: &[u8]) -> Option<Vec<u8>> {
     let reply: Vec<u8> = match (t, req) {
         (FrameType::Command1, [0x00, 0x00]) => vec![0x01, 0x00, 0x03, 0x00, 0x20, 0x02, 0x00, 0x00],
         (FrameType::Command1, [0x06, 0x00]) => {

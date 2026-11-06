@@ -4,7 +4,9 @@ use std::collections::VecDeque;
 
 use mdr_proto::opcode::t1;
 use mdr_proto::request::{self, Request};
-use mdr_proto::Table;
+use mdr_proto::{Group, Table};
+
+use crate::session::REPLY_TIMEOUT_MS;
 
 /// Result of offering a received payload to the handshake.
 #[derive(Debug, PartialEq, Eq)]
@@ -17,8 +19,17 @@ pub(crate) enum Step {
     Done,
 }
 
-/// Reply the current step waits for: table, RET opcode (GET opcode + 1), sub-id.
-type Awaited = (Table, u8, u8);
+/// The reply the current step waits for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Awaited {
+    table: Table,
+    /// RET opcode: the GET opcode + 1.
+    opcode: u8,
+    sub: u8,
+    group: Group,
+    /// When the device ACKed the read; the reply timer runs from here.
+    acked_at: Option<u64>,
+}
 
 #[derive(Debug, Default)]
 pub(crate) struct Handshake {
@@ -67,12 +78,38 @@ impl Handshake {
     /// Offers a received payload. `t1_caps` must already reflect it, so that the
     /// T1 support-function reply can schedule the capability reads.
     pub fn on_reply(&mut self, table: Table, payload: &[u8], t1_caps: &[u8]) -> Step {
-        if !self.matches(table, payload) {
+        let Some(a) = self.awaiting.filter(|a| {
+            matches!(payload, [op, sub, ..] if a.table == table && a.opcode == *op && a.sub == *sub)
+        }) else {
             return Step::NotMine;
-        }
-        if self.awaiting == Some((Table::T1, t1::CONNECT_RET_SUPPORT_FUNCTION, 0x00)) {
+        };
+        if (a.table, a.opcode, a.sub) == (Table::T1, t1::CONNECT_RET_SUPPORT_FUNCTION, 0x00) {
             self.steps.extend(capability_reads(t1_caps));
         }
+        self.advance()
+    }
+
+    /// Starts the reply timer for the current read.
+    pub fn on_ack(&mut self, now_ms: u64) {
+        if let Some(a) = self.awaiting.as_mut().filter(|a| a.acked_at.is_none()) {
+            a.acked_at = Some(now_ms);
+        }
+    }
+
+    pub fn deadline(&self) -> Option<u64> {
+        Some(self.awaiting?.acked_at? + REPLY_TIMEOUT_MS)
+    }
+
+    /// If the current read's reply is overdue, skips it. Returns its group and what follows.
+    pub fn on_timeout(&mut self, now_ms: u64) -> Option<(Group, Step)> {
+        if self.deadline().is_none_or(|d| now_ms < d) {
+            return None;
+        }
+        let group = self.awaiting?.group;
+        Some((group, self.advance()))
+    }
+
+    fn advance(&mut self) -> Step {
         match self.steps.pop_front() {
             Some(next) => Step::Next(self.expect(next)),
             None => {
@@ -82,12 +119,14 @@ impl Handshake {
         }
     }
 
-    fn matches(&self, table: Table, payload: &[u8]) -> bool {
-        matches!((self.awaiting, payload), (Some((t, op, sub)), [p_op, p_sub, ..]) if t == table && op == *p_op && sub == *p_sub)
-    }
-
     fn expect(&mut self, req: Request) -> Request {
-        self.awaiting = Some((req.table, req.bytes[0].wrapping_add(1), req.bytes[1]));
+        self.awaiting = Some(Awaited {
+            table: req.table,
+            opcode: req.bytes[0].wrapping_add(1),
+            sub: req.bytes[1],
+            group: req.group,
+            acked_at: None,
+        });
         req
     }
 }

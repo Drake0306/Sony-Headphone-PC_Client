@@ -13,8 +13,7 @@ pub const ACK_RETRIES: u64 = 3;
 #[derive(Debug)]
 struct Outgoing {
     request: Request,
-    /// Start a reply timer for `request.group` once the device ACKs this frame.
-    track_reply: bool,
+    timer: ReplyTimer,
 }
 
 #[derive(Debug)]
@@ -22,17 +21,28 @@ struct InFlight {
     bytes: Vec<u8>,
     seq: u8,
     group: Group,
-    track_reply: bool,
+    timer: ReplyTimer,
     /// `None` until the frame (or its retransmission) has been handed out.
     sent_at: Option<u64>,
     timeouts: u64,
+}
+
+/// Which reply timer to start once the device ACKs a frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ReplyTimer {
+    /// No reply is waited for (or a lost one is harmless).
+    None,
+    /// A user request: an unanswered one is refused and re-queried.
+    Request,
+    /// A handshake read: an unanswered one is refused and skipped.
+    Handshake,
 }
 
 /// What the device's ACK settled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Acked {
     pub group: Group,
-    pub track_reply: bool,
+    pub timer: ReplyTimer,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,8 +69,8 @@ fn frame_type(table: Table) -> FrameType {
 }
 
 impl Arq {
-    pub fn enqueue(&mut self, request: Request, track_reply: bool) {
-        self.queue.push_back(Outgoing { request, track_reply });
+    pub fn enqueue(&mut self, request: Request, timer: ReplyTimer) {
+        self.queue.push_back(Outgoing { request, timer });
     }
 
     /// Next bytes to write: pending ACKs first, then at most one data frame in flight.
@@ -75,14 +85,14 @@ impl Arq {
             }
             Some(_) => None,
             None => {
-                let Outgoing { request, track_reply } = self.queue.pop_front()?;
+                let Outgoing { request, timer } = self.queue.pop_front()?;
                 let frame = Frame { frame_type: frame_type(request.table), seq: self.next_seq, payload: request.bytes };
                 let bytes = encode(&frame);
                 self.in_flight = Some(InFlight {
                     bytes: bytes.clone(),
                     seq: self.next_seq,
                     group: request.group,
-                    track_reply,
+                    timer,
                     sent_at: Some(now_ms),
                     timeouts: 0,
                 });
@@ -93,8 +103,9 @@ impl Arq {
 
     /// Handles an ACK from the device. Returns what it settled, if it matched the frame in flight.
     pub fn on_ack(&mut self, seq: u8) -> Option<Acked> {
+        // An ACK whose seq does not match the frame in flight is stale; ignore it.
         let f = self.in_flight.as_ref().filter(|f| f.sent_at.is_some() && seq == f.seq ^ 1)?;
-        let acked = Acked { group: f.group, track_reply: f.track_reply };
+        let acked = Acked { group: f.group, timer: f.timer };
         self.in_flight = None;
         self.next_seq ^= 1;
         Some(acked)

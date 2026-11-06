@@ -7,7 +7,7 @@ use mdr_proto::{
 use serde::{Deserialize, Serialize};
 
 /// General setting that drives `DeviceState::multipoint`.
-pub(crate) const GS_MULTIPOINT: u8 = 0xD1;
+pub const GS_MULTIPOINT: u8 = 0xD1;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Status {

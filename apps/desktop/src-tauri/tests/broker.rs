@@ -5,7 +5,9 @@ use std::sync::mpsc::{channel, Receiver};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
-use hairline_lib::broker::{next_backoff, parse_raw, run_broker, run_broker_logged, BrokerCmd};
+use hairline_lib::broker::{
+    is_playing, next_backoff, parse_raw, run_broker, run_broker_logged, BrokerCmd,
+};
 use hairline_lib::frame_log::{file_name, FrameLog};
 use mdr_proto::Table;
 use mdr_proto::UltLevel;
@@ -145,6 +147,7 @@ fn broker_writes_frames_and_logs_to_the_frame_log() {
             |s| etx.send(s.clone()).unwrap(),
             monotonic_ms,
             Some(&mut log),
+            None,
         )
     });
     wait_for(&erx, |s| s.connected);
@@ -176,4 +179,16 @@ fn broker_writes_frames_and_logs_to_the_frame_log() {
             .any(|l| l[1] == "#" && l[2].starts_with("raw reply T1 23 00")),
         "no raw reply in {text}"
     );
+}
+
+#[test]
+fn playing_compares_output_name_with_the_device_name() {
+    assert!(is_playing(Some("Roy's ULT WEAR"), Some("Roy's ULT WEAR")));
+    assert!(is_playing(Some("roy's ult wear"), Some("Roy's ULT WEAR")));
+    assert!(!is_playing(
+        Some("MacBook Pro Speakers"),
+        Some("Roy's ULT WEAR")
+    ));
+    assert!(!is_playing(None, Some("Roy's ULT WEAR")));
+    assert!(!is_playing(Some("Roy's ULT WEAR"), None));
 }

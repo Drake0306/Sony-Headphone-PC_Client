@@ -8,15 +8,13 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use mdr_proto::{request, Group, NcAsmState, Request, Table, UltLevel};
-use mdr_session::{DeviceState, Event, PairedDevice, Session, SessionError};
+use mdr_session::{DeviceState, Event, PairedDevice, Session, SessionError, GS_MULTIPOINT};
 use mdr_transport::{connect, discover, is_ult_wear_name, FakeDevice, Transport};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::audio_macos::current_output_device_name;
 use crate::frame_log::FrameLog;
 
-/// General setting id of multipoint.
-const GS_MULTIPOINT: u8 = 0xD1;
 const RECV_TIMEOUT: Duration = Duration::from_millis(10);
 /// First wait, in seconds, after a failed connect; it doubles up to the maximum.
 const BACKOFF_START_S: u64 = 5;
@@ -75,16 +73,19 @@ pub fn run_broker<E: Fn(&DeviceState)>(
     emit: E,
     clock: impl FnMut() -> u64,
 ) -> io::Result<()> {
-    run_broker_logged(transport, cmds, emit, clock, None)
+    run_broker_logged(transport, cmds, emit, clock, None, None)
 }
 
 /// As `run_broker`, also writing every frame and log line to `log`.
+/// `device_name` is the Bluetooth name of the connected headphones, matched
+/// against the default audio output; without it the model name is used.
 pub fn run_broker_logged<E: Fn(&DeviceState)>(
     mut transport: Box<dyn Transport>,
     cmds: impl Borrow<Receiver<BrokerCmd>>,
     emit: E,
     mut clock: impl FnMut() -> u64,
     mut log: Option<&mut FrameLog>,
+    device_name: Option<&str>,
 ) -> io::Result<()> {
     let cmds = cmds.borrow();
     let mut session = Session::new(clock());
@@ -96,7 +97,8 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
         let now = clock();
         if devices_checked_at.is_none_or(|t| now >= t + DEVICES_EVERY_MS) {
             devices_checked_at = Some(now);
-            let devices = paired_devices();
+            let name = device_name.or(session.state().model.as_deref());
+            let devices = paired_devices(name);
             if devices != session.state().devices {
                 session.set_devices(devices);
                 changed = true;
@@ -205,12 +207,17 @@ fn link_lost<E: Fn(&DeviceState)>(session: &mut Session, emit: &E, e: io::Error)
     e
 }
 
+/// Whether the host's default audio output is the headphones, by name.
+pub fn is_playing(output_name: Option<&str>, device_name: Option<&str>) -> bool {
+    matches!((output_name, device_name), (Some(out), Some(dev)) if out.eq_ignore_ascii_case(dev))
+}
+
 /// The host's own entry in the Link list.
-fn paired_devices() -> Vec<PairedDevice> {
+fn paired_devices(device_name: Option<&str>) -> Vec<PairedDevice> {
     if !cfg!(target_os = "macos") {
         return Vec::new();
     }
-    let playing = current_output_device_name().is_some_and(|n| n.contains("ULT WEAR"));
+    let playing = is_playing(current_output_device_name().as_deref(), device_name);
     vec![PairedDevice {
         name: "This Mac".into(),
         playing,
@@ -243,9 +250,9 @@ pub fn spawn_broker(app: AppHandle, fake: bool) -> Sender<BrokerCmd> {
             let mut backoff = 0;
             loop {
                 let result = match open_transport(fake) {
-                    Ok(t) => {
+                    Ok((t, name)) => {
                         backoff = 0;
-                        run_broker_logged(t, &rx, emit, clock, log.as_mut())
+                        run_broker_logged(t, &rx, emit, clock, log.as_mut(), name.as_deref())
                     }
                     Err(e) => Err(e),
                 };
@@ -284,9 +291,10 @@ fn wait_for_connect(rx: &Receiver<BrokerCmd>, timeout: Option<Duration>) -> Resu
     }
 }
 
-fn open_transport(fake: bool) -> io::Result<Box<dyn Transport>> {
+/// The transport and, for a real device, its Bluetooth name.
+fn open_transport(fake: bool) -> io::Result<(Box<dyn Transport>, Option<String>)> {
     if fake {
-        return Ok(Box::new(FakeDevice::ult_wear()));
+        return Ok((Box::new(FakeDevice::ult_wear()), None));
     }
     // Only a device already connected to this computer is tried, so a
     // reconnect attempt never pages headphones that are elsewhere.
@@ -304,5 +312,5 @@ fn open_transport(fake: bool) -> io::Result<Box<dyn Transport>> {
                 "no connected device exposes the v2 service",
             )
         })?;
-    connect(&pick.address)
+    Ok((connect(&pick.address)?, Some(pick.name.clone())))
 }

@@ -25,6 +25,10 @@
     { label: "1", level: "Ult1", arg: 1 },
     { label: "2", level: "Ult2", arg: 2 },
   ];
+  const VOICE: { label: string; on: boolean }[] = [
+    { label: "ON", on: true },
+    { label: "OFF", on: false },
+  ];
   const TICKS = Array.from({ length: 20 }, (_, i) => i + 1);
   const REFUSED_SHOWN_MS = 4000;
 
@@ -86,6 +90,10 @@
 
   function pickLevel(level: number) {
     requestNc("ambient", { mode: "Ambient", level, voice_focus: st.nc.value?.voice_focus ?? false });
+  }
+
+  function pickVoice(on: boolean) {
+    requestNc("ambient", { mode: "Ambient", level: clampLevel(ncShown?.level), voice_focus: on });
   }
 
   function pickUlt(choice: (typeof ULT)[number]) {
@@ -163,6 +171,18 @@
         {/each}
       </div>
     </div>
+    {#if ncShown?.mode === "Ambient"}
+      <div class="row">
+        <span class="lab">Voice focus</span>
+        <div class="boxes wide" class:pending={isPending(st.nc.status)} class:unavailable={ncOff}>
+          {#each VOICE as choice (choice.label)}
+            <button class:on={ncShown.voice_focus === choice.on} disabled={ncOff} onclick={() => pickVoice(choice.on)}
+              >{choice.label}</button
+            >
+          {/each}
+        </div>
+      </div>
+    {/if}
     <div class="row">
       <span class="lab">ULT</span>
       <div class="boxes ult wide" class:pending={isPending(st.eq_ult.status)} class:unavailable={ultOff}>

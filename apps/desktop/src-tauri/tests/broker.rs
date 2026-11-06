@@ -5,7 +5,9 @@ use std::sync::mpsc::{channel, Receiver};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
-use hairline_lib::broker::{next_backoff, run_broker, BrokerCmd};
+use hairline_lib::broker::{next_backoff, parse_raw, run_broker, run_broker_logged, BrokerCmd};
+use hairline_lib::frame_log::{file_name, FrameLog};
+use mdr_proto::Table;
 use mdr_proto::UltLevel;
 use mdr_session::{DeviceState, Status};
 use mdr_transport::FakeDevice;
@@ -99,4 +101,79 @@ fn reconnect_backoff_doubles_from_five_to_sixty_seconds() {
         })
         .collect();
     assert_eq!(seq, [5, 10, 20, 40, 60, 60, 60]);
+}
+
+#[test]
+fn raw_command_parses_table_and_hex() {
+    let want = Ok(BrokerCmd::Raw {
+        table: Table::T1,
+        bytes: vec![0x22, 0x00],
+    });
+    assert_eq!(parse_raw("t1", "22 00"), want);
+    assert_eq!(parse_raw("T1", "2200"), want);
+    assert_eq!(
+        parse_raw("t2", "06:00"),
+        Ok(BrokerCmd::Raw {
+            table: Table::T2,
+            bytes: vec![0x06, 0x00],
+        })
+    );
+    assert!(parse_raw("t3", "22 00").is_err());
+    assert!(parse_raw("t1", "2").is_err());
+    assert!(parse_raw("t1", "zz").is_err());
+    assert!(parse_raw("t1", "").is_err());
+}
+
+#[test]
+fn frame_log_file_is_named_by_utc_time() {
+    assert_eq!(file_name(0), "1970-01-01-000000.log");
+    assert_eq!(file_name(1_794_000_000), "2026-11-06-212000.log");
+}
+
+#[test]
+fn broker_writes_frames_and_logs_to_the_frame_log() {
+    let dir = std::env::temp_dir().join(format!("hairline-frame-log-{}", std::process::id()));
+    let mut log = FrameLog::create_in(&dir, 1_794_000_000).unwrap();
+    let path = log.path().to_owned();
+    let (tx, rx) = channel();
+    let (etx, erx) = channel();
+    let t = Box::new(FakeDevice::ult_wear());
+    let handle = std::thread::spawn(move || {
+        run_broker_logged(
+            t,
+            rx,
+            |s| etx.send(s.clone()).unwrap(),
+            monotonic_ms,
+            Some(&mut log),
+        )
+    });
+    wait_for(&erx, |s| s.connected);
+    tx.send(BrokerCmd::Raw {
+        table: Table::T1,
+        bytes: vec![0x22, 0x00],
+    })
+    .unwrap();
+    // Give the raw request time to be answered before disconnecting.
+    std::thread::sleep(Duration::from_millis(300));
+    tx.send(BrokerCmd::Disconnect).unwrap();
+    assert!(handle.join().unwrap().is_ok());
+    let text = std::fs::read_to_string(&path).unwrap();
+    std::fs::remove_dir_all(&dir).unwrap();
+    let lines: Vec<Vec<&str>> = text.lines().map(|l| l.splitn(3, ' ').collect()).collect();
+    for line in &lines {
+        assert!(line[0].parse::<u64>().is_ok(), "{line:?}");
+    }
+    let frame = |dir: &str| {
+        lines
+            .iter()
+            .any(|l| l[1] == dir && !l[2].is_empty() && l[2].chars().all(|c| c.is_ascii_hexdigit()))
+    };
+    assert!(frame(">"), "no outgoing frame in {text}");
+    assert!(frame("<"), "no incoming frame in {text}");
+    assert!(
+        lines
+            .iter()
+            .any(|l| l[1] == "#" && l[2].starts_with("raw reply T1 23 00")),
+        "no raw reply in {text}"
+    );
 }

@@ -7,7 +7,7 @@ use mdr_proto::{NcAsmState, NcMode, UltLevel};
 use mdr_session::DeviceState;
 use tauri::{AppHandle, State};
 
-use crate::broker::BrokerCmd;
+use crate::broker::{parse_raw, BrokerCmd};
 use crate::popover;
 
 /// The broker's command channel, held in Tauri state.
@@ -73,4 +73,11 @@ pub fn connect(broker: State<'_, Broker>) -> Result<(), String> {
 #[tauri::command]
 pub fn open_main_window(app: AppHandle) -> Result<(), String> {
     popover::open_main_window(&app).map_err(|e| e.to_string())
+}
+
+/// Sends a hand-written request (`table` is `"t1"` or `"t2"`, `hex` the payload).
+/// Registered only when `HAIRLINE_DEBUG=1`; the deny-list still applies.
+#[tauri::command]
+pub fn debug_raw(broker: State<'_, Broker>, table: String, hex: String) -> Result<(), String> {
+    broker.send(parse_raw(&table, &hex)?)
 }

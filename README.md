@@ -34,6 +34,11 @@ cargo clippy --workspace --all-targets -- -D warnings
 cd apps/desktop && pnpm check
 ```
 
+## Debugging
+
+`HAIRLINE_FRAME_LOG=1` writes every frame and session log line to `captures/local/<YYYY-MM-DD-HHMMSS>.log` (time in UTC).
+`HAIRLINE_DEBUG=1` adds the Tauri command `debug_raw(table, hex)` (`table` is `"t1"` or `"t2"`, e.g. `invoke("debug_raw", { table: "t1", hex: "22 00" })`); the deny-list still applies and replies show up in the log.
+
 ## Layout
 
 - `crates/mdr-frame`: packet framing, escaping and checksums.

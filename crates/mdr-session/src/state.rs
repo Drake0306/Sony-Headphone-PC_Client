@@ -197,7 +197,7 @@ impl DeviceState {
             Group::Volume => &mut self.volume.status,
             Group::GeneralSetting(GS_MULTIPOINT) => &mut self.multipoint.status,
             Group::AutoPowerOff => &mut self.auto_power_off.status,
-            Group::GeneralSetting(_) | Group::Connect | Group::Power => return None,
+            Group::GeneralSetting(_) | Group::Connect | Group::Power | Group::Raw => return None,
         })
     }
 

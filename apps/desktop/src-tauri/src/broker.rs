@@ -7,12 +7,13 @@ use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender, TryRecvError}
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use mdr_proto::{request, NcAsmState, UltLevel};
+use mdr_proto::{request, Group, NcAsmState, Request, Table, UltLevel};
 use mdr_session::{DeviceState, Event, PairedDevice, Session, SessionError};
 use mdr_transport::{connect, discover, is_ult_wear_name, FakeDevice, Transport};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::audio_macos::current_output_device_name;
+use crate::frame_log::FrameLog;
 
 /// General setting id of multipoint.
 const GS_MULTIPOINT: u8 = 0xD1;
@@ -31,6 +32,36 @@ pub enum BrokerCmd {
     SetUlt(UltLevel),
     SetMultipoint(bool),
     Refresh,
+    /// A hand-written request (`HAIRLINE_DEBUG=1` only); still deny-listed.
+    Raw {
+        table: Table,
+        bytes: Vec<u8>,
+    },
+}
+
+/// Builds `BrokerCmd::Raw` from a table name (`t1`/`t2`) and hex bytes, which
+/// may be separated by spaces, colons or dashes.
+pub fn parse_raw(table: &str, hex: &str) -> Result<BrokerCmd, String> {
+    let table = match table.to_ascii_lowercase().as_str() {
+        "t1" => Table::T1,
+        "t2" => Table::T2,
+        other => return Err(format!("unknown table {other:?}; use t1 or t2")),
+    };
+    let digits: Vec<char> = hex
+        .chars()
+        .filter(|c| !matches!(c, ' ' | ':' | '-'))
+        .collect();
+    if digits.is_empty() || digits.len() % 2 != 0 {
+        return Err(format!("{hex:?} is not a whole number of hex bytes"));
+    }
+    let bytes = digits
+        .chunks(2)
+        .map(|pair| {
+            let pair: String = pair.iter().collect();
+            u8::from_str_radix(&pair, 16).map_err(|_| format!("{pair:?} is not a hex byte"))
+        })
+        .collect::<Result<_, _>>()?;
+    Ok(BrokerCmd::Raw { table, bytes })
 }
 
 /// Runs one connection until `Disconnect` (or the command channel closing)
@@ -39,10 +70,21 @@ pub enum BrokerCmd {
 ///
 /// `cmds` is borrowed or owned so the app can keep one receiver across reconnects.
 pub fn run_broker<E: Fn(&DeviceState)>(
+    transport: Box<dyn Transport>,
+    cmds: impl Borrow<Receiver<BrokerCmd>>,
+    emit: E,
+    clock: impl FnMut() -> u64,
+) -> io::Result<()> {
+    run_broker_logged(transport, cmds, emit, clock, None)
+}
+
+/// As `run_broker`, also writing every frame and log line to `log`.
+pub fn run_broker_logged<E: Fn(&DeviceState)>(
     mut transport: Box<dyn Transport>,
     cmds: impl Borrow<Receiver<BrokerCmd>>,
     emit: E,
     mut clock: impl FnMut() -> u64,
+    mut log: Option<&mut FrameLog>,
 ) -> io::Result<()> {
     let cmds = cmds.borrow();
     let mut session = Session::new(clock());
@@ -63,6 +105,9 @@ pub fn run_broker<E: Fn(&DeviceState)>(
 
         let now = clock();
         while let Some(frame) = session.poll_output(now) {
+            if let Some(log) = log.as_deref_mut() {
+                log.sent(now, &frame);
+            }
             if let Err(e) = transport.write(&frame) {
                 return Err(link_lost(&mut session, &emit, e));
             }
@@ -70,7 +115,13 @@ pub fn run_broker<E: Fn(&DeviceState)>(
 
         let mut events = Vec::new();
         match transport.recv_timeout(RECV_TIMEOUT) {
-            Ok(Some(bytes)) => events.extend(session.handle_input(&bytes, clock())),
+            Ok(Some(bytes)) => {
+                let now = clock();
+                if let Some(log) = log.as_deref_mut() {
+                    log.received(now, &bytes);
+                }
+                events.extend(session.handle_input(&bytes, now));
+            }
             Ok(None) => {}
             Err(e) => return Err(link_lost(&mut session, &emit, e)),
         }
@@ -106,7 +157,12 @@ pub fn run_broker<E: Fn(&DeviceState)>(
                     changed = true;
                     gave_up = true;
                 }
-                Event::Log(msg) => eprintln!("hairline: {msg}"),
+                Event::Log(msg) => {
+                    eprintln!("hairline: {msg}");
+                    if let Some(log) = log.as_deref_mut() {
+                        log.note(clock(), msg);
+                    }
+                }
             }
         }
         if changed {
@@ -127,6 +183,12 @@ fn apply(session: &mut Session, cmd: BrokerCmd) -> Result<(), SessionError> {
         BrokerCmd::SetNc(s) => session.set_nc(s),
         BrokerCmd::SetUlt(u) => session.set_ult(u),
         BrokerCmd::SetMultipoint(on) => session.request(request::gs_set_bool(GS_MULTIPOINT, on)),
+        BrokerCmd::Raw { table, bytes } => session.request(Request {
+            table,
+            bytes,
+            capability: None,
+            group: Group::Raw,
+        }),
         BrokerCmd::Refresh => {
             session.request(request::battery_get())?;
             session.request(request::ncasm_get())?;
@@ -177,12 +239,13 @@ pub fn spawn_broker(app: AppHandle, fake: bool) -> Sender<BrokerCmd> {
                 }
                 let _ = app.emit("state", state);
             };
+            let mut log = FrameLog::from_env();
             let mut backoff = 0;
             loop {
                 let result = match open_transport(fake) {
                     Ok(t) => {
                         backoff = 0;
-                        run_broker(t, &rx, emit, clock)
+                        run_broker_logged(t, &rx, emit, clock, log.as_mut())
                     }
                     Err(e) => Err(e),
                 };

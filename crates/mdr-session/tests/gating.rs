@@ -60,3 +60,42 @@ fn requests_before_connected_are_rejected() {
         Err(SessionError::NotConnected)
     );
 }
+
+fn raw(bytes: &[u8]) -> Request {
+    Request {
+        table: Table::T1,
+        bytes: bytes.to_vec(),
+        capability: None,
+        group: Group::Raw,
+    }
+}
+
+#[test]
+fn raw_request_is_still_deny_listed() {
+    let mut s = connected_session();
+    assert!(matches!(
+        s.request(raw(&[0x98, 0x00, 0x16, 0x01])),
+        Err(SessionError::Denied(_))
+    ));
+}
+
+#[test]
+fn raw_request_reply_surfaces_as_log() {
+    let mut s = connected_session();
+    let before = s.state().clone();
+    s.request(raw(&[0x22, 0x00])).unwrap();
+    assert_eq!(s.state(), &before, "a raw request marks nothing pending");
+    let req = drain(&mut s, 500).pop().unwrap();
+    assert_eq!(decode_payload(&req), [0x22, 0x00]);
+    let seq = seq_of(&req);
+    s.handle_input(&frame(mdr_frame::FrameType::Ack, 1 - seq, &[]), 510);
+    let ev = s.handle_input(
+        &frame(mdr_frame::FrameType::Command1, 1, &[0x23, 0x00, 0x43, 0x00]),
+        520,
+    );
+    assert!(
+        ev.contains(&Event::Log("raw reply T1 23 00 43 00".into())),
+        "{ev:?}"
+    );
+    assert_eq!(s.next_timeout_ms(), None, "no reply timer for raw requests");
+}

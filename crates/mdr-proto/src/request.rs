@@ -12,6 +12,8 @@ pub enum Group {
     GeneralSetting(u8),
     AutoPowerOff,
     Power,
+    /// A hand-written debug request: not tracked, its reply is only logged.
+    Raw,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

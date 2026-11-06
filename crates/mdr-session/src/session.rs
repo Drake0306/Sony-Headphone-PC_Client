@@ -39,6 +39,8 @@ pub struct Session {
     decoder: Decoder,
     /// Groups whose request was ACKed and whose reply is still due, with the ACK time.
     awaiting_reply: Vec<(Group, u64)>,
+    /// A raw request was ACKed; the next device data frame is logged as its reply.
+    raw_reply_due: bool,
     last_now_ms: u64,
 }
 
@@ -51,12 +53,21 @@ fn refetch(group: Group) -> Option<Request> {
         Group::Volume => Some(request::volume_get()),
         Group::AutoPowerOff => Some(request::auto_power_off_get()),
         Group::Battery => Some(request::battery_get()),
-        Group::Connect | Group::Codec | Group::Power => None,
+        Group::Connect | Group::Codec | Group::Power | Group::Raw => None,
     }
 }
 
 fn is_power_off(req: &Request) -> bool {
     req.table == Table::T1 && req.bytes.first() == Some(&t1::POWER_SET_STATUS)
+}
+
+/// Bytes as space-separated uppercase hex pairs.
+fn hex(bytes: &[u8]) -> String {
+    bytes
+        .iter()
+        .map(|b| format!("{b:02X}"))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 impl Session {
@@ -67,6 +78,7 @@ impl Session {
             handshake: Handshake::default(),
             decoder: Decoder::new(),
             awaiting_reply: Vec::new(),
+            raw_reply_due: false,
             last_now_ms: now_ms,
         }
     }
@@ -179,6 +191,7 @@ impl Session {
         self.handshake.reset();
         self.decoder = Decoder::new();
         self.awaiting_reply.clear();
+        self.raw_reply_due = false;
         vec![Event::Disconnected]
     }
 
@@ -248,6 +261,7 @@ impl Session {
                         self.awaiting_reply.push((group, self.last_now_ms));
                     }
                     Some((ReplyTimer::Handshake, _)) => self.handshake.on_ack(self.last_now_ms),
+                    Some((_, Group::Raw)) => self.raw_reply_due = true,
                     _ => {}
                 }
                 return;
@@ -270,6 +284,9 @@ impl Session {
     }
 
     fn dispatch(&mut self, table: Table, payload: &[u8], events: &mut Vec<Event>) {
+        if std::mem::take(&mut self.raw_reply_due) {
+            events.push(Event::Log(format!("raw reply {table:?} {}", hex(payload))));
+        }
         let (_kind, msg) = decode(table, payload);
         if let Message::Unknown { .. } = msg {
             events.push(Event::Log(format!(

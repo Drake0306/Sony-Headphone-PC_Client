@@ -1,7 +1,6 @@
 <!--
   The main window shell: nav tabs, the connection status, and one screen per
-  tab chosen from location.hash (#sound ...; Overview by default). Sound is a
-  placeholder until its own task.
+  tab chosen from location.hash (#sound ...; Overview by default).
 -->
 <script lang="ts">
   import { onMount } from "svelte";
@@ -12,6 +11,7 @@
   import Overview from "./Overview.svelte";
   import Scenes from "./Scenes.svelte";
   import Settings from "./Settings.svelte";
+  import Sound from "./Sound.svelte";
 
   const TABS = [
     { id: "overview", label: "Overview" },
@@ -51,8 +51,8 @@
   </nav>
   <span class="status lab">{status}</span>
   <main>
-    {#if tab === "overview"}
-      <Overview {st} />
+    {#if tab === "sound"}
+      <Sound {st} />
     {:else if tab === "noise"}
       <Noise {st} />
     {:else if tab === "devices"}
@@ -62,10 +62,7 @@
     {:else if tab === "settings"}
       <Settings {st} />
     {:else}
-      <div class="page">
-        <h3>Sound</h3>
-        <p class="sub">This screen is on its way.</p>
-      </div>
+      <Overview {st} />
     {/if}
   </main>
 </div>

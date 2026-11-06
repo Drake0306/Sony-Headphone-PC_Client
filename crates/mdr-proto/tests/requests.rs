@@ -80,6 +80,9 @@ fn deny_list_is_keyed_on_opcode_and_sub_id() {
     assert!(denied(Table::T1, &[0x98, 0x00, 0x06, 0x01]).is_none());
     assert!(denied(Table::T1, &[0x98, 0x00, 0x07, 0x01]).is_some());
     assert!(denied(Table::T1, &[0x98]).is_some());
+    assert!(denied(Table::T1, &[0x98, 0x01, 0x06, 0x01]).is_some());
+    assert!(denied(Table::T1, &[0x98, 0x00, 0x06, 0x00]).is_some());
+    assert!(denied(Table::T1, &[0x98, 0x00, 0x06, 0x01, 0xFF]).is_some());
     assert!(denied(Table::T1, &[0xC4, 0x00]).is_some());
     assert!(denied(Table::T1, &[0x3E, 0x00]).is_some());
     assert!(denied(Table::T1, &[0x24, 0x03, 0x01]).is_some()); // power off needs session-level confirmation

@@ -1,0 +1,26 @@
+[package]
+name = "hairline"
+version = "0.1.0"
+description = "Hairline: a desktop controller for the ULT WEAR headphones"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "hairline_lib"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+mdr-proto = { path = "../../../crates/mdr-proto" }
+mdr-session = { path = "../../../crates/mdr-session" }
+mdr-transport = { path = "../../../crates/mdr-transport" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2.12", features = ["tray-icon", "image-png", "macos-private-api"] }
+tauri-plugin-positioner = { version = "2.4", features = ["tray-icon"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+tauri-nspanel = "2.1"
+core-foundation = "0.10"

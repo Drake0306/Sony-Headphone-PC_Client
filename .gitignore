@@ -4,8 +4,8 @@ target/
 node_modules/
 dist/
 # Tauri
-src-tauri/target/
-src-tauri/gen/schemas/
+**/src-tauri/target/
+**/src-tauri/gen/schemas/
 # macOS
 .DS_Store
 # Editors

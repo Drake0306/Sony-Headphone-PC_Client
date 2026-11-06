@@ -1,0 +1,193 @@
+/* Base reset and the shared Hairline pieces: rows, boxed switches, ticks, link list. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: transparent;
+}
+
+body {
+  font-family: "Instrument Sans", system-ui, sans-serif;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  margin: 0;
+}
+
+.dot {
+  font-family: "Doto", monospace;
+  font-weight: 900;
+}
+
+.lab {
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.live {
+  color: var(--ult);
+  font-weight: 600;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--hair);
+  font-size: 13px;
+  gap: 10px;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.big {
+  font-size: 40px;
+  line-height: 1;
+}
+
+.big small {
+  font-family: "Instrument Sans", system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--muted);
+  margin-left: 4px;
+  font-weight: 400;
+}
+
+/* Boxed switches */
+.boxes {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 2px;
+}
+
+.boxes button {
+  background: var(--box);
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  text-align: center;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  padding: 6px 4px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.boxes button.on {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.boxes.ult button.on {
+  background: var(--ult);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.boxes.pending button.on {
+  background: repeating-linear-gradient(45deg, var(--ink) 0 4px, var(--stripe) 4px 8px);
+  color: var(--paper);
+}
+
+.boxes button.refused {
+  border-color: var(--ult);
+  color: var(--ult);
+}
+
+.boxes.unavailable {
+  opacity: 0.35;
+}
+
+.boxes button:disabled {
+  cursor: default;
+}
+
+/* Tick bar */
+.ticks {
+  display: flex;
+  gap: 3px;
+}
+
+.ticks button {
+  width: 5px;
+  height: 12px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: var(--hair);
+  cursor: pointer;
+}
+
+.ticks button.on {
+  background: var(--ink);
+}
+
+.ticks.pending button.on {
+  background: var(--stripe);
+}
+
+.ticks.unavailable {
+  opacity: 0.35;
+}
+
+.ticks button:disabled {
+  cursor: default;
+}
+
+/* Link list */
+.link div {
+  display: flex;
+  justify-content: space-between;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--hair);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.link div:last-child {
+  border-bottom: none;
+}
+
+.btn {
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: var(--box);
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.btn.fill {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}

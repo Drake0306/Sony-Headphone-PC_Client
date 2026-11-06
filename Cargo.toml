@@ -1,0 +1,9 @@
+[workspace]
+# apps/desktop/src-tauri is added to members in a later task.
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+rust-version = "1.85"

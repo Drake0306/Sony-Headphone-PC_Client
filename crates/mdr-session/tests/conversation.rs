@@ -31,6 +31,7 @@ fn full_handshake_reaches_connected_and_reads_initial_state() {
         (&[0x06, 0x00], &[0x07, 0x00, 0x01, 0x42, 0x01]),
         (&[0x04, 0x01], &[0x05, 0x01, 0x08, b'U', b'L', b'T', b' ', b'W', b'E', b'A', b'R']),
         (&[0x04, 0x02], &[0x05, 0x02, 0x05, b'2', b'.', b'1', b'.', b'0']),
+        (&[0x04, 0x03], &[0x05, 0x03, 0x00, 0x08]),
         (&[0x22, 0x00], &[0x23, 0x00, 0x43, 0x00]),
         (&[0x66, 0x17], &[0x67, 0x17, 0x01, 0x01, 0x01, 0x01, 0x0E]),
         (&[0x50, 0x03], &[0x51, 0x03, 0x06, 0x15, 0x0A, 0x00]),
@@ -56,6 +57,7 @@ fn full_handshake_reaches_connected_and_reads_initial_state() {
     assert!(st.connected);
     assert_eq!(st.model.as_deref(), Some("ULT WEAR"));
     assert_eq!(st.firmware.as_deref(), Some("2.1.0"));
+    assert_eq!(st.color, Some(0x08));
     assert_eq!(st.capabilities_t1, vec![0x20, 0x53, 0x6B, 0x12, 0xD1]);
     assert_eq!(st.battery.value, Some((67, Charging::NotCharging)));
     assert_eq!(st.nc.value, Some(NcAsmState { mode: NcMode::Ambient, level: 14, voice_focus: true }));
@@ -68,11 +70,12 @@ fn full_handshake_reaches_connected_and_reads_initial_state() {
 #[test]
 fn ntfy_without_request_updates_state() {
     let mut s = connected_session(); // helper: runs the script above
-    let ev = s.handle_input(&frame(FrameType::Command1, 0, &[0x69, 0x17, 0x01, 0x01, 0x00, 0x00, 0x0E]), 500);
+    // The handshake's 13th and last device reply used seq 0, so the device's next frame is seq 1.
+    let ev = s.handle_input(&frame(FrameType::Command1, 1, &[0x69, 0x17, 0x01, 0x01, 0x00, 0x00, 0x0E]), 500);
     assert!(ev.contains(&Event::StateChanged));
     assert_eq!(s.state().nc.value.unwrap().mode, NcMode::NoiseCancelling);
     assert!(matches!(s.state().nc.status, Status::Confirmed));
-    assert_eq!(drain(&mut s)[0], frame(FrameType::Ack, 1, &[]));
+    assert_eq!(drain(&mut s)[0], frame(FrameType::Ack, 0, &[]));
 }
 
 #[test]

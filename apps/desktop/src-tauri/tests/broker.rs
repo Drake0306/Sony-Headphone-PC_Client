@@ -60,8 +60,8 @@ fn disconnect_marks_all_unavailable() {
     let (tx, rx) = channel();
     let (etx, erx) = channel();
     let mut t = FakeDevice::ult_wear();
-    // The handshake takes 24 incoming frames; the Refresh after it crosses 26.
-    t.drop_link_after(26);
+    // The handshake takes 26 incoming frames; the Refresh after it crosses 28.
+    t.drop_link_after(28);
     let handle = std::thread::spawn(move || run_broker(Box::new(t), rx, |s| etx.send(s.clone()).unwrap(), monotonic_ms));
     let st = wait_for(&erx, |s| s.connected);
     assert!(matches!(st.battery.status, Status::Confirmed));

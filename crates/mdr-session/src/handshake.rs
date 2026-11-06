@@ -63,6 +63,7 @@ impl Handshake {
             request::support_functions(Table::T2),
             request::device_info(0x01),
             request::device_info(0x02),
+            request::device_info(0x03),
         ]);
         self.expect(request::protocol_info())
     }

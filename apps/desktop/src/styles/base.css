@@ -231,8 +231,13 @@ body.kbd a:focus-visible {
   opacity: 0.35;
 }
 
+.toggle.readonly.on::after {
+  background: var(--muted);
+}
+
 .toggle.pending,
-.toggle.unavailable {
+.toggle.unavailable,
+.toggle.readonly {
   cursor: default;
 }
 

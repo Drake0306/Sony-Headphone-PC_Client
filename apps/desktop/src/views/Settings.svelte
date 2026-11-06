@@ -186,7 +186,7 @@
           />
         </Row>
         <Row label="Show in menu bar" note="The popover lives here">
-          <Toggle on={true} status="Unavailable" label="Show in menu bar" onpick={noop} />
+          <Toggle readonly on={true} label="Show in menu bar" title="Hairline always lives in the menu bar" />
         </Row>
         <Row label="Hide Dock icon">
           <Toggle

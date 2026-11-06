@@ -27,7 +27,6 @@
     { label: "Sound quality", value: 0 },
     { label: "Stable connection", value: 1 },
   ];
-  const noop = () => {};
 
   const eqStatus = () => st.eq_ult.status;
   const bands = control<number[]>(() => ({ value: st.eq_ult.value?.bands ?? null, status: eqStatus() }));
@@ -127,7 +126,7 @@
       <div class="block">
         <h4>Upscaling</h4>
         <Row label="DSEE" note="Restores detail lost to compression">
-          <Toggle on={dsee} status="Unavailable" label="DSEE" onpick={noop} />
+          <Toggle readonly on={dsee} label="DSEE" />
         </Row>
         <Row label="Turn DSEE off at low battery">
           <Toggle

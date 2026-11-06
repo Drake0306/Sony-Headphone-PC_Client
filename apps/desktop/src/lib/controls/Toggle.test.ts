@@ -28,4 +28,19 @@ describe("Toggle", () => {
     await fireEvent.click(sw);
     expect(onpick).not.toHaveBeenCalled();
   });
+
+  it("toggle_readonly_shows_value", async () => {
+    const onpick = vi.fn();
+    const { getByRole } = render(Toggle, { on: true, readonly: true, label: "DSEE", onpick });
+    const sw = getByRole("switch");
+    expect(sw).toHaveClass("on");
+    expect(sw).toHaveClass("readonly");
+    expect(sw).not.toHaveClass("unavailable");
+    expect(sw).toHaveAttribute("aria-checked", "true");
+    expect(sw).toHaveAttribute("aria-disabled", "true");
+    expect(sw).toHaveAttribute("tabindex", "-1");
+    expect(sw).toHaveAttribute("title", "Reported by the headphones");
+    await fireEvent.click(sw);
+    expect(onpick).not.toHaveBeenCalled();
+  });
 });

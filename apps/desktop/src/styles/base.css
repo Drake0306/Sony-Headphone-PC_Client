@@ -24,6 +24,18 @@ button {
   font: inherit;
   color: inherit;
   margin: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* No focus ring after a click; keyboard users (body.kbd, set on Tab) get a thin ink ring. */
+button:focus,
+button:focus-visible {
+  outline: none;
+}
+
+body.kbd button:focus-visible {
+  outline: 1px solid var(--ink);
+  outline-offset: 1px;
 }
 
 .dot {

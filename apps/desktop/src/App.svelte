@@ -123,8 +123,17 @@
     });
     getState().then((s) => heard || receive(s));
     const clock = setInterval(() => (now = Date.now()), 30000);
+    // Focus rings only for keyboard users: a Tab press turns them on, a click turns them off.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Tab") document.body.classList.add("kbd");
+    };
+    const onPointer = () => document.body.classList.remove("kbd");
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", onPointer);
     return () => {
       clearInterval(clock);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onPointer);
       unlisten.then((stop) => stop());
     };
   });

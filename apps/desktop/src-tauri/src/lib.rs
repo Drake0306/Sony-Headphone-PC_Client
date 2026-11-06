@@ -3,8 +3,10 @@
 mod audio_macos;
 pub mod broker;
 mod commands;
+pub mod dock;
 pub mod frame_log;
 mod popover;
+pub mod settings;
 mod tray;
 
 use std::sync::Mutex;
@@ -25,40 +27,67 @@ fn wants_debug() -> bool {
 
 type InvokeHandler = Box<dyn Fn(tauri::ipc::Invoke) -> bool + Send + Sync>;
 
+/// The handler for every command, plus any `extra` ones.
+macro_rules! handler {
+    ($($extra:path),*) => {
+        Box::new(tauri::generate_handler![
+            commands::get_state,
+            commands::set_nc,
+            commands::set_ult,
+            commands::set_multipoint,
+            commands::set_eq_preset,
+            commands::set_eq_bands,
+            commands::set_volume,
+            commands::set_dsee_auto_off,
+            commands::set_connection_mode,
+            commands::set_auto_power_off,
+            commands::set_wear_pause,
+            commands::set_voice_assistant,
+            commands::set_quick_access,
+            commands::set_voice_guide_volume,
+            commands::set_touch_panel,
+            commands::set_sidetone,
+            commands::connect,
+            commands::open_main_window,
+            settings::get_settings,
+            settings::set_settings,
+            $($extra),*
+        ])
+    };
+}
+
 fn invoke_handler(debug: bool) -> InvokeHandler {
     if debug {
-        Box::new(tauri::generate_handler![
-            commands::get_state,
-            commands::set_nc,
-            commands::set_ult,
-            commands::set_multipoint,
-            commands::connect,
-            commands::open_main_window,
-            commands::debug_raw,
-        ])
+        handler!(commands::debug_raw)
     } else {
-        Box::new(tauri::generate_handler![
-            commands::get_state,
-            commands::set_nc,
-            commands::set_ult,
-            commands::set_multipoint,
-            commands::connect,
-            commands::open_main_window,
-        ])
+        handler!()
     }
 }
 
 pub fn run() {
     let fake = wants_fake_device();
-    let builder = tauri::Builder::default().plugin(tauri_plugin_positioner::init());
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_positioner::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ));
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init());
     builder
         .manage(Mutex::new(DeviceState::default()))
         .invoke_handler(invoke_handler(wants_debug()))
         .setup(move |app| {
+            let app_settings = match settings::dir(app.handle()) {
+                Ok(dir) => settings::load(&dir),
+                Err(e) => {
+                    eprintln!("hairline: no settings directory ({e}); using defaults");
+                    settings::AppSettings::default()
+                }
+            };
             #[cfg(target_os = "macos")]
-            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            app.set_activation_policy(dock::policy(false, app_settings.hide_dock_icon).into());
+            app.manage(Mutex::new(app_settings));
             tray::create(app.handle())?;
             popover::create(app.handle())?;
             let tx = broker::spawn_broker(app.handle().clone(), fake);

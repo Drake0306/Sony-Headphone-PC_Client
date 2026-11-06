@@ -50,6 +50,26 @@ fn broker_connects_and_emits_state_then_applies_set_ult() {
 }
 
 #[test]
+fn broker_applies_eq_preset_and_dsee() {
+    let (tx, rx) = channel();
+    let (etx, erx) = channel();
+    let t = Box::new(FakeDevice::ult_wear());
+    std::thread::spawn(move || run_broker(t, rx, |s| etx.send(s.clone()).unwrap(), monotonic_ms));
+    wait_for(&erx, |s| s.connected);
+    tx.send(BrokerCmd::SetEqPreset(0x16)).unwrap();
+    let st = wait_for(&erx, |s| {
+        s.eq_ult.value.as_ref().map(|e| e.preset) == Some(0x16)
+            && matches!(s.eq_ult.status, Status::Confirmed)
+    });
+    assert_eq!(st.eq_ult.value.unwrap().ult, UltLevel::Ult1);
+    tx.send(BrokerCmd::SetDseeAutoOff(false)).unwrap();
+    wait_for(&erx, |s| {
+        s.dsee_auto_off.value == Some(false) && matches!(s.dsee_auto_off.status, Status::Confirmed)
+    });
+    tx.send(BrokerCmd::Disconnect).unwrap();
+}
+
+#[test]
 fn broker_returns_ok_on_disconnect() {
     let (tx, rx) = channel();
     let (etx, erx) = channel();
@@ -67,8 +87,11 @@ fn disconnect_marks_all_unavailable() {
     let (tx, rx) = channel();
     let (etx, erx) = channel();
     let mut t = FakeDevice::ult_wear();
-    // The handshake takes 26 incoming frames; the Refresh after it crosses 28.
-    t.drop_link_after(28);
+    // The handshake sends 27 requests (protocol, two support lists, three
+    // device-info reads and 21 capability reads), and the fake receives each
+    // request plus the ACK for its reply: 54 incoming frames. The Refresh after
+    // it crosses 56 (battery GET and the ACK of its reply).
+    t.drop_link_after(56);
     let handle = std::thread::spawn(move || {
         run_broker(
             Box::new(t),

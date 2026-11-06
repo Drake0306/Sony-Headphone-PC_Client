@@ -8,7 +8,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use mdr_proto::{request, Group, NcAsmState, Request, Table, UltLevel};
-use mdr_session::{DeviceState, Event, PairedDevice, Session, SessionError, GS_MULTIPOINT};
+use mdr_session::{DeviceState, Event, PairedDevice, Session, SessionError};
 use mdr_transport::{connect, discover, is_ult_wear_name, FakeDevice, Transport};
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -29,6 +29,18 @@ pub enum BrokerCmd {
     SetNc(NcAsmState),
     SetUlt(UltLevel),
     SetMultipoint(bool),
+    SetEqPreset(u8),
+    SetEqBands(Vec<u8>),
+    SetVolume(u8),
+    SetDseeAutoOff(bool),
+    SetConnectionMode(u8),
+    SetAutoPowerOff(u8),
+    SetWearPause(bool),
+    SetVoiceAssistant(u8),
+    SetQuickAccess(Vec<u8>),
+    SetVoiceGuideVolume(i8),
+    SetTouchPanel(bool),
+    SetSidetone(bool),
     Refresh,
     /// A hand-written request (`HAIRLINE_DEBUG=1` only); still deny-listed.
     Raw {
@@ -184,7 +196,19 @@ fn apply(session: &mut Session, cmd: BrokerCmd) -> Result<(), SessionError> {
     match cmd {
         BrokerCmd::SetNc(s) => session.set_nc(s),
         BrokerCmd::SetUlt(u) => session.set_ult(u),
-        BrokerCmd::SetMultipoint(on) => session.request(request::gs_set_bool(GS_MULTIPOINT, on)),
+        BrokerCmd::SetMultipoint(on) => session.set_multipoint(on),
+        BrokerCmd::SetEqPreset(preset) => session.set_eq_preset(preset),
+        BrokerCmd::SetEqBands(bands) => session.set_eq_bands(bands),
+        BrokerCmd::SetVolume(v) => session.set_volume(v),
+        BrokerCmd::SetDseeAutoOff(auto) => session.set_dsee_auto_off(auto),
+        BrokerCmd::SetConnectionMode(v) => session.set_connection_mode(v),
+        BrokerCmd::SetAutoPowerOff(v) => session.set_auto_power_off(v),
+        BrokerCmd::SetWearPause(on) => session.set_wear_pause(on),
+        BrokerCmd::SetVoiceAssistant(v) => session.set_voice_assistant(v),
+        BrokerCmd::SetQuickAccess(functions) => session.set_quick_access(functions),
+        BrokerCmd::SetVoiceGuideVolume(v) => session.set_voice_guide_volume(v),
+        BrokerCmd::SetTouchPanel(on) => session.set_touch_panel(on),
+        BrokerCmd::SetSidetone(on) => session.set_sidetone(on),
         BrokerCmd::Raw { table, bytes } => session.request(Request {
             table,
             bytes,

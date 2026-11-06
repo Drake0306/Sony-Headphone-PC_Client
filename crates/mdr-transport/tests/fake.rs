@@ -114,3 +114,61 @@ fn dropped_link_fails_reads_and_writes() {
         std::io::ErrorKind::BrokenPipe
     );
 }
+
+#[test]
+fn fake_device_answers_every_phase2_read() {
+    let mut t = FakeDevice::ult_wear();
+    let (s, _) = connected(&mut t);
+    let st = s.state();
+    assert_eq!(st.capabilities_t2, [0x42, 0x50, 0xF2]);
+    assert_eq!(st.dsee.value, Some(true));
+    assert_eq!(st.dsee_auto_off.value, Some(true));
+    assert_eq!(st.connection_mode.value, Some(0));
+    assert_eq!(st.wear_pause.value, Some(false));
+    assert_eq!(st.voice_assistant.value, Some(0xFF));
+    assert_eq!(st.quick_access.value, Some(vec![0, 0]));
+    assert_eq!(st.voice_guide_volume.value, Some(2));
+    assert_eq!(st.playback, Some(2));
+    assert_eq!(st.touch_panel.value, Some(false));
+    assert_eq!(st.sidetone.value, Some(true));
+    assert_eq!(st.auto_power_off.value, Some(0x10));
+    assert_eq!(st.volume.value, Some(0x1C));
+    for status in [
+        &st.dsee.status,
+        &st.dsee_auto_off.status,
+        &st.connection_mode.status,
+        &st.wear_pause.status,
+        &st.voice_assistant.status,
+        &st.quick_access.status,
+        &st.voice_guide_volume.status,
+        &st.touch_panel.status,
+        &st.sidetone.status,
+        &st.auto_power_off.status,
+        &st.volume.status,
+    ] {
+        assert_eq!(status, &Status::Confirmed);
+    }
+}
+
+#[test]
+fn fake_device_echoes_phase2_sets() {
+    let mut t = FakeDevice::ult_wear();
+    let (mut s, mut now) = connected(&mut t);
+    s.set_volume(12).unwrap();
+    s.set_wear_pause(true).unwrap();
+    s.set_auto_power_off(0x11).unwrap();
+    s.set_connection_mode(1).unwrap();
+    s.set_sidetone(false).unwrap();
+    s.set_voice_guide_volume(-2).unwrap();
+    for _ in 0..100 {
+        now += 5;
+        pump_once(&mut s, &mut t, now);
+    }
+    let st = s.state();
+    assert_eq!(st.volume.value, Some(12));
+    assert_eq!(st.wear_pause.value, Some(true));
+    assert_eq!(st.auto_power_off.value, Some(0x11));
+    assert_eq!(st.connection_mode.value, Some(1));
+    assert_eq!(st.sidetone.value, Some(false));
+    assert_eq!(st.voice_guide_volume.value, Some(-2));
+}

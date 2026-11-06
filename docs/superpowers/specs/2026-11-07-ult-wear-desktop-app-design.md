@@ -1,6 +1,6 @@
 # ULT WEAR desktop app and MDR protocol library — design
 
-Date: 2026-11-07. Author: Roy (decisions) with Claude (drafting). Status: approved to build; stack choice is Claude's call and is flagged below.
+Date: 2026-11-07. Author: Roy. Status: approved to build; stack choice is Claude's call and is flagged below.
 
 ## Intent
 
@@ -57,7 +57,7 @@ Background research lives in `docs/research/` (reports as HTML, notes as Markdow
 
 ## Decisions
 
-### Stack (Claude's call, flagged for veto)
+### Stack (assistant's call, flagged for veto)
 
 Earlier in the conversation Claude proposed native SwiftUI on Mac plus a separate WinUI app. The chosen design (Hairline) uses no system materials and must look identical on all three platforms, Roy wants one new library he owns, and one person is building. So:
 
@@ -125,7 +125,7 @@ Earlier in the conversation Claude proposed native SwiftUI on Mac plus a separat
 - Exact timeout values, reconnect back-off, and the fake device's scripted behaviour.
 - Font licensing files and bundling method (OFL for all three faces).
 
-## Builder-check resolutions (Claude's calls, 2026-11-07)
+## Builder-check resolutions (2026-11-07)
 
 A fresh reviewer read this document and asked five questions. Resolutions:
 

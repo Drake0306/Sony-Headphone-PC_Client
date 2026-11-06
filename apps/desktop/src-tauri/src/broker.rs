@@ -260,7 +260,10 @@ pub fn spawn_broker(app: AppHandle, fake: bool) -> Sender<BrokerCmd> {
                     Ok(()) => wait_for_connect(&rx, None),
                     Err(e) => {
                         backoff = next_backoff(backoff);
-                        eprintln!("hairline: no link ({e}); retrying in {backoff}s");
+                        eprintln!(
+                            "hairline: no link ({:?}: {e}); retrying in {backoff}s",
+                            e.kind()
+                        );
                         wait_for_connect(&rx, Some(Duration::from_secs(backoff)))
                     }
                 };

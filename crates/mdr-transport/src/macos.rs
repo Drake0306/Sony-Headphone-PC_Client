@@ -4,6 +4,10 @@
 //! callbacks arrive on the main run loop, so the application's main run loop
 //! must be running. Use the transport from a worker thread: blocking the main
 //! thread in `recv_timeout` would starve the delegate.
+//!
+//! The channel is opened asynchronously: a synchronous open made inside a
+//! main-queue block fails on real hardware and leaves the DLCI half-open on
+//! the device (see `docs/protocol-notes.md`).
 
 use std::ffi::c_void;
 use std::io;
@@ -27,37 +31,64 @@ const WRITE_CHUNK: usize = 512;
 const SDP_POLL: Duration = Duration::from_millis(200);
 /// How long an SDP query may take to produce the v2 record.
 const SDP_WAIT: Duration = Duration::from_secs(6);
+/// How long the asynchronous RFCOMM open may take to complete.
+const OPEN_TIMEOUT: Duration = Duration::from_secs(15);
+/// Open status reported when the channel closes before the open completes
+/// (kIOReturnNotOpen).
+const CLOSED_BEFORE_OPEN: i32 = 0xe00002cd_u32 as i32;
+
+/// Where the delegate forwards its callbacks.
+struct DelegateIvars {
+    /// Received bytes; an empty `Vec` signals closure.
+    data: Sender<Vec<u8>>,
+    /// Status of the asynchronous open; only the first value is read.
+    open: Sender<i32>,
+}
 
 define_class!(
-    /// Forwards received RFCOMM data into a channel; an empty `Vec` signals closure.
+    /// Forwards the open status and received RFCOMM data into channels; an
+    /// empty `Vec` signals closure.
     #[unsafe(super(NSObject))]
     #[name = "MdrTransportRFCOMMDelegate"]
-    #[ivars = Sender<Vec<u8>>]
+    #[ivars = DelegateIvars]
     struct Delegate;
 
     unsafe impl NSObjectProtocol for Delegate {}
 
     unsafe impl IOBluetoothRFCOMMChannelDelegate for Delegate {
+        #[unsafe(method(rfcommChannelOpenComplete:status:))]
+        fn open_complete(&self, _channel: Option<&IOBluetoothRFCOMMChannel>, status: i32) {
+            let _ = self.ivars().open.send(status);
+        }
+
         #[unsafe(method(rfcommChannelData:data:length:))]
-        fn data(&self, _channel: Option<&IOBluetoothRFCOMMChannel>, data: *mut c_void, length: usize) {
+        fn data(
+            &self,
+            _channel: Option<&IOBluetoothRFCOMMChannel>,
+            data: *mut c_void,
+            length: usize,
+        ) {
             if data.is_null() || length == 0 {
                 return;
             }
             // SAFETY: IOBluetooth passes a buffer of `length` bytes valid for this call.
             let bytes = unsafe { std::slice::from_raw_parts(data.cast::<u8>(), length) };
-            let _ = self.ivars().send(bytes.to_vec());
+            let _ = self.ivars().data.send(bytes.to_vec());
         }
 
         #[unsafe(method(rfcommChannelClosed:))]
         fn closed(&self, _channel: Option<&IOBluetoothRFCOMMChannel>) {
-            let _ = self.ivars().send(Vec::new());
+            // A close before the open completed is an open failure; afterwards
+            // nobody reads the open status and this send is ignored.
+            let _ = self.ivars().open.send(CLOSED_BEFORE_OPEN);
+            let _ = self.ivars().data.send(Vec::new());
         }
     }
 );
 
 impl Delegate {
-    fn new(tx: Sender<Vec<u8>>) -> Retained<Self> {
-        let this = Self::alloc().set_ivars(tx);
+    fn new(ivars: DelegateIvars) -> Retained<Self> {
+        let this = Self::alloc().set_ivars(ivars);
         // SAFETY: NSObject's designated initialiser.
         unsafe { msg_send![super(this), init] }
     }
@@ -238,6 +269,14 @@ fn query_v2_record(device: &Device) -> io::Result<Record> {
 }
 
 fn open_channel(device: &Device, record: &Record) -> io::Result<Box<dyn Transport>> {
+    // The open completes on the main run loop, which cannot advance while the
+    // main thread waits for it.
+    if MainThreadMarker::new().is_some() {
+        return Err(io::Error::new(
+            io::ErrorKind::WouldBlock,
+            "RFCOMM open must be started off the main thread",
+        ));
+    }
     let mut channel_id: BluetoothRFCOMMChannelID = 0;
     // SAFETY: record query on the main queue; `channel_id` outlives the call.
     let ret = on_main(|| unsafe { record.get().getRFCOMMChannelID(&mut channel_id) });
@@ -245,13 +284,18 @@ fn open_channel(device: &Device, record: &Record) -> io::Result<Box<dyn Transpor
         return Err(io_err("getRFCOMMChannelID", ret));
     }
     let (tx, rx) = mpsc::channel();
+    let (open_tx, open_rx) = mpsc::channel();
+    // Start the open in one short hop; never wait for the callback inside it.
     let link: Link = on_main(move || {
-        let delegate = Delegate::new(tx);
+        let delegate = Delegate::new(DelegateIvars {
+            data: tx,
+            open: open_tx,
+        });
         let delegate_obj: &AnyObject = &delegate;
         let mut channel = None;
         // SAFETY: IOBluetooth call on the main queue with valid arguments.
         let ret = unsafe {
-            device.get().openRFCOMMChannelSync_withChannelID_delegate(
+            device.get().openRFCOMMChannelAsync_withChannelID_delegate(
                 Some(&mut channel),
                 channel_id,
                 Some(delegate_obj),
@@ -266,17 +310,54 @@ fn open_channel(device: &Device, record: &Record) -> io::Result<Box<dyn Transpor
                     channel.closeChannel();
                 }
             }
-            return Err(io_err("openRFCOMMChannelSync", ret));
+            return Err(io_err("openRFCOMMChannelAsync", ret));
         }
-        let channel =
-            channel.ok_or_else(|| io::Error::other("openRFCOMMChannelSync returned no channel"))?;
+        let channel = channel
+            .ok_or_else(|| io::Error::other("openRFCOMMChannelAsync returned no channel"))?;
         Ok(MainOnly((channel, delegate)))
     })?;
+    let failure = match open_rx.recv_timeout(OPEN_TIMEOUT) {
+        Ok(0) => None,
+        Ok(CLOSED_BEFORE_OPEN) => Some(io::Error::other(
+            "RFCOMM open failed: channel closed before the open completed",
+        )),
+        Ok(status) => Some(io::Error::other(format!(
+            "RFCOMM open failed: IOReturn {status:#010x}"
+        ))),
+        Err(RecvTimeoutError::Timeout) => Some(io::Error::new(
+            io::ErrorKind::TimedOut,
+            format!("RFCOMM open timed out after {}s", OPEN_TIMEOUT.as_secs()),
+        )),
+        Err(RecvTimeoutError::Disconnected) => {
+            Some(io::Error::other("RFCOMM open failed: delegate went away"))
+        }
+    };
+    if let Some(err) = failure {
+        abandon_open(device, link);
+        return Err(err);
+    }
     Ok(Box::new(MacTransport {
         link: Some(link),
         rx,
         closed: false,
     }))
+}
+
+/// Tears down a channel whose open failed or timed out. Closing the baseband
+/// connection clears a DLCI the device may have left half-open; the system
+/// reconnects audio by itself.
+fn abandon_open(device: &Device, link: Link) {
+    on_main(move || {
+        let (channel, _delegate) = &link.0;
+        // SAFETY: on the main queue. Detach the unretained delegate before the
+        // link (and the delegate) is released here.
+        unsafe {
+            channel.setDelegate(None);
+            channel.closeChannel();
+            device.get().closeConnection();
+        }
+        drop(link);
+    });
 }
 
 struct MacTransport {

@@ -9,6 +9,8 @@ Opcode values and payload layouts below were read on 2026-11-07 from mos9527/Son
 - ARQ: every data frame must be ACKed with `seq = 1 - received_seq`; one frame in flight; the device retransmits forever if not ACKed. Our own sends wait for the device's ACK before the next send.
 - Primitive encodings in payloads: `MDRPodArray<T>` = one byte count then elements; `MDRArray<T>` = one byte count then variable-size elements; `MDRPrefixedString` = one byte length then bytes (UTF-8, not NUL-terminated). Integers big-endian.
 
+macOS (IOBluetooth, hardware-checked on the WH-ULT900N fw 2.1.4, macOS 27.2): `openRFCOMMChannelSync` called inside a main-queue dispatch block returns `kIOReturnError` (0xe00002bc) after about 1.5 s on a fresh link, every time, because it needs to pump the run loop itself. It also leaves the v2 DLCI half-open on the device, so later opens on that channel hang (no UA, no DM) until the device times it out. The same synchronous call made directly on the main thread succeeds (about 2.7 s), and `openRFCOMMChannelAsync` started on the main queue succeeds in about 1.3 s with `rfcommChannelOpenComplete:status:` status 0 on the main run loop. The transport therefore opens asynchronously and waits for that callback off the main thread (15 s limit). After a failed or timed-out open, `closeConnection` on the device resets the baseband link and clears a stuck DLCI; the system reconnects audio by itself. Other RFCOMM channels on the device (15, 19, 20, 22) open either way.
+
 ## Table 1 opcodes (COMMAND_1) used
 
 | Group | GET | RET | SET | NTFY | Capability GET/RET |

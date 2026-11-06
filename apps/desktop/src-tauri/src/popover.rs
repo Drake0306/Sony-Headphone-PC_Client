@@ -112,11 +112,8 @@ fn hide(app: &AppHandle) {
 /// forward. The Dock icon shows while the window exists.
 pub fn open_main_window(app: &AppHandle) -> tauri::Result<()> {
     hide(app);
-    // Regular before showing, so the window can come to the front.
-    dock::apply(app, ActivationPolicyKind::Regular);
-    #[cfg(target_os = "macos")]
-    app.show()?;
     if let Some(window) = app.get_webview_window(MAIN) {
+        bring_forward(app)?;
         window.show()?;
         window.unminimize()?;
         return window.set_focus();
@@ -140,5 +137,16 @@ pub fn open_main_window(app: &AppHandle) -> tauri::Result<()> {
             dock::apply_for(&handle, false, hide_dock_icon);
         }
     });
+    // Only once the window exists, so a failed build leaves no Dock icon behind.
+    bring_forward(app)?;
     window.set_focus()
+}
+
+/// Switches to the Regular policy (Dock icon) and unhides the app, so the main
+/// window can come to the front.
+fn bring_forward(app: &AppHandle) -> tauri::Result<()> {
+    dock::apply(app, ActivationPolicyKind::Regular);
+    #[cfg(target_os = "macos")]
+    app.show()?;
+    Ok(())
 }

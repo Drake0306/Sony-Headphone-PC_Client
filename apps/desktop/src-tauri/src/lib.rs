@@ -96,6 +96,15 @@ pub fn run() {
             app.manage(commands::Broker(tx));
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Hairline");
+        .build(tauri::generate_context!())
+        .expect("error while building Hairline")
+        .run(|app, event| {
+            // Clicking the Dock icon reopens the main window.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = event {
+                let _ = popover::open_main_window(app);
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = (app, event);
+        });
 }

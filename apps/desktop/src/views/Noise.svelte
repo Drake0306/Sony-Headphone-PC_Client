@@ -9,6 +9,7 @@
   import Toggle from "../lib/controls/Toggle.svelte";
   import { control } from "../lib/control.svelte";
   import * as noise from "../lib/noise";
+  import { SCENES_PREVIEW } from "../lib/scenesPreview";
   import { refusedReason, type DeviceState, type NcAsmState, type NcMode } from "../lib/state";
 
   let { st }: { st: DeviceState } = $props();
@@ -80,16 +81,15 @@
       </div>
       <div class="block">
         <h4>Automatic</h4>
-        <div class="scene">
-          <span>At the desk</span><span class="lab">Preview</span>
-          <span class="when">When this Mac is playing</span>
-          <div class="then"><span>Ambient 14</span><span>Voice focus</span></div>
-        </div>
-        <div class="scene">
-          <span>On a call</span><span class="lab">Preview</span>
-          <span class="when">When Zoom or FaceTime has the mic</span>
-          <div class="then"><span>NC</span></div>
-        </div>
+        {#each SCENES_PREVIEW as card (card.name)}
+          <div class="scene">
+            <span>{card.name}</span><span class="lab">Preview</span>
+            <span class="when">{card.when}</span>
+            <div class="then">
+              {#each card.then as action (action.label)}<span class:u={action.ult}>{action.label}</span>{/each}
+            </div>
+          </div>
+        {/each}
         <p class="note">Modes arrive after Phase 2.</p>
       </div>
     </div>

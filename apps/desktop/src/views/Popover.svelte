@@ -48,8 +48,8 @@
   const ncStatus = $derived(displayStatus($nc, st.nc.status));
   const ultShown = $derived(shownValue($ult, st.eq_ult.status, st.eq_ult.value?.ult ?? null));
   const ultStatus = $derived(displayStatus($ult, st.eq_ult.status));
-  // Voice focus never shows the refusal outline; the Noise switch carries it.
-  const voiceStatus = $derived(refusedReason(ncStatus) !== null ? "Confirmed" : ncStatus);
+  // Voice focus and the level never show the refusal outline; the Noise switch carries it.
+  const followerStatus = $derived(refusedReason(ncStatus) !== null ? "Confirmed" : ncStatus);
   const subtitle = $derived(
     withFake([colourway(st.color), codecLabel(st.codec.value)].filter((part) => part !== "").join(" · "), fake),
   );
@@ -98,7 +98,7 @@
 
 {#if st.connected}
   <div class="pop">
-    <div class="row"><span class="name">{st.model ?? "ULT WEAR"}</span><span class="lab">{subtitle}</span></div>
+    <div class="row"><span class="name">{st.model ?? ""}</span><span class="lab">{subtitle}</span></div>
     <div class="row">
       <span class="lab">Battery</span>
       {#if battery !== null}
@@ -123,7 +123,7 @@
       <Ticks
         count={20}
         value={ncShown?.level ?? null}
-        status={ncStatus}
+        status={followerStatus}
         disabled={ncShown?.mode !== "Ambient"}
         label="Ambient level"
         onpick={pickLevel}
@@ -132,7 +132,7 @@
     {#if ncShown?.mode === "Ambient"}
       <div class="row">
         <span class="lab">Voice focus</span>
-        <Boxes options={VOICE} value={ncShown.voice_focus} status={voiceStatus} width="190px" onpick={pickVoice} />
+        <Boxes options={VOICE} value={ncShown.voice_focus} status={followerStatus} width="190px" onpick={pickVoice} />
       </div>
     {/if}
     <div class="row">
@@ -155,7 +155,7 @@
   </div>
 {:else}
   <div class="pop">
-    <div class="row"><span class="name">{st.model ?? "ULT WEAR"}</span><span class="lab">{withFake("Not connected", fake)}</span></div>
+    <div class="row"><span class="name">{st.model ?? ""}</span><span class="lab">{withFake("Not connected", fake)}</span></div>
     {#if lastSeen}
       <div class="row">
         <span class="lab">Last seen</span>

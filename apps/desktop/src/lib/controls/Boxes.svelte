@@ -39,7 +39,7 @@
 </script>
 
 <div class="boxes" class:lg={size === "lg"} class:pending={busy} class:unavailable={off} style:width>
-  {#each options as option (option.label)}
+  {#each options as option, i (i)}
     {@const refused = reason !== null && option.value === outlined}
     {@const dead = off || option.inert === true}
     <button

@@ -106,3 +106,34 @@ fn apply_launch_at_login(app: &AppHandle, on: bool) {
         eprintln!("hairline: launch at login not changed: {e}");
     }
 }
+
+/// Makes `launch_at_login` match the login item the system actually has (it
+/// can be removed in System Settings) and saves the reconciled value to `dir`.
+pub fn reconcile_launch_at_login(
+    app: &AppHandle,
+    dir: Option<&Path>,
+    mut s: AppSettings,
+) -> AppSettings {
+    use tauri_plugin_autostart::ManagerExt;
+    let enabled = match app.autolaunch().is_enabled() {
+        Ok(enabled) => enabled,
+        Err(e) => {
+            eprintln!("hairline: launch at login state unknown ({e}); keeping the setting");
+            return s;
+        }
+    };
+    if enabled == s.launch_at_login {
+        return s;
+    }
+    eprintln!(
+        "hairline: launch at login was {} in settings but the login item says {enabled}; using the login item",
+        s.launch_at_login
+    );
+    s.launch_at_login = enabled;
+    if let Some(dir) = dir {
+        if let Err(e) = save(dir, &s) {
+            eprintln!("hairline: could not save settings: {e}");
+        }
+    }
+    s
+}

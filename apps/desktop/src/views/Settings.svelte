@@ -217,7 +217,7 @@
         <LinkList
           items={[
             { label: "App version", value: version },
-            { label: "Protocol", value: "MDR v2 · tables 1+2" },
+            { label: "App protocol", value: "MDR v2 · tables 1+2" },
             { label: "Not affiliated with Sony", value: "" },
           ]}
         />

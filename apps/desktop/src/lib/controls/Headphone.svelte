@@ -20,7 +20,9 @@
     2: "--panel:#d9d6cc;--cup:#efede6;--text:#161614",
     8: "--panel:#4a5550;--cup:#efede6;--text:#efede6",
   };
-  const tint = $derived(TINTS[color ?? 8] ?? TINTS[8]);
+  /** Colourway not reported (or not known): a theme-neutral panel. */
+  const NEUTRAL = "--panel:var(--hair);--cup:var(--paper);--text:var(--ink)";
+  const tint = $derived((color !== null ? TINTS[color] : undefined) ?? NEUTRAL);
 </script>
 
 <div class="photo" style={tint}>

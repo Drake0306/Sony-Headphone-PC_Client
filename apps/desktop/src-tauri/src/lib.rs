@@ -80,13 +80,19 @@ pub fn run() {
         .manage(commands::Runtime { fake })
         .invoke_handler(invoke_handler(wants_debug()))
         .setup(move |app| {
-            let app_settings = match settings::dir(app.handle()) {
-                Ok(dir) => settings::load(&dir),
+            let dir = settings::dir(app.handle());
+            let app_settings = match &dir {
+                Ok(dir) => settings::load(dir),
                 Err(e) => {
                     eprintln!("hairline: no settings directory ({e}); using defaults");
                     settings::AppSettings::default()
                 }
             };
+            let app_settings = settings::reconcile_launch_at_login(
+                app.handle(),
+                dir.as_deref().ok(),
+                app_settings,
+            );
             #[cfg(target_os = "macos")]
             app.set_activation_policy(dock::policy(false, app_settings.hide_dock_icon).into());
             app.manage(Mutex::new(app_settings));

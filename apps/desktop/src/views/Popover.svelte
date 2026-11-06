@@ -4,7 +4,8 @@
   import Boxes from "../lib/controls/Boxes.svelte";
   import LinkList from "../lib/controls/LinkList.svelte";
   import Ticks from "../lib/controls/Ticks.svelte";
-  import { connect, openMainWindow, setNc, setUlt, watchState, type NcModeArg } from "../lib/ipc";
+  import { connect, openMainWindow, setUlt, watchState } from "../lib/ipc";
+  import * as noise from "../lib/noise";
   import { displayStatus, pending, shownValue } from "../lib/pending";
   import {
     codecLabel,
@@ -22,7 +23,6 @@
     { label: "AMB", value: "Ambient" },
     { label: "OFF", value: "Off" },
   ];
-  const NC_ARG: Record<NcMode, NcModeArg> = { NoiseCancelling: "nc", Ambient: "ambient", Off: "off" };
   // Phase 1 draws every active ULT box orange, OFF included.
   const ULT: { label: string; value: UltLevel; orange: boolean }[] = [
     { label: "OFF", value: "Off", orange: true },
@@ -65,24 +65,9 @@
     st = next;
   }
 
-  const clampLevel = (level: number | undefined) => Math.min(20, Math.max(1, level ?? 1));
-
-  function requestNc(arg: NcModeArg, next: NcAsmState) {
-    nc.request(next, () => setNc(arg, next.level, next.voice_focus));
-  }
-
-  function pickNoise(mode: NcMode) {
-    const cur = st.nc.value;
-    requestNc(NC_ARG[mode], { mode, level: clampLevel(cur?.level), voice_focus: cur?.voice_focus ?? false });
-  }
-
-  function pickLevel(level: number) {
-    requestNc("ambient", { mode: "Ambient", level, voice_focus: st.nc.value?.voice_focus ?? false });
-  }
-
-  function pickVoice(on: boolean) {
-    requestNc("ambient", { mode: "Ambient", level: clampLevel(ncShown?.level), voice_focus: on });
-  }
+  const pickNoise = (mode: NcMode) => noise.pickNoise(nc, st.nc.value, mode);
+  const pickLevel = (level: number) => noise.pickLevel(nc, st.nc.value, level);
+  const pickVoice = (on: boolean) => noise.pickVoice(nc, ncShown, on);
 
   function pickUlt(level: UltLevel) {
     ult.request(level, () => setUlt(ULT_ARG[level]));

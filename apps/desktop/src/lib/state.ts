@@ -106,7 +106,7 @@ export interface AppSettings {
 }
 
 /** `AppSettings::default()`. */
-export const defaultSettings = (): AppSettings => ({ theme: "system", launch_at_login: false, hide_dock_icon: true });
+export const defaultSettings = (): AppSettings => ({ theme: "paper", launch_at_login: false, hide_dock_icon: true });
 
 const unavailable = <T>(): Tracked<T> => ({ value: null, status: "Unavailable" });
 
@@ -174,3 +174,42 @@ export function codecLabel(codec: Codec | null): string {
       return "";
   }
 }
+
+/** Marketing model number for the name the device reports. */
+export const modelNumber = (model: string | null): string => (model === "ULT WEAR" ? "WH-ULT900N" : (model ?? ""));
+
+/** EQ preset names by id (mdr-proto `preset_name`); the device sends empty names. */
+export function presetName(id: number): string {
+  const names: Record<number, string> = {
+    0x00: "Off",
+    0x10: "Bright",
+    0x11: "Excited",
+    0x12: "Mellow",
+    0x13: "Relaxed",
+    0x14: "Vocal",
+    0x15: "Treble Boost",
+    0x16: "Bass Boost",
+    0x17: "Speech",
+    0xa0: "Manual",
+    0xa1: "Custom 1",
+    0xa2: "Custom 2",
+  };
+  return names[id] ?? "Unknown";
+}
+
+/** Auto power-off element values (`27 05`) in the order the Settings boxes show them. */
+export const AUTO_POWER_OFF: { label: string; value: number; long: string }[] = [
+  { label: "5", value: 0x00, long: "5 min" },
+  { label: "15", value: 0x04, long: "15 min" },
+  { label: "30", value: 0x01, long: "30 min" },
+  { label: "60", value: 0x02, long: "60 min" },
+  { label: "180", value: 0x03, long: "180 min" },
+  { label: "Removed", value: 0x10, long: "When removed" },
+  { label: "Never", value: 0x11, long: "Off" },
+];
+
+export const autoOffLabel = (value: number | null): string =>
+  AUTO_POWER_OFF.find((o) => o.value === value)?.long ?? "";
+
+/** `PlaybackStatus` 0x01 is play; anything else reads as idle. */
+export const isPlaying = (playback: number | null) => playback === 0x01;

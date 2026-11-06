@@ -43,6 +43,8 @@
   color-scheme: light;
 }
 
+/* Keep in sync: the two Ink blocks below must carry the same values. */
+
 /* Ink: paper and ink swap; Forest Gray and orange stay. Chosen explicitly,
    or by "System" (no data-theme) when the system appearance is dark. */
 :root[data-theme="ink"] {
@@ -55,6 +57,7 @@
   color-scheme: dark;
 }
 
+/* Keep in sync with the :root[data-theme="ink"] block above. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="paper"]) {
     --paper: #161614;

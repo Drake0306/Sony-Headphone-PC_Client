@@ -41,4 +41,16 @@ describe("Ticks", () => {
     await fireEvent.click(getAllByRole("button")[3]);
     expect(onpick).not.toHaveBeenCalled();
   });
+
+  it("ticks_render_refused_state", () => {
+    const { container } = render(Ticks, {
+      count: 20,
+      value: 5,
+      status: { Refused: { reason: "busy" } },
+      onpick: () => {},
+    });
+    const bar = container.querySelector(".ticks");
+    expect(bar).toHaveClass("refused");
+    expect(bar).toHaveAttribute("title", "busy");
+  });
 });

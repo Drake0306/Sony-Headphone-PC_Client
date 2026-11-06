@@ -1,6 +1,6 @@
 <!-- The tick bar (ambient level). `onpick` receives the 1-based level clicked. -->
 <script lang="ts">
-  import { isPending, type Status } from "../state";
+  import { isPending, refusedReason, type Status } from "../state";
 
   interface Props {
     count: number;
@@ -18,9 +18,17 @@
   const levels = $derived(Array.from({ length: count }, (_, i) => i + 1));
   const off = $derived(disabled || status === "Unavailable");
   const busy = $derived(isPending(status));
+  const reason = $derived(refusedReason(status));
 </script>
 
-<div class="ticks" class:lg={size === "lg"} class:pending={busy} class:unavailable={off}>
+<div
+  class="ticks"
+  class:lg={size === "lg"}
+  class:pending={busy}
+  class:refused={reason !== null}
+  class:unavailable={off}
+  title={reason ?? undefined}
+>
   {#each levels as level (level)}
     <button
       class:on={level <= (value ?? 0)}

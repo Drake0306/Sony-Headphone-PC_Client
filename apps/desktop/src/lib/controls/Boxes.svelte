@@ -11,6 +11,8 @@
     value: T;
     /** The active box is the orange ULT one. */
     orange?: boolean;
+    /** Tooltip for the box (a refusal reason takes its place). */
+    title?: string;
   }
 
   interface Props {
@@ -41,7 +43,7 @@
       class:on={option.value === value}
       class:orange={option.orange}
       class:refused
-      title={refused ? reason : undefined}
+      title={refused ? reason : option.title}
       aria-pressed={option.value === value}
       aria-disabled={off}
       tabindex={off ? -1 : 0}

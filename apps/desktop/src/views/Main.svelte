@@ -1,12 +1,17 @@
 <!--
-  The main window shell: nav tabs, the connection status, and one body per
-  tab chosen from location.hash (#sound ...; Overview by default). The real
-  screens replace the placeholders in later tasks.
+  The main window shell: nav tabs, the connection status, and one screen per
+  tab chosen from location.hash (#sound ...; Overview by default). Sound is a
+  placeholder until its own task.
 -->
 <script lang="ts">
   import { onMount } from "svelte";
   import { watchState } from "../lib/ipc";
   import { emptyState, type DeviceState } from "../lib/state";
+  import Devices from "./Devices.svelte";
+  import Noise from "./Noise.svelte";
+  import Overview from "./Overview.svelte";
+  import Scenes from "./Scenes.svelte";
+  import Settings from "./Settings.svelte";
 
   const TABS = [
     { id: "overview", label: "Overview" },
@@ -26,7 +31,6 @@
   const status = $derived(
     st.connected ? ["Connected", st.firmware ? `FW ${st.firmware}` : ""].filter(Boolean).join(" · ") : "Not connected",
   );
-  const title = $derived(TABS.find((t) => t.id === tab)?.label ?? "");
 
   onMount(() => {
     const onHash = () => (tab = tabFromHash());
@@ -46,13 +50,22 @@
     {/each}
   </nav>
   <span class="status lab">{status}</span>
-  <main class="page">
-    {#if tab === "scenes"}
-      <h3>Scenes</h3>
-      <p class="sub">Scenes arrive with the modes module.</p>
+  <main>
+    {#if tab === "overview"}
+      <Overview {st} />
+    {:else if tab === "noise"}
+      <Noise {st} />
+    {:else if tab === "devices"}
+      <Devices {st} />
+    {:else if tab === "scenes"}
+      <Scenes />
+    {:else if tab === "settings"}
+      <Settings {st} />
     {:else}
-      <h3>{title}</h3>
-      <p class="sub">This screen is on its way.</p>
+      <div class="page">
+        <h3>Sound</h3>
+        <p class="sub">This screen is on its way.</p>
+      </div>
     {/if}
   </main>
 </div>
@@ -60,7 +73,7 @@
 <style>
   .win {
     position: relative;
-    min-height: 100vh;
+    height: 100vh;
     background: var(--paper);
   }
 
@@ -93,20 +106,7 @@
     right: 16px;
   }
 
-  .page {
-    padding: 48px 32px 24px;
-  }
-
-  h3 {
-    margin: 0 0 4px;
-    font-size: 20px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-  }
-
-  .sub {
-    margin: 0 0 18px;
-    color: var(--muted);
-    font-size: 12px;
+  main {
+    height: 100%;
   }
 </style>

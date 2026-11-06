@@ -13,10 +13,11 @@ const FILE_NAME: &str = "settings.json";
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Theme {
+    /// The default: the light Hairline palette.
+    #[default]
     Paper,
     Ink,
     /// Follows the system's light/dark appearance.
-    #[default]
     System,
 }
 
@@ -30,7 +31,7 @@ pub struct AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         AppSettings {
-            theme: Theme::System,
+            theme: Theme::Paper,
             launch_at_login: false,
             hide_dock_icon: true,
         }

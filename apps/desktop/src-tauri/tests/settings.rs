@@ -17,7 +17,7 @@ fn load_defaults_when_missing() {
     assert_eq!(
         s,
         AppSettings {
-            theme: Theme::System,
+            theme: Theme::Paper,
             launch_at_login: false,
             hide_dock_icon: true,
         }

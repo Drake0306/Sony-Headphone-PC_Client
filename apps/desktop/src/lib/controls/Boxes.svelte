@@ -13,6 +13,8 @@
     orange?: boolean;
     /** Tooltip for the box (a refusal reason takes its place). */
     title?: string;
+    /** This box alone is faded and inert (e.g. a value shown but not settable). */
+    inert?: boolean;
   }
 
   interface Props {
@@ -39,15 +41,17 @@
 <div class="boxes" class:lg={size === "lg"} class:pending={busy} class:unavailable={off} style:width>
   {#each options as option (option.label)}
     {@const refused = reason !== null && option.value === outlined}
+    {@const dead = off || option.inert === true}
     <button
       class:on={option.value === value}
       class:orange={option.orange}
       class:refused
+      class:inert={option.inert}
       title={refused ? reason : option.title}
       aria-pressed={option.value === value}
-      aria-disabled={off}
-      tabindex={off ? -1 : 0}
-      onclick={off ? undefined : () => busy || onpick(option.value)}>{option.label}</button
+      aria-disabled={dead}
+      tabindex={dead ? -1 : 0}
+      onclick={dead ? undefined : () => busy || onpick(option.value)}>{option.label}</button
     >
   {/each}
 </div>

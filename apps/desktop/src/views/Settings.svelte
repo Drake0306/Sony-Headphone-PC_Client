@@ -62,7 +62,7 @@
   const quickOptions = $derived([
     { label: "Off", value: "off" as const },
     ...(st.quick_access.value ?? []).flatMap((id, i) =>
-      id === 0 ? [] : [{ label: `Slot ${i + 1}: ${hex(id)}`, value: "set" as const }],
+      id === 0 ? [] : [{ label: `Slot ${i + 1}: ${hex(id)}`, value: "set" as const, inert: true, title: "not decodable yet" }],
     ),
   ]);
   const assistantOptions = $derived.by(() => {
@@ -185,7 +185,7 @@
             onpick={(on) => login.request(on, () => save("launch_at_login", on))}
           />
         </Row>
-        <Row label="Show in menu bar" note="Icon shows battery when connected">
+        <Row label="Show in menu bar" note="The popover lives here">
           <Toggle on={true} status="Unavailable" label="Show in menu bar" onpick={noop} />
         </Row>
         <Row label="Hide Dock icon">
@@ -196,9 +196,7 @@
             onpick={(on) => dock.request(on, () => save("hide_dock_icon", on))}
           />
         </Row>
-        <Row label="Hotkeys" note="Phase 4">
-          <div class="keys unavailable"><span>⌃⌥N</span><span>⌃⌥U</span><span>⌃⌥T</span></div>
-        </Row>
+        <Row label="Hotkeys" note="Phase 4" unavailable />
         <Row label="Battery history" note="Phase 4">
           <Toggle on={null} status="Unavailable" label="Battery history" onpick={noop} />
         </Row>

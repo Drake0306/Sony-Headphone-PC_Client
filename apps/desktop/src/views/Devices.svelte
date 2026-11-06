@@ -40,7 +40,7 @@
       </div>
       <div class="block">
         <h4>Multipoint</h4>
-        <Row label="Connect to two devices" note="Turning this on switches the codec to AAC">
+        <Row label="Connect to two devices" note="Two devices at once">
           <Toggle
             on={multipoint.shown}
             status={multipoint.status}

@@ -48,7 +48,11 @@
   const top = $derived(Math.max(1, (st.eq_capability?.steps ?? 21) - 1));
   const onOff = (v: boolean | null) => (v === null ? "--" : v ? "On" : "Off");
   const links = $derived([
-    { label: "This Mac", value: isPlaying(st.playback) ? "▶ Playing" : "Idle", live: isPlaying(st.playback) },
+    {
+      label: "This Mac",
+      value: !st.connected ? "--" : isPlaying(st.playback) ? "▶ Playing" : "Idle",
+      live: st.connected && isPlaying(st.playback),
+    },
     { label: "Multipoint", value: onOff(st.multipoint.value) },
     { label: "Auto off", value: autoOffLabel(st.auto_power_off.value) || "--" },
     { label: "Wear pause", value: onOff(st.wear_pause.value) },
@@ -57,7 +61,7 @@
 </script>
 
 <div class="ov">
-  <Headphone color={st.color} {caption} name={st.model ?? "ULT WEAR"} />
+  <Headphone color={st.color} {caption} name={st.model ?? ""} />
   <div class="right">
     <div class="rows">
       <Row kind="overview" label="Battery">
@@ -90,7 +94,7 @@
           label="Ambient level"
           onpick={(level) => noise.pickLevel(nc, st.nc.value, level)}
         />
-        {#snippet aside()}<span class="dot num">{ncShown?.level ?? "--"}</span>{/snippet}
+        {#snippet aside()}<span class="dot num" class:off={ncShown?.mode !== "Ambient"}>{ncShown?.level ?? "--"}</span>{/snippet}
       </Row>
       <Row kind="overview" label="ULT">
         <Boxes
@@ -105,9 +109,13 @@
       </Row>
       <Row kind="overview" label="Equalizer">
         <div class="faders" class:unavailable={!eq}>
-          {#each eq?.bands ?? [10, 10, 10, 10, 10, 10] as band, i (i)}
-            <div class:cb={i === 0}><div class="track"><i style:bottom={`${(band / top) * 90}%`}></i></div></div>
-          {/each}
+          {#if eq}
+            {#each eq.bands as band, i (i)}
+              <div class:cb={i === 0}><div class="track"><i style:bottom={`${(band / top) * 90}%`}></i></div></div>
+            {/each}
+          {:else}
+            {#each [0, 1, 2, 3, 4, 5] as i (i)}<div><div class="track"></div></div>{/each}
+          {/if}
         </div>
         {#snippet aside()}{eq ? presetName(eq.preset) : ""}{/snippet}
       </Row>
@@ -149,6 +157,10 @@
   .num {
     font-size: 20px;
     color: var(--ink);
+  }
+
+  .num.off {
+    opacity: 0.35;
   }
 
   .codec {

@@ -9,14 +9,16 @@
     label: string;
     note?: string;
     kind?: "overview" | "setting";
+    /** Faded: a setting that is not available yet. */
+    unavailable?: boolean;
     children?: Snippet;
     aside?: Snippet;
   }
 
-  let { label, note, kind = "setting", children, aside }: Props = $props();
+  let { label, note, kind = "setting", unavailable = false, children, aside }: Props = $props();
 </script>
 
-<div class="r {kind}" class:aside={aside !== undefined}>
+<div class="r {kind}" class:aside={aside !== undefined} class:unavailable>
   {#if kind === "overview"}
     <span class="lab">{label}</span>
   {:else}
@@ -55,6 +57,10 @@
 
   .setting .content {
     justify-self: end;
+  }
+
+  .unavailable > * {
+    opacity: 0.35;
   }
 
   small {

@@ -124,3 +124,13 @@ Earlier in the conversation Claude proposed native SwiftUI on Mac plus a separat
 - How the popover is positioned and dismissed on each platform within the constraints above.
 - Exact timeout values, reconnect back-off, and the fake device's scripted behaviour.
 - Font licensing files and bundling method (OFL for all three faces).
+
+## Builder-check resolutions (Claude's calls, 2026-11-07)
+
+A fresh reviewer read this document and asked five questions. Resolutions:
+
+1. **Paired devices, "playing", "take audio".** The ULT WEAR declares no peripheral-management function on table 2, so on this model these are host-side: "playing" = this computer is the active A2DP source for the headphones (plus `A3 01` playback status when it answers); "take audio" = ask the OS to make this computer the active audio source (macOS: connect/activate the device as output; later platforms likewise). Phase 1 ships the popover's device row on that basis and does not block on the headphones. Phase 1 starts (not ends) with a read-only hardware spike that probes the table-2 peripheral GETs (`36 02`, `32 …`) and records what answers in `docs/hardware-validation.md`. Capability gating in `mdr-session` is "declared by `06/07`, or proven by a read-only probe on this unit" (a per-unit allowlist stored with the device record). SETs on proven-but-undeclared commands stay behind the Advanced panel.
+2. **Deny-list granularity.** Keyed on opcode plus inquired sub-id. `98 00 16 …` (reboot) and the other destructive entries are denied; `98 00 06 01` is allowed only as the tail of the multipoint-toggle sequence, which is therefore an ordinary control, not a confirmed action. Power off (`24 03 01`) and reset (`F8 09 …`) stay behind explicit confirmation.
+3. **Codec box values.** Codec comes from the wire (`12 02` / `13 02`) in Phase 1. Sample rate, bitrate and "negotiated with" come from the macOS audio stack (CoreAudio / IORegistry) in Phase 2, macOS only; Windows and Linux show blank until a platform module exists. "Time left" needs battery history (Phase 4) and shows blank before that. Blank, never invented.
+4. **Hero image.** Our own illustration (the SVG silhouette from the mockups, tinted by the reported colourway), shipped in the repo under MIT. No Sony renders. The Overview layout must hold without the image.
+5. **Commit attribution.** Encoded in `CLAUDE.md` at the repo root: no Co-Authored-By or "Generated with" lines, no Claude credits anywhere in the repo. Commits are authored by Roy's identity only.

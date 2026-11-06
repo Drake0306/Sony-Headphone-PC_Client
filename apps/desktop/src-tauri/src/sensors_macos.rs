@@ -9,11 +9,13 @@ pub fn frontmost_app_name() -> Option<String> {
     use std::sync::Once;
 
     static FAILED: Once = Once::new();
-    let workspace = NSWorkspace::sharedWorkspace();
-    let name = workspace
-        .frontmostApplication()
-        .and_then(|app| app.localizedName())
-        .map(|name| name.to_string());
+    // The broker thread never ends, so its implicit pool would never drain.
+    let name = objc2::rc::autoreleasepool(|_| {
+        NSWorkspace::sharedWorkspace()
+            .frontmostApplication()
+            .and_then(|app| app.localizedName())
+            .map(|name| name.to_string())
+    });
     if name.is_none() {
         FAILED.call_once(|| eprintln!("hairline: frontmost app unknown; app triggers stay off"));
     }

@@ -50,6 +50,8 @@ pub enum BrokerCmd {
     ApplyScene(String),
     /// The saved scene list.
     SetScenes(Vec<Scene>),
+    /// Re-emits the `"scenes"` event (list and active scene); nothing else.
+    EmitScenes,
     Refresh,
     /// A hand-written request (`HAIRLINE_DEBUG=1` only); still deny-listed.
     Raw {
@@ -94,7 +96,8 @@ pub struct SceneHost<'a> {
 }
 
 impl SceneHost<'_> {
-    /// Handles `ApplyScene` and `SetScenes` (other commands are ignored) and
+    /// Handles `ApplyScene`, `SetScenes` and `EmitScenes` (other commands are
+    /// ignored), emits `"scenes"`, and
     /// returns the actions to send now (none while disconnected).
     fn command(&mut self, cmd: &BrokerCmd, connected: bool) -> Option<Actions> {
         let actions = match cmd {
@@ -109,10 +112,23 @@ impl SceneHost<'_> {
                 self.engine.set_scenes(scenes.clone());
                 None
             }
+            BrokerCmd::EmitScenes => None,
             _ => return None,
         };
         (self.emit)(&self.engine);
         self.engine.deliver(actions, connected)
+    }
+
+    /// After a connect: re-evaluates as connected and returns what to send,
+    /// either a newly outranking scene or the held actions (never both).
+    fn on_connected(&mut self) -> Option<Actions> {
+        let inputs = (self.sense)(true);
+        let before = self.engine.active().map(str::to_owned);
+        let actions = self.engine.on_connected(&inputs);
+        if self.engine.active() != before.as_deref() {
+            (self.emit)(&self.engine);
+        }
+        actions
     }
 
     /// Re-evaluates the triggers, emitting when the active scene changes.
@@ -231,7 +247,11 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
                     emit(session.state());
                     return Ok(());
                 }
-                Ok(cmd @ (BrokerCmd::ApplyScene(_) | BrokerCmd::SetScenes(_))) => {
+                Ok(
+                    cmd @ (BrokerCmd::ApplyScene(_)
+                    | BrokerCmd::SetScenes(_)
+                    | BrokerCmd::EmitScenes),
+                ) => {
                     let connected = session.state().connected;
                     let due = scenes
                         .as_deref_mut()
@@ -254,11 +274,10 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
 
         if events.contains(&Event::Connected) {
             if let Some(host) = scenes.as_deref_mut() {
-                if let Some(actions) = host.engine.on_connected() {
+                if let Some(actions) = host.on_connected() {
                     send_scene(&mut session, &actions, &mut events);
                 }
-                // Re-evaluate now that the headphones count as connected.
-                scenes_checked_at = None;
+                scenes_checked_at = Some(clock());
             }
         }
 
@@ -309,7 +328,7 @@ fn apply(session: &mut Session, cmd: BrokerCmd) -> Result<(), SessionError> {
         BrokerCmd::SetTouchPanel(on) => session.set_touch_panel(on),
         BrokerCmd::SetSidetone(on) => session.set_sidetone(on),
         // Handled by the scene host; without one there is nothing to do.
-        BrokerCmd::ApplyScene(_) | BrokerCmd::SetScenes(_) => Ok(()),
+        BrokerCmd::ApplyScene(_) | BrokerCmd::SetScenes(_) | BrokerCmd::EmitScenes => Ok(()),
         BrokerCmd::Raw { table, bytes } => session.request(Request {
             table,
             bytes,

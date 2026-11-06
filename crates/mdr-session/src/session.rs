@@ -291,6 +291,9 @@ impl Session {
     /// The last EQ state the device reported, for read-modify-write. A device
     /// that does not declare EQ/ULT is `Unavailable`, not `Busy`.
     fn current_eq(&mut self) -> Result<EqUltState, SessionError> {
+        if !self.state.connected {
+            return Err(SessionError::NotConnected);
+        }
         let id = function::PRESET_EQ_AND_ULT_MODE;
         if !self.is_capable(Table::T1, id) {
             self.state.eq_ult.status = Status::Unavailable;

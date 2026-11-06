@@ -198,9 +198,13 @@ pub fn set_sidetone(broker: State<'_, Broker>, on: bool) -> Result<(), String> {
     broker.send(BrokerCmd::SetSidetone(on))
 }
 
+/// The list; also asks the broker to re-emit `"scenes"` so a newly opened
+/// window learns the active scene.
 #[tauri::command]
-pub fn get_scenes(scenes: State<'_, Mutex<Vec<Scene>>>) -> Vec<Scene> {
-    scenes.lock().map(|s| s.clone()).unwrap_or_default()
+pub fn get_scenes(broker: State<'_, Broker>, scenes: State<'_, Mutex<Vec<Scene>>>) -> Vec<Scene> {
+    let list = scenes.lock().map(|s| s.clone()).unwrap_or_default();
+    let _ = broker.send(BrokerCmd::EmitScenes);
+    list
 }
 
 /// Validates and saves the whole list, then hands it to the broker, which
@@ -214,10 +218,12 @@ pub fn set_scenes(
 ) -> Result<(), String> {
     check_scenes(&scenes)?;
     let dir = settings::dir(&app).map_err(|e| e.to_string())?;
+    // Held across save, update and send so concurrent saves cannot interleave.
+    let mut current = state
+        .lock()
+        .map_err(|_| "scene list unavailable".to_string())?;
     store::save(&dir, &scenes).map_err(|e| format!("could not save scenes: {e}"))?;
-    if let Ok(mut current) = state.lock() {
-        *current = scenes.clone();
-    }
+    *current = scenes.clone();
     broker.send(BrokerCmd::SetScenes(scenes))
 }
 

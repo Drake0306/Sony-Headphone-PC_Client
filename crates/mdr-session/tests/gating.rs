@@ -138,3 +138,14 @@ fn preset_and_ult_go_in_one_request() {
         [0x58, 0x03, 0x16, 0x02, 0x06, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A]
     );
 }
+
+#[test]
+fn eq_setters_before_the_handshake_are_not_connected() {
+    let mut s = Session::new(0);
+    assert_eq!(
+        s.set_ult(mdr_proto::UltLevel::Ult2),
+        Err(SessionError::NotConnected)
+    );
+    assert_eq!(s.set_eq_preset(0x10), Err(SessionError::NotConnected));
+    assert!(matches!(s.state().eq_ult.status, Status::Unavailable));
+}

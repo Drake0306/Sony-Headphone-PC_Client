@@ -98,13 +98,16 @@ impl Engine {
         }
     }
 
-    /// After a connect: the active scene's actions if any were held for it
-    /// while disconnected, once.
-    pub fn on_connected(&mut self) -> Option<Actions> {
-        if !std::mem::take(&mut self.held) {
-            return None;
+    /// After a connect, with `inputs` taken as connected: re-evaluates first,
+    /// so a scene that now outranks the held one (say `HeadphonesConnected`)
+    /// wins and the held actions are dropped. Otherwise the still-active
+    /// scene's held actions, once.
+    pub fn on_connected(&mut self, inputs: &Inputs) -> Option<Actions> {
+        let held = std::mem::take(&mut self.held);
+        if let Some(actions) = self.tick(inputs) {
+            return Some(actions);
         }
-        let id = self.active.clone()?;
+        let id = self.active.clone().filter(|_| held)?;
         self.actions_of(&id)
     }
 
@@ -118,31 +121,18 @@ impl Engine {
 
 /// Sends a scene's actions through the session setters, so capability gating
 /// and the deny-list apply as for the popover. Noise mode, ambient level and
-/// voice focus form one NC request built on the current NC state; ULT and the
+/// voice focus form one NC request built on the current NC state (`Busy`
+/// when that is not known yet); ULT and the
 /// EQ preset form one EQ request when both are set. One result per setter
 /// call, in order; a failure does not stop the rest.
 pub fn apply_actions(session: &mut Session, a: &Actions) -> Vec<Result<(), SessionError>> {
     let mut results = Vec::new();
     if a.nc.is_some() || a.ambient_level.is_some() || a.voice_focus.is_some() {
-        let mut nc = session.state().nc.value.unwrap_or(NcAsmState {
-            mode: NcMode::Off,
-            level: 1,
-            voice_focus: false,
+        results.push(match session.state().nc.value {
+            Some(nc) => session.set_nc(with_nc(nc, a)),
+            // No NC state to build on: guessing would overwrite the Keep fields.
+            None => Err(SessionError::Busy),
         });
-        if let Some(mode) = a.nc {
-            nc.mode = match mode {
-                Nc::Off => NcMode::Off,
-                Nc::NoiseCancelling => NcMode::NoiseCancelling,
-                Nc::Ambient => NcMode::Ambient,
-            };
-        }
-        if let Some(level) = a.ambient_level {
-            nc.level = level;
-        }
-        if let Some(on) = a.voice_focus {
-            nc.voice_focus = on;
-        }
-        results.push(session.set_nc(nc));
     }
     let ult = a.ult.map(ult_level);
     match (ult, a.eq_preset) {
@@ -163,6 +153,24 @@ pub fn apply_actions(session: &mut Session, a: &Actions) -> Vec<Result<(), Sessi
         results.push(session.set_dsee_auto_off(auto));
     }
     results
+}
+
+/// `nc` with the scene's `Some` NC fields applied.
+fn with_nc(mut nc: NcAsmState, a: &Actions) -> NcAsmState {
+    if let Some(mode) = a.nc {
+        nc.mode = match mode {
+            Nc::Off => NcMode::Off,
+            Nc::NoiseCancelling => NcMode::NoiseCancelling,
+            Nc::Ambient => NcMode::Ambient,
+        };
+    }
+    if let Some(level) = a.ambient_level {
+        nc.level = level;
+    }
+    if let Some(on) = a.voice_focus {
+        nc.voice_focus = on;
+    }
+    nc
 }
 
 fn ult_level(v: u8) -> Option<UltLevel> {

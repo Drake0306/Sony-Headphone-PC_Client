@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hairline Screens</title>
+<meta name="description" content="Every screen of the ULT WEAR app in the merged Hairline design: popover, overview, sound, noise, devices, scenes, settings and control states.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;family=Doto:wght@700;900&amp;family=DM+Mono:wght@400;500&amp;display=swap">
+<style>
+/* Page chrome: quiet, so the mockups carry the design. */
+:root { --pbg: #f3f2ee; --pfg: #1c1c1a; --pmuted: #66665f; --pline: #d8d6ce; --psurface: #ffffff; --paccent: #2b4a6f; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --pbg: #17171a; --pfg: #ebe9e3; --pmuted: #9e9d96; --pline: #313136; --psurface: #1f1f23; --paccent: #9fbbe0; color-scheme: dark; } }
+:root[data-theme="dark"] { --pbg: #17171a; --pfg: #ebe9e3; --pmuted: #9e9d96; --pline: #313136; --psurface: #1f1f23; --paccent: #9fbbe0; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--pbg); color: var(--pfg); font-family: "Instrument Sans", "Helvetica Neue", Arial, sans-serif; font-size: 16px; line-height: 1.55;
+  padding-block: 0 5rem; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1240px; margin: 0 auto; }
+header.top { padding-block: 3rem 1.5rem; border-bottom: 1px solid var(--pline); }
+h1 { font-size: clamp(1.8rem, 3.6vw, 2.6rem); line-height: 1.1; margin: 0 0 0.8rem; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+.lede { font-size: 1.1rem; margin: 0; max-width: 720px; }
+p { margin: 0 0 1rem; }
+h2 { font-size: 1.45rem; margin: 0 0 0.3rem; letter-spacing: -0.01em; }
+.note { color: var(--pmuted); margin: 0 0 1rem; max-width: 720px; font-size: 0.98rem; }
+.changes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.8rem; margin: 1.5rem 0 0; }
+.changes div { background: var(--psurface); border: 1px solid var(--pline); border-radius: 6px; padding: 0.8rem 1rem; font-size: 0.92rem; }
+.changes strong { display: block; margin-bottom: 0.2rem; }
+section.screen { padding-block: 2.5rem 1rem; border-bottom: 1px solid var(--pline); }
+.pair { display: grid; grid-template-columns: 340px 340px; gap: 1.5rem; }
+@media (max-width: 760px) { .pair { grid-template-columns: 1fr; } }
+.winwrap { overflow-x: auto; padding-bottom: 0.5rem; }
+.cap { font-size: 0.8rem; color: var(--pmuted); margin: 0 0 0.5rem; }
+footer { margin-top: 3rem; font-size: 0.85rem; color: var(--pmuted); }
+
+/* ===== Hairline design tokens (the app itself) ===== */
+.hl { --paper: #efede6; --ink: #161614; --forest: #4a5550; --hair: #cfccc2; --muted: #6f726d; --ult: #ff6600; --box: #f8f7f3;
+  font-family: "Instrument Sans", system-ui, sans-serif; color: var(--ink); font-variant-numeric: tabular-nums; }
+.hl * { box-sizing: border-box; }
+.hl .dot { font-family: "Doto", monospace; font-weight: 900; }
+.hl .lab { font-family: "DM Mono", monospace; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.hl .live { color: var(--ult); font-weight: 600; }
+.hl .pop { width: 340px; background: var(--paper); border: 1px solid var(--hair); border-radius: 10px; padding: 14px 16px; }
+.hl .win { width: 880px; height: 560px; background: var(--paper); border: 1px solid var(--hair); border-radius: 10px; position: relative; overflow: hidden; }
+.traffic { position: absolute; top: 12px; left: 12px; display: flex; gap: 7px; }
+.traffic i { width: 11px; height: 11px; border-radius: 50%; background: #ff5f57; display: block; }
+.traffic i:nth-child(2) { background: #febc2e; } .traffic i:nth-child(3) { background: #28c840; }
+.hl nav.tabs { position: absolute; top: 13px; left: 90px; display: flex; gap: 18px; }
+.hl nav.tabs span { font-family: "DM Mono", monospace; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.hl nav.tabs .on { color: var(--ink); text-decoration: underline; text-underline-offset: 4px; }
+.hl .status { position: absolute; top: 12px; right: 16px; }
+
+/* Panel-style boxed switches (imported from direction 2) */
+.hl .boxes { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; }
+.hl .boxes span { background: var(--box); border: 1px solid var(--ink); text-align: center; font-family: "DM Mono", monospace; font-size: 11px; padding: 6px 4px; white-space: nowrap; }
+.hl .boxes .on { background: var(--ink); color: var(--paper); }
+.hl .boxes.ult .on { background: var(--ult); color: var(--ink); font-weight: 500; }
+.hl .boxes.lg span { padding: 10px 6px; font-size: 12px; }
+.hl .boxes.pending .on { background: repeating-linear-gradient(45deg, var(--ink) 0 4px, #3a3a36 4px 8px); }
+
+/* Tick bar ambient level (Hairline original) */
+.hl .ticks { display: flex; gap: 3px; }
+.hl .ticks i { width: 5px; height: 12px; background: var(--hair); }
+.hl .ticks i.on { background: var(--ink); }
+.hl .ticks.lg i { width: 9px; height: 22px; }
+
+/* Rows */
+.hl .row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--hair); font-size: 13px; gap: 10px; }
+.hl .row:last-child { border-bottom: none; }
+.hl .big { font-size: 40px; line-height: 1; }
+.hl .big small { font-family: "Instrument Sans"; font-size: 13px; color: var(--muted); margin-left: 4px; font-weight: 400; }
+
+/* Link list (imported from direction 2) */
+.hl .link div { display: flex; justify-content: space-between; font-family: "DM Mono", monospace; font-size: 11px; padding: 7px 0; border-bottom: 1px solid var(--hair); text-transform: uppercase; letter-spacing: 0.03em; }
+.hl .link div:last-child { border-bottom: none; }
+
+/* Faders (imported from direction 2) */
+.hl .faders { display: flex; gap: 14px; align-items: flex-end; height: 150px; }
+.hl .faders > div { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 6px; }
+.hl .faders .track { width: 3px; background: var(--hair); height: 100%; position: relative; }
+.hl .faders .track i { position: absolute; left: -10px; width: 23px; height: 10px; background: var(--ink); }
+.hl .faders .cb .track i { background: var(--forest); }
+.hl .faders .track b { position: absolute; left: -22px; width: 48px; text-align: center; font-family: "DM Mono"; font-size: 9px; color: var(--muted); }
+.hl .faders .lab { text-align: center; }
+.hl .faders.mini { height: 56px; gap: 8px; }
+.hl .faders.mini .track i { left: -6px; width: 15px; height: 6px; }
+
+/* Window layouts */
+.hl .ov { padding: 44px 32px 24px; display: grid; grid-template-columns: 1fr 1.1fr; gap: 28px; height: 100%; }
+.hl .photo { background: var(--forest); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: rgba(239,237,230,0.92); position: relative; min-height: 0; }
+.hl .photo .cap2 { position: absolute; left: 14px; bottom: 12px; }
+.hl .photo .cap2 .lab { color: rgba(239,237,230,0.75); }
+.hl .photo .cap2 b { display: block; font-family: "Doto"; font-weight: 900; font-size: 22px; color: #efede6; }
+.hl .rows3 > div { display: grid; grid-template-columns: 96px 1fr auto; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--hair); font-size: 13px; }
+.hl .rows3 > div:first-child { padding-top: 0; }
+.hl .rows3 .sm { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.hl .page { padding: 48px 32px 24px; height: 100%; }
+.hl .page h3 { margin: 0 0 4px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+.hl .page .sub { color: var(--muted); font-size: 12px; margin: 0 0 18px; }
+.hl .two { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.hl .three { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 28px; }
+.hl .block h4 { font-family: "DM Mono"; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 400; margin: 0 0 8px; }
+.hl .block { margin-bottom: 20px; }
+.hl .presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+.hl .presets span { border: 1px solid var(--hair); background: var(--box); font-size: 11px; padding: 5px 8px; font-family: "DM Mono"; text-transform: uppercase; letter-spacing: 0.03em; }
+.hl .presets .on { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.hl .toggle { width: 34px; height: 18px; border: 1px solid var(--ink); position: relative; flex: none; }
+.hl .toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; background: var(--hair); }
+.hl .toggle.on::after { left: 18px; background: var(--ink); }
+.hl .codec { border: 1px solid var(--ink); padding: 10px 12px; display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; }
+.hl .codec .dot { font-size: 26px; line-height: 1; }
+.hl .codec .meta { font-size: 12px; }
+.hl .codec .meta span { color: var(--muted); }
+.hl .devcard { border: 1px solid var(--hair); padding: 10px 12px; margin-bottom: 8px; display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; font-size: 13px; }
+.hl .devcard.on { border-color: var(--ink); }
+.hl .devcard .lab { display: block; margin-top: 2px; }
+.hl .btn { border: 1px solid var(--ink); background: var(--box); font-family: "DM Mono"; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 10px; white-space: nowrap; }
+.hl .btn.fill { background: var(--ink); color: var(--paper); }
+.hl .scene { border: 1px solid var(--hair); padding: 10px 12px; margin-bottom: 8px; display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 13px; }
+.hl .scene.on { border-color: var(--ink); }
+.hl .scene .when { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+.hl .scene .then { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
+.hl .scene .then span { border: 1px solid var(--hair); font-family: "DM Mono"; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 6px; }
+.hl .scene .then span.u { border-color: var(--ult); color: var(--ult); }
+.hl .set > div { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--hair); font-size: 13px; }
+.hl .set > div small { display: block; color: var(--muted); font-size: 11px; }
+.hl .set > div:last-child { border-bottom: none; }
+.hl .keys { display: flex; gap: 4px; }
+.hl .keys span { border: 1px solid var(--hair); font-family: "DM Mono"; font-size: 10px; padding: 2px 6px; }
+.hl .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; height: 100%; gap: 10px; }
+.hl .empty .hp { color: var(--hair); }
+.hl .btnrow { display: flex; gap: 6px; justify-content: flex-end; margin-top: 8px; }
+.states { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; }
+.states .hl { background: var(--paper); border: 1px solid var(--hair); border-radius: 8px; padding: 14px 16px; }
+.states .hl p { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="hp" viewBox="0 0 64 56">
+    <path d="M8 36V28C8 14.7 18.7 4 32 4s24 10.7 24 24v8" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+    <rect x="4" y="30" width="14" height="22" rx="5" fill="currentColor"/>
+    <rect x="46" y="30" width="14" height="22" rx="5" fill="currentColor"/>
+  </symbol>
+</svg>
+<div class="wrap">
+
+<header class="top">
+  <h1>Hairline, with the Panel controls</h1>
+  <p class="lede">Every screen of the app in the merged design. The base is Hairline: off-white paper, Forest Gray, dot-matrix numerals, one-pixel rules. From Panel it takes the boxed switches, the Link list and the fader equalizer. Orange appears in exactly two places, the active ULT level and "playing", so it means "live".</p>
+  <div class="changes">
+    <div><strong>NC / AMB / OFF switch</strong>Panel's boxed buttons replace Hairline's thin segment, in the popover and in the window.</div>
+    <div><strong>ULT switch</strong>Panel's boxed OFF / 1 / 2 with the orange active box, in both places.</div>
+    <div><strong>Ambient level</strong>Stays Hairline's tick bar, not the knob. Shown larger in the Noise screen.</div>
+    <div><strong>Battery</strong>Stays Hairline's dot-matrix number.</div>
+    <div><strong>Link list</strong>Panel's two-column list with "playing" is now on the Overview and in the popover footer.</div>
+    <div><strong>Equalizer</strong>Panel's faders replace the bar chart: mini on the Overview, full size with dB marks on the Sound screen.</div>
+    <div><strong>Codec</strong>Gets its own boxed row: codec, sample rate, bitrate, DSEE, and the connection-quality switch the device supports.</div>
+    <div><strong>Everything else</strong>Hairline as drawn before.</div>
+  </div>
+</header>
+
+<!-- ===== POPOVERS ===== -->
+<section class="screen">
+  <h2>Menu-bar popover</h2>
+  <p class="note">Left: connected. Right: the ULT WEAR is paired but not connected over Bluetooth, which is also what you see when it's on the headphone cable.</p>
+  <div class="pair">
+    <div class="hl">
+      <p class="cap">Connected</p>
+      <div class="pop">
+        <div class="row"><span style="font-weight:600">ULT WEAR</span><span class="lab">Forest Gray · LDAC</span></div>
+        <div class="row"><span class="lab">Battery</span><span class="dot big">67<small>%</small></span></div>
+        <div class="row"><span class="lab">Noise</span><div class="boxes" style="width:190px"><span>NC</span><span class="on">AMB</span><span>OFF</span></div></div>
+        <div class="row"><span class="lab">Level 14</span><div class="ticks"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+        <div class="row"><span class="lab">ULT</span><div class="boxes ult" style="width:190px"><span>OFF</span><span class="on">1</span><span>2</span></div></div>
+        <div class="link" style="margin-top:4px"><div><span>MacBook Pro</span><span class="live">▶ Playing</span></div><div><span>iPhone</span><span>Take</span></div></div>
+        <div class="row" style="padding-top:10px"><span class="lab">Open window</span><span class="lab">⌥⌘N</span></div>
+      </div>
+    </div>
+    <div class="hl">
+      <p class="cap">Not connected</p>
+      <div class="pop">
+        <div class="row"><span style="font-weight:600">ULT WEAR</span><span class="lab">Not connected</span></div>
+        <div class="row"><span class="lab">Last seen</span><span style="font-size:12px">12 minutes ago · 67%</span></div>
+        <div class="row"><span class="lab">Noise</span><div class="boxes" style="width:190px;opacity:0.35"><span>NC</span><span>AMB</span><span>OFF</span></div></div>
+        <div class="row"><span class="lab">ULT</span><div class="boxes ult" style="width:190px;opacity:0.35"><span>OFF</span><span>1</span><span>2</span></div></div>
+        <div class="row" style="display:block;padding-top:12px"><span style="font-size:12px;color:var(--muted)">Turn the headphones on, or reconnect from the Bluetooth menu. Controls return the moment they link.</span></div>
+        <div class="btnrow"><span class="btn fill">Connect</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== OVERVIEW ===== -->
+<section class="screen">
+  <h2>Overview</h2>
+  <p class="note">The first screen after launch. Photo in the device's own colourway on the left; everything you touch daily on the right, nothing below the fold.</p>
+  <div class="winwrap"><div class="hl"><div class="win">
+    <div class="traffic"><i></i><i></i><i></i></div>
+    <nav class="tabs"><span class="on">Overview</span><span>Sound</span><span>Noise</span><span>Devices</span><span>Scenes</span><span>Settings</span></nav>
+    <span class="status lab">Connected · FW 2.1.0</span>
+    <div class="ov">
+      <div class="photo"><svg width="220" height="190"><use href="#hp"/></svg><div class="cap2"><span class="lab">WH-ULT900N · Forest Gray</span><b>ULT WEAR</b></div></div>
+      <div>
+        <div class="rows3">
+          <div><span class="lab">Battery</span><span class="dot big">67<small>%</small></span><span class="sm">18 h left</span></div>
+          <div><span class="lab">Noise</span><div class="boxes"><span>NC</span><span class="on">AMB</span><span>OFF</span></div><span class="sm">voice focus on</span></div>
+          <div><span class="lab">Level</span><div class="ticks"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="font-size:20px">14</span></div>
+          <div><span class="lab">ULT</span><div class="boxes ult"><span>OFF</span><span class="on">ULT 1</span><span>ULT 2</span></div><span class="sm">deep bass</span></div>
+          <div><span class="lab">Equalizer</span>
+            <div class="faders mini"><div class="cb"><div class="track"><i style="bottom:70%"></i></div></div><div><div class="track"><i style="bottom:52%"></i></div></div><div><div class="track"><i style="bottom:45%"></i></div></div><div><div class="track"><i style="bottom:50%"></i></div></div><div><div class="track"><i style="bottom:58%"></i></div></div><div><div class="track"><i style="bottom:64%"></i></div></div></div>
+            <span class="sm">Bass Boost</span></div>
+          <div><span class="lab">Codec</span><span><span class="dot" style="font-size:18px">LDAC</span> <span class="sm">96 kHz · 990 kbps</span></span><span class="sm">DSEE on</span></div>
+        </div>
+        <div class="link" style="margin-top:14px"><div><span>MacBook Pro</span><span class="live">▶ Playing</span></div><div><span>iPhone</span><span>Take</span></div><div><span>Multipoint</span><span>On</span></div><div><span>Auto off</span><span>15 min</span></div><div><span>Wear pause</span><span>On</span></div></div>
+      </div>
+    </div>
+  </div></div></div>
+</section>
+
+<!-- ===== SOUND ===== -->
+<section class="screen">
+  <h2>Sound</h2>
+  <p class="note">The full fader equalizer with dB marks, the twelve presets the device reports, Clear Bass as its own larger fader, and the codec box with the connection-quality switch.</p>
+  <div class="winwrap"><div class="hl"><div class="win">
+    <div class="traffic"><i></i><i></i><i></i></div>
+    <nav class="tabs"><span>Overview</span><span class="on">Sound</span><span>Noise</span><span>Devices</span><span>Scenes</span><span>Settings</span></nav>
+    <span class="status lab">Connected · FW 2.1.0</span>
+    <div class="page">
+      <div class="two" style="grid-template-columns: 1.35fr 1fr">
+        <div>
+          <div class="block"><h4>Equalizer · Bass Boost · drag a handle, or type a value</h4>
+            <div class="faders" style="height:200px;padding-top:10px">
+              <div class="cb"><div class="track"><b style="top:-2px">+10</b><b style="bottom:-2px">-10</b><i style="bottom:70%"></i></div><span class="lab">Clear Bass</span><span class="lab" style="color:var(--ink)">+4</span></div>
+              <div><div class="track"><i style="bottom:52%"></i></div><span class="lab">400 Hz</span><span class="lab" style="color:var(--ink)">0</span></div>
+              <div><div class="track"><i style="bottom:45%"></i></div><span class="lab">1 kHz</span><span class="lab" style="color:var(--ink)">-1</span></div>
+              <div><div class="track"><i style="bottom:50%"></i></div><span class="lab">2.5 kHz</span><span class="lab" style="color:var(--ink)">0</span></div>
+              <div><div class="track"><i style="bottom:58%"></i></div><span class="lab">6.3 kHz</span><span class="lab" style="color:var(--ink)">+2</span></div>
+              <div><div class="track"><i style="bottom:64%"></i></div><span class="lab">16 kHz</span><span class="lab" style="color:var(--ink)">+3</span></div>
+            </div>
+          </div>
+          <div class="block"><h4>Presets</h4>
+            <div class="presets"><span>Off</span><span>Bright</span><span>Excited</span><span>Mellow</span><span>Relaxed</span><span>Vocal</span><span>Treble Boost</span><span class="on">Bass Boost</span><span>Speech</span><span>Manual</span><span>Custom 1</span><span>Custom 2</span></div>
+            <div class="btnrow"><span class="btn">Save as Custom 1</span><span class="btn">Reset</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="block"><h4>ULT</h4><div class="boxes ult lg"><span>OFF</span><span class="on">ULT 1</span><span>ULT 2</span></div>
+            <p style="font-size:12px;color:var(--muted);margin:8px 0 0">ULT 1 lifts the deep bass. ULT 2 adds power across the low range. Sony notes high Clear Bass can mask ULT 2.</p></div>
+          <div class="block"><h4>Codec and connection</h4>
+            <div class="codec"><span class="dot">LDAC</span><div class="meta">96 kHz · 990 kbps<br><span>Negotiated with MacBook Pro</span></div><span class="lab" style="color:var(--ink)">Live</span></div>
+            <div style="margin-top:8px" class="boxes"><span class="on">Sound quality</span><span>Stable connection</span></div>
+            <p style="font-size:11px;color:var(--muted);margin:6px 0 0">Stable connection switches to AAC and is required for multipoint.</p></div>
+          <div class="block"><h4>Upscaling</h4>
+            <div class="set"><div><span>DSEE<small>Restores detail lost to compression</small></span><span class="toggle on"></span></div><div><span>Turn DSEE off at low battery<small>Saves about 10% runtime</small></span><span class="toggle"></span></div></div></div>
+        </div>
+      </div>
+    </div>
+  </div></div></div>
+</section>
+
+<!-- ===== NOISE ===== -->
+<section class="screen">
+  <h2>Noise</h2>
+  <p class="note">The big version of the switch and the level bar. Focus on Voice and the level only apply in Ambient, so they sit under it. The NC/AMB button behaviour maps what the cup button cycles through.</p>
+  <div class="winwrap"><div class="hl"><div class="win">
+    <div class="traffic"><i></i><i></i><i></i></div>
+    <nav class="tabs"><span>Overview</span><span>Sound</span><span class="on">Noise</span><span>Devices</span><span>Scenes</span><span>Settings</span></nav>
+    <span class="status lab">Connected · FW 2.1.0</span>
+    <div class="page">
+      <div class="two">
+        <div>
+          <div class="block"><h4>Noise control</h4><div class="boxes lg"><span>Noise cancelling</span><span class="on">Ambient</span><span>Off</span></div></div>
+          <div class="block"><h4>Ambient level</h4>
+            <div style="display:flex;align-items:center;gap:14px"><div class="ticks lg"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="dot" style="font-size:34px">14</span></div>
+            <div style="display:flex;justify-content:space-between;margin-top:6px"><span class="lab">1 · quiet room</span><span class="lab">20 · street</span></div></div>
+          <div class="block"><div class="set"><div><span>Focus on voice<small>Keeps speech, trims the rest of the ambient feed</small></span><span class="toggle on"></span></div><div><span>Quick Attention<small>Hold the right cup to hear through momentarily</small></span><span class="toggle on"></span></div></div></div>
+        </div>
+        <div>
+          <div class="block"><h4>Cup button cycles through</h4>
+            <div class="set"><div><span>Noise cancelling</span><span class="toggle on"></span></div><div><span>Ambient</span><span class="toggle on"></span></div><div><span>Off</span><span class="toggle"></span></div></div>
+            <p style="font-size:11px;color:var(--muted);margin:6px 0 0">The physical NC/AMB button steps through only the modes that are on.</p></div>
+          <div class="block"><h4>Automatic</h4>
+            <div class="scene on"><span>At the desk</span><span class="lab" style="color:var(--ink)">Active</span><span class="when">When MacBook Pro is playing</span><div class="then"><span>Ambient 14</span><span>Voice focus</span></div></div>
+            <div class="scene"><span>On a call</span><span class="lab">Scene</span><span class="when">When Zoom or FaceTime has the mic</span><div class="then"><span>NC</span></div></div>
+            <div class="btnrow"><span class="btn">Edit in Scenes</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div></div></div>
+</section>
+
+<!-- ===== DEVICES ===== -->
+<section class="screen">
+  <h2>Devices</h2>
+  <p class="note">Multipoint without the modal. Two connected devices, one click to take the audio, the paired list below, and pairing mode as a button rather than a button-hold ritual.</p>
+  <div class="winwrap"><div class="hl"><div class="win">
+    <div class="traffic"><i></i><i></i><i></i></div>
+    <nav class="tabs"><span>Overview</span><span>Sound</span><span>Noise</span><span class="on">Devices</span><span>Scenes</span><span>Settings</span></nav>
+    <span class="status lab">Connected · FW 2.1.0</span>
+    <div class="page">
+      <div class="two">
+        <div>
+          <div class="block"><h4>Connected now</h4>
+            <div class="devcard on"><div>MacBook Pro<span class="lab">LDAC · 96 kHz · this Mac</span></div><span class="live lab">▶ Playing</span></div>
+            <div class="devcard"><div>iPhone<span class="lab">AAC · idle</span></div><span class="btn">Take audio</span></div></div>
+          <div class="block"><h4>Multipoint</h4>
+            <div class="set"><div><span>Connect to two devices<small>Turning this on switches the codec to AAC</small></span><span class="toggle on"></span></div><div><span>Switch to whichever starts playing<small>Host-side rule, not a headphone setting</small></span><span class="toggle on"></span></div></div></div>
+        </div>
+        <div>
+          <div class="block"><h4>Paired</h4>
+            <div class="link"><div><span>MacBook Pro</span><span>Connected</span></div><div><span>iPhone</span><span>Connected</span></div><div><span>iPad</span><span>Connect</span></div><div><span>Work laptop</span><span>Forget</span></div></div></div>
+          <div class="block"><h4>Pair a new device</h4>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 8px">Puts the headphones in pairing mode for two minutes. The app pauses auto-reconnect so it doesn't grab them back.</p>
+            <span class="btn fill">Enter pairing mode</span></div>
+          <div class="block"><h4>This headphone</h4>
+            <div class="link"><div><span>Model</span><span>WH-ULT900N</span></div><div><span>Firmware</span><span>2.1.0</span></div><div><span>Bluetooth</span><span>5.2 · channel 18</span></div><div><span>Colourway</span><span>Forest Gray</span></div></div></div>
+        </div>
+      </div>
+    </div>
+  </div></div></div>
+</section>
+
+<!-- ===== SCENES ===== -->
+<section class="screen">
+  <h2>Scenes</h2>
+  <p class="note">The feature Sony's phone app brands as Adaptive Sound Control, rebuilt on the desktop with desktop triggers: which device is playing, which app has the microphone, time of day, which Wi-Fi you're on. One scene open for editing.</p>
+  <div class="winwrap"><div class="hl"><div class="win">
+    <div class="traffic"><i></i><i></i><i></i></div>
+    <nav class="tabs"><span>Overview</span><span>Sound</span><span>Noise</span><span>Devices</span><span class="on">Scenes</span><span>Settings</span></nav>
+    <span class="status lab">Connected · FW 2.1.0</span>
+    <div class="page">
+      <div class="two" style="grid-template-columns: 1fr 1.3fr">
+        <div>
+          <div class="block"><h4>Scenes · first match wins</h4>
+            <div class="scene on"><span>At the desk</span><span class="lab" style="color:var(--ink)">Active</span><span class="when">MacBook Pro is playing</span><div class="then"><span>Ambient 14</span><span>Voice focus</span><span class="u">ULT 1</span></div></div>
+            <div class="scene"><span>On a call</span><span class="lab">Off</span><span class="when">Zoom or FaceTime has the mic</span><div class="then"><span>NC</span><span>ULT off</span></div></div>
+            <div class="scene"><span>Late</span><span class="lab">Off</span><span class="when">After 22:00</span><div class="then"><span>NC</span><span>Volume 40%</span><span>DSEE off</span></div></div>
+            <div class="scene"><span>Phone takes over</span><span class="lab">Off</span><span class="when">iPhone starts playing</span><div class="then"><span>Take audio</span></div></div>
+            <div class="btnrow"><span class="btn fill">New scene</span></div></div>
+        </div>
+        <div>
+          <div class="block"><h4>Editing · At the desk</h4>
+            <div class="set">
+              <div><span>When<small>MacBook Pro is playing</small></span><span class="btn">Change</span></div>
+              <div><span>Noise</span><div class="boxes" style="width:210px"><span>NC</span><span class="on">AMB</span><span>OFF</span><span>Keep</span></div></div>
+              <div><span>Ambient level</span><div class="ticks"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+              <div><span>Focus on voice</span><span class="toggle on"></span></div>
+              <div><span>ULT</span><div class="boxes ult" style="width:210px"><span>OFF</span><span class="on">1</span><span>2</span><span>Keep</span></div></div>
+              <div><span>Equalizer</span><div class="boxes" style="width:210px"><span>Bass Boost</span><span class="on">Keep</span></div></div>
+              <div><span>Hotkey<small>Apply this scene by hand</small></span><div class="keys"><span>⌃</span><span>⌥</span><span>1</span></div></div>
+            </div>
+            <div class="btnrow"><span class="btn">Delete</span><span class="btn fill">Save scene</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div></div></div>
+</section>
+
+<!-- ===== SETTINGS ===== -->
+<section class="screen">
+  <h2>Settings</h2>
+  <p class="note">Headphone settings on the left, app settings on the right. Every headphone setting here is one the ULT WEAR actually declares.</p>
+  <div class="winwrap"><div class="hl"><div class="win">
+    <div class="traffic"><i></i><i></i><i></i></div>
+    <nav class="tabs"><span>Overview</span><span>Sound</span><span>Noise</span><span>Devices</span><span>Scenes</span><span class="on">Settings</span></nav>
+    <span class="status lab">Connected · FW 2.1.0</span>
+    <div class="page">
+      <div class="two">
+        <div>
+          <div class="block"><h4>Headphones</h4>
+            <div class="set">
+              <div><span>Auto power off<small>When not worn</small></span><div class="boxes" style="width:200px"><span>5</span><span class="on">15</span><span>30</span><span>Never</span></div></div>
+              <div><span>Pause when taken off</span><span class="toggle on"></span></div>
+              <div><span>Touch panel</span><span class="toggle on"></span></div>
+              <div><span>Voice guide<small>Volume of the spoken prompts</small></span><div class="boxes" style="width:200px"><span>Off</span><span class="on">Low</span><span>High</span></div></div>
+              <div><span>Quick Access<small>Double-tap action</small></span><div class="boxes" style="width:200px"><span class="on">Spotify</span><span>Endel</span><span>Off</span></div></div>
+              <div><span>Voice assistant</span><div class="boxes" style="width:200px"><span class="on">Siri</span><span>Google</span><span>Off</span></div></div>
+              <div><span>Reset headphones<small>Settings only, or factory reset</small></span><span class="btn">Reset…</span></div>
+            </div></div>
+        </div>
+        <div>
+          <div class="block"><h4>This app</h4>
+            <div class="set">
+              <div><span>Open at login</span><span class="toggle on"></span></div>
+              <div><span>Show in menu bar<small>Icon shows battery when connected</small></span><span class="toggle on"></span></div>
+              <div><span>Hide Dock icon</span><span class="toggle on"></span></div>
+              <div><span>Hotkeys<small>Noise · ULT · Take audio</small></span><div class="keys"><span>⌃⌥N</span><span>⌃⌥U</span><span>⌃⌥T</span></div></div>
+              <div><span>Battery history<small>Logs level every 5 minutes</small></span><span class="toggle on"></span></div>
+              <div><span>Appearance</span><div class="boxes" style="width:200px"><span class="on">Paper</span><span>Ink</span><span>System</span></div></div>
+              <div><span>Advanced<small>Frame log, capability list, send a raw command</small></span><span class="btn">Open…</span></div>
+            </div></div>
+          <div class="block"><div class="link"><div><span>App version</span><span>0.1.0</span></div><div><span>Protocol</span><span>MDR v2 · tables 1+2</span></div><div><span>Not affiliated with Sony</span><span></span></div></div></div>
+        </div>
+      </div>
+    </div>
+  </div></div></div>
+</section>
+
+<!-- ===== STATES ===== -->
+<section class="screen">
+  <h2>Control states</h2>
+  <p class="note">Every control shows what the headphones have actually confirmed. No existing client does this, and it's the main reason their controls "snap back".</p>
+  <div class="states">
+    <div class="hl"><span class="lab">Confirmed</span><div class="boxes ult" style="margin-top:6px"><span>OFF</span><span class="on">1</span><span>2</span></div><p>Solid fill. The headphones replied with this value.</p></div>
+    <div class="hl"><span class="lab">Pending</span><div class="boxes ult pending" style="margin-top:6px"><span>OFF</span><span>1</span><span class="on">2</span></div><p>Striped fill for up to a second while the command is in flight.</p></div>
+    <div class="hl"><span class="lab">Refused</span><div class="boxes ult" style="margin-top:6px"><span>OFF</span><span class="on">1</span><span style="border-color:var(--ult);color:var(--ult)">2</span></div><p>Orange outline and a one-line reason: "ULT is off during calls."</p></div>
+    <div class="hl"><span class="lab">Not available on this model</span><div class="boxes" style="margin-top:6px;opacity:0.35"><span>Speak-to-chat</span></div><p>Faded and not clickable. Decided by the capability list, not by hiding features.</p></div>
+  </div>
+</section>
+
+<section class="screen" style="border-bottom:none">
+  <h2>Not drawn yet</h2>
+  <p class="note">A dark "Ink" theme (paper and ink swap, Forest Gray stays), the Windows tray flyout in this language, the Advanced panel with the frame log, and first-run onboarding. Say the word and I'll add any of them. Otherwise, tell me what to change on these.</p>
+</section>
+
+<footer>Drawn 2026-11-07. Static mockups; the app name is a placeholder. The paired device names and scene names are examples.</footer>
+</div>
+</body>
+</html>

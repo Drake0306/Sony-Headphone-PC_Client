@@ -1,0 +1,15 @@
+# Rust
+target/
+# Node
+node_modules/
+dist/
+# Tauri
+src-tauri/target/
+src-tauri/gen/schemas/
+# macOS
+.DS_Store
+# Editors
+.vscode/
+.idea/
+# Local captures (may contain device addresses)
+captures/local/

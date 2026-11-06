@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sony Headphone Desktop Client Landscape</title>
+<meta name="description" content="What exists for controlling Sony headphones from a desktop, how your ULT WEAR fits in, and what to build your own library on.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&amp;family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<style>
+/* Layout: a single reading column for prose; tables and comparison grids may run wider than the column. */
+:root {
+  --bg: #f6f5f2;
+  --surface: #ffffff;
+  --surface-2: #eceae4;
+  --fg: #1d1f24;
+  --muted: #5b5f6a;
+  --line: #d9d6ce;
+  --accent: #2f5d8a;
+  --accent-soft: #e2ebf4;
+  --good: #2e7d4f;
+  --warn: #a8690b;
+  --bad: #b23b3b;
+  --good-soft: #e3f1e8;
+  --warn-soft: #f7ecd6;
+  --bad-soft: #f6e1e1;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --body: "Source Serif 4", "Iowan Old Style", Georgia, serif;
+  --mono: "IBM Plex Mono", "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15171b; --surface: #1d2025; --surface-2: #262a31; --fg: #e8e6e1; --muted: #a2a6b0; --line: #343941;
+    --accent: #8db4dd; --accent-soft: #223246; --good: #6fc08f; --warn: #e0a84a; --bad: #e27a7a;
+    --good-soft: #1f3328; --warn-soft: #3a2f17; --bad-soft: #3b2222; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15171b; --surface: #1d2025; --surface-2: #262a31; --fg: #e8e6e1; --muted: #a2a6b0; --line: #343941;
+  --accent: #8db4dd; --accent-soft: #223246; --good: #6fc08f; --warn: #e0a84a; --bad: #e27a7a;
+  --good-soft: #1f3328; --warn-soft: #3a2f17; --bad-soft: #3b2222; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--body); font-size: 17px; line-height: 1.6;
+  padding-block: 0 4rem;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+code { font-family: var(--mono); font-size: 0.86em; background: var(--surface-2); padding: 0.05em 0.35em; border-radius: 3px; }
+pre { background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 1rem; overflow-x: auto; font-family: var(--mono); font-size: 0.82rem; line-height: 1.55; margin: 1rem 0; }
+pre code { background: none; padding: 0; font-size: inherit; }
+
+.wrap { max-width: 1180px; margin: 0 auto; }
+.col { max-width: 720px; }
+
+header.masthead { padding-block: 3rem 2rem; border-bottom: 1px solid var(--line); }
+.eyebrow { font-family: var(--display); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 0.75rem; }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(1.9rem, 4vw, 3rem); line-height: 1.08; margin: 0 0 1rem; text-wrap: balance; letter-spacing: -0.01em; }
+.lede { font-size: 1.2rem; line-height: 1.5; margin: 0; max-width: 760px; }
+.meta { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-top: 1.25rem; font-family: var(--display); font-size: 0.85rem; color: var(--muted); }
+
+h2 { font-family: var(--display); font-weight: 700; font-size: clamp(1.4rem, 2.6vw, 1.9rem); line-height: 1.15; margin: 3rem 0 1rem; text-wrap: balance; letter-spacing: -0.01em; }
+h3 { font-family: var(--display); font-weight: 700; font-size: 1.1rem; margin: 2rem 0 0.6rem; }
+p { margin: 0 0 1rem; }
+ul, ol { padding-left: 1.3rem; margin: 0 0 1rem; }
+li { margin-bottom: 0.4rem; }
+strong { font-weight: 600; }
+.src { font-family: var(--display); font-size: 0.78rem; color: var(--muted); margin: -0.4rem 0 1.2rem; line-height: 1.5; }
+.src a { color: var(--muted); }
+
+.verdict { background: var(--accent-soft); border-left: 4px solid var(--accent); padding: 1.1rem 1.3rem; margin: 1.5rem 0 0; border-radius: 0 6px 6px 0; }
+.verdict h2 { margin: 0 0 0.5rem; font-size: 1.15rem; }
+.verdict p:last-child { margin: 0; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+.card .rank { font-family: var(--display); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.card h3 { margin: 0; font-size: 1.05rem; line-height: 1.25; }
+.card .stats { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.card p { font-size: 0.95rem; margin: 0; line-height: 1.45; }
+.pill { display: inline-block; font-family: var(--display); font-size: 0.72rem; font-weight: 500; padding: 0.1em 0.55em; border-radius: 999px; background: var(--surface-2); color: var(--muted); white-space: nowrap; }
+.pill.good { background: var(--good-soft); color: var(--good); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.bad { background: var(--bad-soft); color: var(--bad); }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); margin: 1.25rem 0; }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; line-height: 1.4; }
+th, td { text-align: left; vertical-align: top; padding: 0.6rem 0.7rem; border-bottom: 1px solid var(--line); min-width: 0; }
+th { font-family: var(--display); font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); position: sticky; top: 0; white-space: nowrap; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 0.82rem; }
+td.name { white-space: nowrap; font-family: var(--display); font-weight: 500; }
+td.name small { display: block; font-weight: 400; color: var(--muted); font-size: 0.75rem; white-space: normal; }
+td.mono { font-family: var(--mono); font-size: 0.8rem; white-space: nowrap; }
+.shortlist table { min-width: 1380px; }
+.shortlist td { font-size: 0.84rem; }
+.ult table { min-width: 980px; }
+.ult td.name { white-space: normal; min-width: 180px; }
+.compact table { min-width: 640px; }
+tr.baseline td { color: var(--muted); }
+tr.top td.name { color: var(--accent); }
+
+.options { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin: 1.25rem 0; }
+.option { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 1rem 1.1rem; min-width: 0; }
+.option.best { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.option h3 { margin: 0 0 0.4rem; font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.option p, .option li { font-size: 0.93rem; line-height: 1.45; }
+.option ul { margin: 0.4rem 0 0; padding-left: 1.1rem; }
+
+.note { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 1rem 1.2rem; margin: 1.5rem 0; font-size: 0.95rem; }
+.note h3 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+.note ul { margin: 0; }
+.note.danger { border-color: var(--bad); }
+.note.danger h3 { color: var(--bad); }
+
+dl.facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.5rem 1.25rem; margin: 1rem 0; font-size: 0.95rem; }
+dl.facts dt { font-family: var(--display); font-weight: 700; font-size: 0.85rem; padding-top: 0.15rem; }
+dl.facts dd { margin: 0; min-width: 0; }
+@media (max-width: 560px) { dl.facts { grid-template-columns: 1fr; gap: 0.2rem 0; } dl.facts dd { margin-bottom: 0.6rem; } }
+
+ol.plan { counter-reset: step; list-style: none; padding: 0; }
+ol.plan li { counter-increment: step; display: grid; grid-template-columns: 2rem 1fr; gap: 0.75rem; margin-bottom: 0.9rem; }
+ol.plan li::before { content: counter(step); font-family: var(--display); font-weight: 700; color: var(--accent); font-size: 1.1rem; line-height: 1.4; }
+ol.plan li > div { min-width: 0; }
+ol.plan strong { display: block; font-family: var(--display); font-size: 0.95rem; }
+
+footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--line); font-family: var(--display); font-size: 0.82rem; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Research report · desktop control of Sony Bluetooth headphones · ULT WEAR edition</p>
+  <h1>Your ULT WEAR, the clients that support it, and what to build your own library on</h1>
+  <p class="lede">You own a WH-ULT900N. There is no separate 2026 ULT WEAR model. It speaks Sony's v2 protocol, its ULT bass button is controllable over Bluetooth, and no major desktop client exposes it. Roughly sixty desktop projects exist, almost all from 2026, and four carry real weight. For a library that goes beyond Sony's app, start from mos9527's MIT-licensed libmdr and its extracted command tables.</p>
+  <div class="meta">
+    <span>Data pulled 2026-11-06 and 2026-11-07</span>
+    <span>Written for Roy, building a Sony headphone app and library</span>
+    <span>Scope: Windows, macOS, Linux</span>
+  </div>
+</header>
+
+<section class="col">
+  <div class="verdict">
+    <h2>Bottom line</h2>
+    <p><strong>Fork or vendor mos9527's <code>libmdr</code> (MIT, C++20) as the seed of your own library.</strong> It is the only codebase with machine-extracted command tables for all four Sony tables, pulled from Sony's own app binary, and it already defines the ULT mode structs your headphones use. Keep its code generator so new opcodes stay data-driven. If you want a Rust core, copy overheard's sans-IO crate layout and port the tables. Read Gadgetbridge and Resonance as references only, since their licenses (AGPL and PolyForm Noncommercial) would bind your library.</p>
+    <p><strong>"Features Sony never gave" come from two places.</strong> First, opcodes the firmware answers but Sound Connect hides or mis-sends: codec readout, the device's real EQ layout, action logs, test and calibration modes, paired-device management over table 2, and settings a model accepts without declaring. Second, host-side logic the phone app brands as features: adaptive sound, scenes, per-app ambient, automatic multipoint switching, hotkeys, battery history. Firmware and voice-pack work is a separate Airoha transport with real brick risk; treat it as a later, optional module.</p>
+  </div>
+</section>
+
+<section class="col">
+  <h2>Your headphones: WH-ULT900N, not a 2026 model</h2>
+  <p>No Sony press release, support page, review or project mentions a "ULT WEAR 2", "WH-ULT900N2" or "WH-ULT910N". The only ULT over-ear is the WH-ULT900N announced on 11 April 2024. Sony's 2026 headphone launches were the WF-1000XM6 and WH-1000XM6 colour refreshes, and the ULT WEAR went on clearance in April 2026. A unit bought in 2026 is a WH-ULT900N, most likely on firmware 2.1.0 (released 9 December 2025, security hardening only, no rollback). Earlier firmware was 2.0.5 (September 2024) and 2.0.7 (May 2025, iPhone ringtone fix). Firmware updates go through the phone app only.</p>
+  <dl class="facts">
+    <dt>Silicon</dt>
+    <dd>Sony "Integrated Processor V1" plus a MediaTek MT2822M Bluetooth SoC per the FCC-photo teardown. MediaTek's Airoha subsidiary sells the same silicon, which is why projects call it an "Airoha chipset" and why the device advertises the MTK firmware-transfer function.</dd>
+    <dt>Bluetooth</dt>
+    <dd>5.2, Classic only in practice. Codecs SBC, AAC, LDAC. LC3 was promised at launch but never appears in Sony's codec page or any firmware note, and the device advertises no LE Audio function. LDAC is unavailable while multipoint is on.</dd>
+    <dt>Protocol</dt>
+    <dd>Sony MDR v2 only, over RFCOMM. Service UUID <code>956C7B26-D49A-4BA8-B03F-B17D393CB6E2</code>, channel 18 on firmware 2.1.0 (do not hard-code it). Protocol-info reply <code>01 00 03 00 20 02 00 00</code>: version 0x03002002, command tables 1 and 2 enabled. The v1 UUID is not advertised. Only one control client at a time.</dd>
+    <dt>Identity</dt>
+    <dd>Bluetooth name "ULT WEAR" in all 2026 reports ("Sony ULT" in a December 2024 report, so match both). The BLE sibling "LE_ULT WEAR" is the ordinary GATT advertisement, not LE Audio. BlueZ modalias <code>usb:v054Cp0F1Ed0210</code>.</dd>
+    <dt>Features it has</dt>
+    <dd>ULT button (OFF / ULT1 / ULT2), noise cancelling, ambient sound with 20 levels and Focus on Voice, Quick Attention, 5-band EQ plus Clear Bass with presets, DSEE, multipoint, touch panel, wear detection with auto pause and auto power-off, 360 Reality Audio with head tracking, Quick Access (Spotify Tap, Endel, Amazon Music), voice assistant selection, voice guide volume, Adaptive Sound Control via the phone app.</dd>
+    <dt>Features it lacks</dt>
+    <dd>Speak-to-Chat and Find Your Headphones are not device features: neither appears in the help guide nor in the capability list, so a client should not render them for this model.</dd>
+  </dl>
+
+  <h3>What the device declares on connect</h3>
+  <p>On firmware 2.1.0 the capability handshake returns these support functions. Decoded against libmdr's enum, table 1 includes battery level, power off, auto power-off with wearing detection, codec indicator, DSEE indicator and auto-off, preset EQ and ULT mode, ambient sound mode select, NC/ambient dual level adjustment, Adaptive Sound Control (AUTO_NCASM), voice assistant settings and alerts, playback controller with call volume, play-pause on wear/remove, head tracker, action and operation log notifiers, general settings 1 to 3, connection mode with LDAC status, reset settings, Quick Access, BLE setup and GATT connectable, and the MTK firmware transfer. Table 2 adds voice guidance (MTK transfer variant), Safe Listening and Quick Access easy setting. Head-tracking sensor data is not on this channel at all: it is a Bluetooth HID report that only flows while A2DP audio is active.</p>
+<pre><code>table 1:  10 12 13 14 15 20 23 25 27 32 53 69 6B 70 93 F4 90 A1 F1 B2 B7 C1 C2 D1 D2 D3 E3 E2 F9 FD
+table 2:  42 50 F2</code></pre>
+  <p class="src">Sources: <a href="https://helpguide.sony.net/mdr/2981/v1/en/index.html">Sony help guide (model 2981)</a>; <a href="https://helpguide.sony.net/mdr/2981/v1/en/contents/TP1001293721.html">supported codecs</a>; <a href="https://helpguide.sony.net/mdr/2981/v1/en/contents/TP1001375636.html">ULT button</a>; <a href="https://thewalkmanblog.blogspot.com/2024/04/sony-wh-ult900n-ult-wear-fcc-teardown.html">Walkman Blog FCC teardown</a>; <a href="https://kunkoku.jp/headphoneupdate-25.html">kunkoku.jp firmware notes</a>; <a href="https://kotaku.com/sony-ult-wear-noise-canceling-headphones-go-on-clearance-at-record-low-while-wh-1000xm6-stays-at-full-price-2000683692">Kotaku, April 2026</a>; <a href="https://github.com/owaiskaifi/sony-connect/blob/master/docs/PROTOCOL.md">owaiskaifi PROTOCOL.md</a>; <a href="https://github.com/Leonard013/sony-ult-ctl/blob/main/README.md">sony-ult-ctl README</a>; <a href="https://github.com/mos9527/SonyHeadphonesClient/blob/v1-compat/libmdr/include/mdr/Generated/ProtocolV2.hpp">libmdr ProtocolV2.hpp</a>; <a href="https://codeberg.org/Freeyourgadget/Gadgetbridge/issues/4444">Gadgetbridge issue #4444</a>; <a href="https://github.com/NicholasSlattery/sony-head-tracker/blob/main/docs/MACOS.md">sony-head-tracker MACOS.md</a>.</p>
+</section>
+
+<section>
+  <h2>Who actually supports the ULT WEAR</h2>
+  <div class="col">
+    <p>Hardware-verified means someone ran the client against a real WH-ULT900N and said what worked. README-only means the model name is in a list or a regex. None of the four big general-purpose clients exposes the ULT button. The only codebases that implement and verify ULT mode are four small single-model tools.</p>
+  </div>
+  <div class="tablewrap ult">
+    <table>
+      <thead><tr><th>Project</th><th>Platform · stack · license</th><th>ULT WEAR evidence</th><th>Confirmed on the ULT WEAR</th><th>ULT button</th></tr></thead>
+      <tbody>
+        <tr><td class="name"><a href="https://github.com/owaiskaifi/sony-connect">owaiskaifi/sony-connect</a><small>created 2026-10-17</small></td><td>Linux · Rust</td><td><span class="pill good">Verified fw 2.1.0</span></td><td>Battery, volume, NC/ambient/voice focus, ULT off/1/2, CLI. The most rigorous byte-level notes for this model.</td><td><span class="pill good">Yes</span></td></tr>
+        <tr><td class="name"><a href="https://github.com/cristianoashok/Z-ULT-Connect">cristianoashok/Z-ULT-Connect</a><small>created 2026-10-19</small></td><td>Windows tray · C# .NET 10</td><td><span class="pill good">Verified fw 2.1.0</span></td><td>Noise control, all presets plus a draggable 6-point custom EQ, ULT off/1/2. Protocol from mos9527.</td><td><span class="pill good">Yes, with EQ</span></td></tr>
+        <tr><td class="name"><a href="https://github.com/pats01/sony-ult-wear-omarchy">pats01/sony-ult-wear-omarchy</a><small>validated 2026-08-19</small></td><td>Linux (Omarchy) · Python + QML</td><td><span class="pill good">Verified</span></td><td>v2 handshake, ANC, ambient, voice focus, off, ULT 1/2/off applied and read back, AAC/LDAC switching via PipeWire. Set round-trips 0.25 to 0.33 s.</td><td><span class="pill good">Yes</span></td></tr>
+        <tr><td class="name"><a href="https://github.com/Leonard013/sony-ult-ctl">Leonard013/sony-ult-ctl</a><small>created 2026-04-28</small></td><td>macOS · Python CLI + Swift menu bar</td><td><span class="pill good">Verified</span></td><td>NC, ambient 0 to 20, voice focus, off, ULT 1/2/off, battery, live packet monitor, raw frame sender.</td><td><span class="pill good">Yes</span></td></tr>
+        <tr><td class="name">Gadgetbridge<small>Android, AGPL</small></td><td>Android · Java</td><td><span class="pill good">Verified fw 2.0.7</span></td><td>Broadest set: battery, ambient, power off, pause on remove, Quick Access, voice notifications, NC/AMB button function, DSEE, LDAC, auto power-off, touch panel, multipoint, capture voice, Service Link, factory reset, voice guide volume. EQ and volume not working.</td><td><span class="pill bad">No</span></td></tr>
+        <tr><td class="name"><a href="https://github.com/AmitRajput-Dev/SonyBridge">AmitRajput-Dev/SonyBridge</a></td><td>macOS · SwiftUI + C++</td><td><span class="pill warn">Partially verified</span></td><td>NC/ambient/battery from two contributors (Linux PR #2, macOS fw 2.0.7 PR #26). README badge says "Verified" but its own note says only the CH720N is fully verified. Multipoint bytes taken from Gadgetbridge's ULT work. Open discovery bug #29 on macOS 27.2.</td><td><span class="pill bad">No</span></td></tr>
+        <tr><td class="name"><a href="https://github.com/marconvcm/sony-device-center">marconvcm/sony-device-center</a></td><td>Win/Linux/mac · Qt 6</td><td><span class="pill warn">Community report fw 2.1.0</span></td><td>Connect, battery, NC on/off, ambient with level, auto power-off work. Cannot switch NC to Ambient directly (controller bug #34, shared with other models). EQ, DSEE untested. README still "Untested".</td><td><span class="pill bad">No</span></td></tr>
+        <tr><td class="name"><a href="https://github.com/mos9527/SonyHeadphonesClient">mos9527/SonyHeadphonesClient</a></td><td>All platforms · C++ libmdr</td><td><span class="pill warn">User report</span></td><td>"Every feature works" on the web app per issue #30, after a battery-percent bug was fixed in March 2026. No ULT device-support doc, no ULT test fixtures. libmdr defines the ULT structs, but one third party claims the EQ reply parser ignores the ULT byte. Unverified either way.</td><td><span class="pill warn">Structs only</span></td></tr>
+        <tr><td class="name"><a href="https://github.com/maniacx/BudsLink">maniacx/BudsLink</a></td><td>Linux Flatpak · GJS</td><td><span class="pill">Config file only</span></td><td>Config enables battery, ambient, power off, pause on remove, Quick Access, voice notifications. No EQ, no ULT, no multipoint. Unchanged since January 2026.</td><td><span class="pill bad">No</span></td></tr>
+        <tr><td class="name"><a href="https://github.com/flotttt/Overhead">flotttt/Overhead</a></td><td>macOS notch app</td><td><span class="pill good">README "Tested"</span></td><td>Listed as tested alongside XM6 and CH720N; no feature matrix.</td><td><span class="pill bad">No</span></td></tr>
+        <tr><td class="name"><a href="https://github.com/NicholasSlattery/sony-head-tracker">NicholasSlattery/sony-head-tracker</a></td><td>macOS</td><td><span class="pill good">Hardware validated</span></td><td>Head-tracker HID stream only (50 to 60 packets/s, OpenTrack UDP). Needs a silent A2DP keepalive. Not a settings client.</td><td><span class="pill">n/a</span></td></tr>
+        <tr><td class="name">sbtfix, sony-tray, aecca/sound-connect, XMDeck, HyperEars, earshot, acouplet, WebMDR</td><td>various</td><td><span class="pill">Name match only</span></td><td>"Should work" or regex entries. aecca's profile was copied from a Device Center comment, not hardware.</td><td><span class="pill bad">No</span></td></tr>
+        <tr><td class="name">Resonance, hush, overheard</td><td>various</td><td><span class="pill bad">No mention</span></td><td>Verified on XM6 and WF-C700N only.</td><td><span class="pill bad">No</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="src">Sources: each project's README and the linked issues and pull requests, read 2026-11-07; <a href="https://gadgetbridge.org/gadgets/headphones/sony/">gadgetbridge.org Sony page</a>; <a href="https://codeberg.org/Freeyourgadget/Gadgetbridge/pulls/6399">Gadgetbridge PR #6399</a>; <a href="https://github.com/AmitRajput-Dev/SonyBridge/pull/26">SonyBridge PR #26</a>; <a href="https://github.com/AmitRajput-Dev/SonyBridge/blob/main/docs/MULTIPOINT_RESEARCH.md">SonyBridge MULTIPOINT_RESEARCH.md</a>; <a href="https://github.com/marconvcm/sony-device-center/issues/64">Device Center issue #64</a>; <a href="https://github.com/mos9527/SonyHeadphonesClient/issues/30">mos9527 issue #30</a>; <a href="https://github.com/maniacx/BudsLink/blob/main/src/lib/devices/sony/deviceConfigs/Sony-ULT.js">BudsLink Sony-ULT.js</a>; <a href="https://github.com/pats01/sony-ult-wear-omarchy/blob/main/HARDWARE_VALIDATION.md">pats01 HARDWARE_VALIDATION.md</a>.</p>
+
+  <div class="col">
+    <h3>The ULT button on the wire</h3>
+    <p>ULT mode is not a dedicated feature. It is multiplexed into the v2 equalizer family as inquired type <code>0x03</code> (PRESET_EQ_AND_ULT_MODE, support function 0x53). The six bands are Clear Bass plus five EQ bands (400 Hz, 1 kHz, 2.5 kHz, 6.3 kHz, 16 kHz), centred at <code>0x0A</code> with 21 steps. Sony's own class name for the payload, THMSGV2T1EqParamUltMode, survives in libmdr's generated header.</p>
+<pre><code>GET   56 03
+RET   57 03 &lt;preset&gt; &lt;ult&gt; 06 &lt;b1..b6&gt;      e.g. 57 03 00 02 06 0A 0A 0A 0A 0A 0A  (preset OFF, ULT2, flat)
+SET   58 03 &lt;preset&gt; &lt;ult&gt; 06 &lt;b1..b6&gt;      ult: 00 OFF · 01 ULT1 · 02 ULT2
+NTFY  59 03 ...                             (sent after any SET, even if the GET used type 00)
+CAP   50 03  ->  51 03 06 15 0A 0C (&lt;id&gt; &lt;name&gt;)...   bands=6 steps=21 ult2step=0x0A presets=12
+
+presets: 00 OFF · 10 BRIGHT ... 17 SPEECH · A0 CUSTOM · A1..A5 USER_SETTING1-5</code></pre>
+    <p>Two hardware reports on firmware 2.1.0 disagree on one point: owaiskaifi found that type 03 ignores the preset and band bytes (a ULT-only setter, with type 00 for full EQ), while Z-ULT-Connect says presets must go through <code>58 03</code>. Test both on your unit. A malformed EQ SET (band count without bands) corrupted the custom EQ slot and reset ULT in one report, so always read-modify-write.</p>
+    <p>Other byte contracts verified on this model: NC/ambient uses the 7-byte <code>68 17</code> layout (the older 8-byte layout puts the level in a byte the ULT WEAR ignores), and ambient fields are ignored while in NC mode. Battery is <code>22 00</code> with no threshold byte, which is what broke mos9527's percentage. Volume is <code>A6/A8 20</code> on a 0 to 30 scale synced with AVRCP. Multipoint is <code>d6 d1</code> to read, <code>d8 d1 00 XX</code> to set (inverted: 00 is on) followed by <code>98 00 06 01</code>.</p>
+    <p class="src">Sources: <a href="https://github.com/owaiskaifi/sony-connect/blob/master/docs/PROTOCOL.md">owaiskaifi PROTOCOL.md</a>; <a href="https://github.com/Leonard013/sony-ult-ctl/blob/main/README.md">sony-ult-ctl README</a>; <a href="https://github.com/cristianoashok/Z-ULT-Connect/blob/main/README.md">Z-ULT-Connect README</a>; <a href="https://github.com/pats01/sony-ult-wear-omarchy/blob/main/backend/sony_ult/headset.py">pats01 headset.py</a>; <a href="https://github.com/mos9527/SonyHeadphonesClient/blob/v1-compat/libmdr/include/mdr/Generated/ProtocolV2T1.hpp">libmdr ProtocolV2T1.hpp</a>; <a href="https://github.com/AmitRajput-Dev/SonyBridge/blob/main/docs/MULTIPOINT_RESEARCH.md">SonyBridge MULTIPOINT_RESEARCH.md</a>.</p>
+  </div>
+</section>
+
+<section>
+  <h2>The wider ecosystem</h2>
+  <div class="cards">
+    <article class="card">
+      <span class="rank">#1 · Successor and library home</span>
+      <h3><a href="https://github.com/mos9527/SonyHeadphonesClient">mos9527/SonyHeadphonesClient</a></h3>
+      <div class="stats">345 ★ · 3,765 downloads · 23 contributors · commit 2026-11-06</div>
+      <p>C++20, Dear ImGui, MIT. Windows, Linux, macOS, iOS, Android, HarmonyOS, web PWA. The only client with hardware-verified full feature tables for WH-1000XM6 and WF-1000XM6, and the home of libmdr.</p>
+      <p><span class="pill good">Most complete tables</span> <span class="pill warn">Messy releases</span></p>
+    </article>
+    <article class="card">
+      <span class="rank">#2 · Fastest-growing newcomer</span>
+      <h3><a href="https://github.com/marconvcm/sony-device-center">marconvcm/sony-device-center</a></h3>
+      <div class="stats">283 ★ · 1,945 downloads · 12 contributors · v0.1.6 2026-11-01</div>
+      <p>C++20 + Qt 6, MIT. Daemon, CLI, capability discovery with a cache, 111 hardware-free protocol tests. Covered by SoundGuys and Android Authority. A fork of SonyBridge, "written with heavy AI assistance".</p>
+      <p><span class="pill good">Daemon + CLI</span> <span class="pill warn">ULT untested in README</span></p>
+    </article>
+    <article class="card">
+      <span class="rank">#3 · The only store presence that works</span>
+      <h3><a href="https://github.com/maniacx/BudsLink">maniacx/BudsLink</a></h3>
+      <div class="stats">270 ★ · 30 contributors · 4,567 Flathub installs/month</div>
+      <p>Multi-brand Linux Flatpak in GJS, GPL-3.0, with Sony config files for nearly every model. Shows what a store listing unlocks.</p>
+      <p><span class="pill good">Flathub</span> <span class="pill">Linux only</span></p>
+    </article>
+    <article class="card">
+      <span class="rank">#4 · macOS native</span>
+      <h3><a href="https://github.com/AmitRajput-Dev/SonyBridge">AmitRajput-Dev/SonyBridge</a></h3>
+      <div class="stats">132 ★ · 2,232 downloads · Homebrew 85 installs/30d · v0.4.0 2026-10-28</div>
+      <p>SwiftUI menu-bar app over a C++ core, MIT. Dropped Windows and Linux in September 2026. Holds the only golden multipoint fixture captured on a ULT WEAR.</p>
+      <p><span class="pill good">Homebrew cask</span> <span class="pill warn">Thin verification</span></p>
+    </article>
+  </div>
+  <div class="col">
+    <p>GitHub search returns 240 repositories matching "sony headphones", yet everything outside these four sits under 50 stars and under 1,000 downloads. Plutoberth's original client remains the most-downloaded ever at 60,121 release downloads, but it was archived on 2025-07-19, speaks only the v1 protocol, and cannot connect to your ULT WEAR at all. Distribution is the unclaimed territory: no Sony-specific client is on Flathub, Homebrew core, winget, Scoop, Chocolatey or the Mac App Store, and no free project signs its binaries.</p>
+  </div>
+  <div class="tablewrap shortlist">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Client</th><th>Platforms</th><th>Stack</th><th>License</th><th>Stars</th><th>Downloads</th><th>Last activity</th><th>Supported models (as declared)</th><th>Feature coverage</th><th>ULT WEAR</th></tr>
+      </thead>
+      <tbody>
+        <tr class="baseline">
+          <td class="num">0</td>
+          <td class="name"><a href="https://github.com/Plutoberth/SonyHeadphonesClient">Plutoberth/SonyHeadphonesClient</a><small>baseline, archived</small></td>
+          <td>Win / mac / Linux</td><td>C++20, Dear ImGui</td><td>MIT</td>
+          <td class="num">1,361</td><td class="num">60,121</td>
+          <td>Archived 2025-07-19; last release v1.3.2 2023-04-26</td>
+          <td>WH-1000XM3 full, XM4 partial, MDR-XB950BT. v1 only</td>
+          <td>NC/ambient level, Focus on Voice, VPT. Write-only, no battery, no EQ</td>
+          <td><span class="pill bad">Cannot connect</span></td>
+        </tr>
+        <tr class="top">
+          <td class="num">1</td>
+          <td class="name"><a href="https://github.com/mos9527/SonyHeadphonesClient">mos9527/SonyHeadphonesClient</a><small>home of libmdr</small></td>
+          <td>Win (XP+) / Linux / mac / iOS / Android / Web PWA / HarmonyOS</td><td>C++20, Dear ImGui; <code>libmdr</code> + <code>libmdr-bt</code></td><td>MIT</td>
+          <td class="num">345</td><td class="num">3,765</td>
+          <td>Commit 2026-11-06; last tagged release 1.4.4 2025-09-27 (current work ships as nightlies and PWA)</td>
+          <td>WF-1000XM5/XM6, WF-C510/C700N, WF-L910, WF-LC900, LinkBuds S, WH-1000XM3/XM5/XM6, WH-CH720N; XM2/XM4 in progress</td>
+          <td>Broadest: NC/AMB incl. auto, EQ, DSEE, multipoint, Speak-to-Chat, listening mode, touch, NC/AMB button, voice guidance, now playing, power off, voice assistant</td>
+          <td><span class="pill warn">User report; no ULT UI</span></td>
+        </tr>
+        <tr class="top">
+          <td class="num">2</td>
+          <td class="name"><a href="https://github.com/marconvcm/sony-device-center">marconvcm/sony-device-center</a><small>"Sony Device Center"</small></td>
+          <td>Linux / Win / mac</td><td>C++20 + Qt 6/QML; <code>sonyd</code> daemon, <code>sonyctl</code> CLI</td><td>MIT</td>
+          <td class="num">283</td><td class="num">1,945</td>
+          <td>v0.1.6 2026-11-01; 6 releases in 8 weeks</td>
+          <td>WH-1000XM5/XM3/XM4 and WF-1000XM6 verified; WH-1000XM6 partial; ULT WEAR, WF-1000XM5, LinkBuds S, CH720N untested</td>
+          <td>NC/Ambient 1-20 and FoV, 5-band EQ + Clear Bass (10-band XM6), DSEE, L/R/case battery, Speak-to-Chat, Adaptive Volume, auto power-off, CLI, daemon</td>
+          <td><span class="pill warn">Partial, bug #64</span></td>
+        </tr>
+        <tr class="top">
+          <td class="num">3</td>
+          <td class="name"><a href="https://github.com/maniacx/BudsLink">maniacx/BudsLink</a><small>multi-brand</small></td>
+          <td>Linux (Flatpak)</td><td>JavaScript (GJS / GNOME)</td><td>GPL-3.0</td>
+          <td class="num">270</td><td class="num">543 + Flathub</td>
+          <td>v0.2.2 2026-10-27; commit 2026-11-04; 30 contributors</td>
+          <td>Sony configs for LinkBuds, LinkBuds S, ULT, WF-1000XM3 to XM6, WF-C series, WH-1000XM2 to XM6, CH720N, XB900N/910N, WI-C100</td>
+          <td>Per-device config files; the only Flathub route</td>
+          <td><span class="pill">6 basic toggles</span></td>
+        </tr>
+        <tr class="top">
+          <td class="num">4</td>
+          <td class="name"><a href="https://github.com/AmitRajput-Dev/SonyBridge">AmitRajput-Dev/SonyBridge</a><small>macOS menu bar</small></td>
+          <td>macOS 12+ (Win/Linux dropped Sept 2026)</td><td>SwiftUI + C++ core</td><td>MIT</td>
+          <td class="num">132</td><td class="num">2,232</td>
+          <td>v0.4.0 2026-10-28; Homebrew 85 installs/30d</td>
+          <td>Verified WH-CH720N, ULT WEAR (NC/ambient/battery); expected XM5/XM6, XB910N, CH520, WF-1000XM4/XM5, C700N, LinkBuds S</td>
+          <td>NC/ambient/FoV, EQ + Clear Bass, DSEE, battery incl. case, codec/firmware readout, multipoint view/switch/pin, Speak-to-Chat, Adaptive Volume</td>
+          <td><span class="pill warn">NC/ambient/battery</span></td>
+        </tr>
+        <tr>
+          <td class="num">5</td>
+          <td class="name"><a href="https://github.com/artistro08/ConnectFlyout">artistro08/ConnectFlyout</a><small>Microsoft Store</small></td>
+          <td>Windows 11 22H2+</td><td>C# WinUI (net10) on Device Center protocol code</td><td>MIT</td>
+          <td class="num">26</td><td class="num">272 + MS Store</td>
+          <td>v1.3.3 2026-10-26</td>
+          <td>WF-1000XM6, WH-1000XM4/XM5, WH-XB900N tested</td>
+          <td>NC/Ambient/Off with global hotkeys, Scenes, playback switching, EQ, DSEE</td>
+          <td><span class="pill">Not listed</span></td>
+        </tr>
+        <tr>
+          <td class="num">6</td>
+          <td class="name"><a href="https://github.com/abhiinhii/sony-tray">abhiinhii/sony-tray</a></td>
+          <td>Windows (.NET 8 WPF) + macOS 13+</td><td>C# / Swift; protocol ported from libmdr</td><td>MIT</td>
+          <td class="num">19</td><td class="num">907</td>
+          <td>v1.1.2 2026-10-19</td>
+          <td>WH-1000XM5 tested; XM6, WF-1000XM5, LinkBuds, ULT Wear, CH720N "should work"</td>
+          <td>NC/Ambient 1-20/FoV, 12 EQ presets, battery L/R/case; tray only</td>
+          <td><span class="pill">Should work</span></td>
+        </tr>
+        <tr>
+          <td class="num">7</td>
+          <td class="name"><a href="https://github.com/RodiAda/kde-headphones">RodiAda/kde-headphones</a> / <a href="https://github.com/CpuJP/OpenSound">CpuJP/OpenSound</a><small>desktop-shell widgets</small></td>
+          <td>Linux (KDE Plasma 6 / GNOME 48-51)</td><td>C++ on libmdr / Rust GTK4 + D-Bus daemon</td><td>MIT / GPL-3.0</td>
+          <td class="num">1 / 1</td><td class="num">4 / 25</td>
+          <td>v0.4.5 2026-10-23 / v0.5.1 2026-11-04</td>
+          <td>WH/WF-1000XM3 to XM6, CH720N, C510/C700N, LinkBuds / WH-1000XM5 tested</td>
+          <td>Near-full: NC/ambient, EQ incl. custom slots, DSEE, Speak-to-Chat, multipoint, touch, wear-pause, voice guidance, BT quality</td>
+          <td><span class="pill">Not listed</span></td>
+        </tr>
+        <tr>
+          <td class="num">8</td>
+          <td class="name"><a href="https://github.com/shellingtonshreyas/xm6-macos-controller">shellingtonshreyas/xm6-macos-controller</a></td>
+          <td>macOS</td><td>Swift / SwiftUI</td><td>GPL-3.0</td>
+          <td class="num">38</td><td class="num">348 + Homebrew tap</td>
+          <td>v1.0.0 2026-04-21; commit 2026-09-09</td>
+          <td>WH-1000XM6 only</td>
+          <td>NC/Ambient 1-20/FoV, volume, battery, DSEE, Speak-to-Chat; no custom EQ</td>
+          <td><span class="pill bad">XM6 only</span></td>
+        </tr>
+        <tr>
+          <td class="num">9</td>
+          <td class="name"><a href="https://github.com/aecca/sound-connect">aecca/sound-connect</a></td>
+          <td>macOS 14+ / Linux</td><td>Rust (gpui) + Swift</td><td>MIT</td>
+          <td class="num">7</td><td class="num">62</td>
+          <td>v0.4.0 2026-10-20</td>
+          <td>WH-1000XM5/XM6, CH720N, ULT WEAR, WF-1000XM4/XM5/XM6, LinkBuds S; also Bose</td>
+          <td>NC/ambient, EQ, DSEE, battery, Speak-to-Chat, wear-pause, button remap, call-triggered ambient, CLI + URL scheme</td>
+          <td><span class="pill">Name match</span></td>
+        </tr>
+        <tr>
+          <td class="num">10</td>
+          <td class="name"><a href="https://github.com/baglayan/acouplet">baglayan/acouplet</a></td>
+          <td>macOS 15.4+</td><td>Swift menu bar</td><td>MIT</td>
+          <td class="num">10</td><td class="num">236</td>
+          <td>Prereleases to 2026-10-22</td>
+          <td>Primarily WF-1000XM5</td>
+          <td>NC/ambient, EQ, DSEE, multipoint + source selection, fit test, experimental LDAC output driver</td>
+          <td><span class="pill">Name match</span></td>
+        </tr>
+        <tr>
+          <td class="num">11</td>
+          <td class="name"><a href="https://github.com/rolottr/open-sound-connect">rolottr/open-sound-connect</a><small>commercial, $9.99</small></td>
+          <td>macOS 15+</td><td>Swift (Nina Labs)</td><td>MIT (source)</td>
+          <td class="num">8</td><td class="num">n/a (paid)</td>
+          <td>Commit 2026-10-26</td>
+          <td>WH-1000XM4 primary; XM5/XM6 experimental</td>
+          <td>Scenes automation, Speak-to-Chat config, wearing detection, touch, voice guidance, protocol log</td>
+          <td><span class="pill">Not listed</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="src">Row sources: each project's GitHub API record, README and releases page, retrieved 2026-11-06 and 2026-11-07; <a href="https://api.github.com/search/repositories?q=sony+headphones+in:name,description&amp;sort=stars">GitHub search API</a>; <a href="https://formulae.brew.sh/api/analytics/cask-install/30d.json">Homebrew analytics</a>; <a href="https://flathub.org/api/v2/search">Flathub search API</a>; <a href="https://www.soundguys.com/sony-headphones-windows-linux-unofficial-app-162956/">SoundGuys</a>; <a href="https://www.androidauthority.com/sony-open-source-headphone-app-3710109/">Android Authority</a>.</p>
+</section>
+
+<section>
+  <h2>Building your own library: what to start from</h2>
+  <div class="col">
+    <p>Nothing is published on PyPI, crates.io, npm, pub.dev or NuGet as a Sony protocol library. Every reusable piece is an in-repo module of an app. Since you intend to write your own library and extend it past Sony's app, the question is not "which library do I link" but "which command tables, code generator and architecture do I inherit, under which license".</p>
+  </div>
+  <div class="options">
+    <article class="option best">
+      <h3>Seed from mos9527's libmdr <span class="pill good">Recommended</span></h3>
+      <p>MIT, C++20. Payload structs are data-driven: each struct's first field is its opcode, trivially serializable payloads use a packed macro, dynamic ones get generated serialize, deserialize and validate code driven by <code>// CODEGEN</code> hints. Adding an opcode means adding an enum value and a struct, then regenerating. It has a stable C ABI, a transport-agnostic polled connection vtable, replay tests over captured fixtures in CI, and builds for every platform including Emscripten.</p>
+      <ul>
+        <li>The tables were extracted from the Sound Connect iOS binary, where Java class names survive J2ObjC compilation. The checked-in JSON intermediate representation under <code>tooling/ida/generated/</code> holds 623 payload declarations and 111 enums for v2 table 1 and 306 and 47 for table 2, and headers can be regenerated from it without IDA.</li>
+        <li>It already defines the ULT structs: EqUltModeStatus, EqParamUltMode and the RET, NTFY and capability variants.</li>
+        <li>Risks: a single core maintainer, pre-1.0 branch churn, and C++ FFI if your UI language is Rust, .NET or Swift. Vendoring a snapshot insulates you from the churn.</li>
+      </ul>
+    </article>
+    <article class="option">
+      <h3>Rust core: copy overheard's shape <span class="pill">Architecture reference</span></h3>
+      <p>MIT or Apache-2.0, sans-IO workspace: <code>mdr-frame</code> (framing and stop-and-wait ARQ, no_std), <code>mdr-proto</code> (typed commands), <code>mdr-session</code> (handshake, ARQ, request-reply correlation, capability and state cache), an async client, and a transport crate for RFCOMM and GATT. Capability-gated rather than model-gated. Version 0.1.0, seven commits, Linux-only, verified on WF-C700N and WH-1000XM6 only. Port libmdr's tables into this layout rather than hand-typing them.</p>
+    </article>
+    <article class="option">
+      <h3>Device Center's sony-protocol <span class="pill">Mid-size reference</span></h3>
+      <p>MIT, C++. <code>IProtocol</code>, <code>ProtocolV1/V2</code>, <code>FrameCodec</code>, <code>CapabilityDiscovery</code> with a per-model cache, and a device profile registry that selects wire variants (10-band EQ, noise-control layout, detailed battery) from a profile. 111 hardware-free tests. Hand-coded and feature-oriented, not exhaustive. Its README prints service UUIDs that disagree with five other sources, so verify byte layouts before trusting them.</p>
+    </article>
+    <article class="option">
+      <h3>Read, never copy <span class="pill warn">License-bound</span></h3>
+      <ul>
+        <li><strong>Gadgetbridge</strong> (AGPL-3.0): the most battle-tested byte layouts and the broadest ULT WEAR feature set, but table 1 only, with many "not implemented for V2" stubs. Any derived library must be AGPL.</li>
+        <li><strong>Resonance</strong> (PolyForm Noncommercial): the best prose protocol document, including table 2 group maps and tested opcodes, with evidence levels per row. Forbids commercial use.</li>
+        <li><strong>ohm-app docs</strong> (CC0) and <strong>AndreasOlofsson/mdr-protocol</strong>: freely reusable but thin and dated.</li>
+        <li><strong>Forking Plutoberth</strong>: archived, v1-only, write-only, cannot talk to your headphones. Not a foundation.</li>
+      </ul>
+    </article>
+  </div>
+  <div class="col">
+    <h3>How commands get discovered</h3>
+    <p>Five methods are in use. The highest-yield one in 2026 is static extraction from Sony's own binaries, which gives you the complete opcode and payload inventory at once. Dynamic capture then tells you which variant your specific model answers.</p>
+    <ul>
+      <li><strong>iOS binary via IDA.</strong> mos9527's <code>tooling/ida</code> pipeline loads the decrypted Sound Connect ARM64 binary, runs an extraction script that resolves J2ObjC descriptors and correlates serializers, and emits the JSON IR. The README calls itself an LLM-generated guide and requires you to source the app through an account and device you are authorized to use. Nothing from Sony's binary is committed, only derived IR.</li>
+      <li><strong>Android APK via jadx.</strong> Resonance reconstructed its document from Sound Connect 13.3.0 this way. Enums keep their original names in package <code>com.sony.songpal.tandemfamily.message.mdr</code>, so values are not guesswork. Helper class names are obfuscated and only hold for that build.</li>
+      <li><strong>HCI snoop plus Wireshark.</strong> Gadgetbridge's wiki has the generic steps: enable the Android HCI snoop log, drive Sony's app, pull the log, filter by MAC, bracket the unknown action with marker commands. Plutoberth's original contributors found this "extremely confusing" and that EQ changes left no trace, which is why static extraction won.</li>
+      <li><strong>In-app frame recorders.</strong> mos9527 ships a Protocol Debugger that records, replays, modifies and sends packets, plus a scrubber that turns captures into test fixtures. Resonance has a CLI deepscan and a test mode that changes each setting and restores it. hush has a raw-frame command behind an allow-list. sony-ult-ctl has a live monitor for your exact model.</li>
+      <li><strong>The capability handshake.</strong> Command <code>06</code> on both tables returns <code>07 00 &lt;n&gt; (&lt;function&gt; &lt;priority&gt;)×n</code>. General settings are self-describing: their capability reply carries slot, type, format, name and summary strings such as SIDETONE_SETTING or TAP_SENSITIVITY_SETTING, so a library can enumerate many settings generically.</li>
+    </ul>
+    <p class="src">Sources: <a href="https://github.com/mos9527/SonyHeadphonesClient/blob/v1-compat/tooling/ida/README.md">mos9527 tooling/ida README</a>; <a href="https://github.com/mos9527/SonyHeadphonesClient/blob/v1-compat/tooling/ida/generated/inventory.json">inventory.json</a>; <a href="https://github.com/mos9527/SonyHeadphonesClient/blob/v1-compat/DEVELOPER.md">DEVELOPER.md</a>; <a href="https://github.com/mos9527/SonyHeadphonesClient/blob/v1-compat/tests/README.md">tests README</a>; <a href="https://github.com/andreabedini/overheard">overheard</a>; <a href="https://github.com/marconvcm/sony-device-center/blob/main/libs/sony-protocol/include/sony/protocol/CapabilityDiscovery.h">Device Center CapabilityDiscovery.h</a>; <a href="https://github.com/FireWall-code/Resonance-for-Sound-Connect/blob/main/docs/PROTOCOL.md">Resonance PROTOCOL.md</a>; <a href="https://github.com/FireWall-code/Resonance-for-Sound-Connect/blob/main/LICENSE">Resonance LICENSE</a>; <a href="https://codeberg.org/Freeyourgadget/Gadgetbridge/wiki/BT-Protocol-Reverse-Engineering">Gadgetbridge RE wiki</a>; <a href="https://codeberg.org/Freeyourgadget/Gadgetbridge/src/branch/master/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/sony/headphones/protocol/impl/v2/PayloadTypeV2.java">Gadgetbridge PayloadTypeV2.java</a>; <a href="https://github.com/Plutoberth/SonyHeadphonesClient/pull/36#issuecomment-795633877">Plutoberth PR #36</a>; <a href="https://github.com/AndreasOlofsson/mdr-protocol/blob/master/reverse_engineering.md">mdr-protocol reverse_engineering.md</a>.</p>
+  </div>
+</section>
+
+<section class="col">
+  <h2>Features Sony never gave you</h2>
+  <p>The firmware only answers commands it implements, so there is no secret developer unlock. What exists is larger than Sound Connect shows, in two layers.</p>
+
+  <h3>Layer 1: on the wire, hidden or mis-sent by the app</h3>
+  <ul>
+    <li><strong>Undeclared but answered opcodes.</strong> Resonance found the XM6 answers connection-mode <code>02</code> while declaring only <code>E7</code>, and accepts a Cinema-mode frame it does not declare. hush found the XM6 ambient sub-type that round-trips is <code>0x19</code>, not the one Gadgetbridge sends. Nobody has catalogued this for the ULT WEAR, which is an opening for you.</li>
+    <li><strong>The real EQ layout.</strong> The device self-describes its bands and steps (<code>50 03</code> on your model, <code>5A 00</code> returns centre frequencies on 10-band models). Clients that hard-code Sony's UI layout miss this. On the ULT WEAR, combined EQ plus ULT control exists only in two tiny projects.</li>
+    <li><strong>Codec readout.</strong> Opcodes <code>12/13</code> exist; Device Center shipped with the codec hard-coded to LDAC until someone actually queried it.</li>
+    <li><strong>Action and operation logs.</strong> The device pushes <code>C9</code> action logs unsolicited; the log inquired types include time-series operation logs and sound-dropout notifiers. Your ULT WEAR declares both notifiers. The app consumes these silently.</li>
+    <li><strong>Test and calibration modes.</strong> GET_TEST <code>0x0F</code>, NC test mode start and finish, face-tap test mode, call test sound, earbud-fit detection, head-gesture training, reset types. Sound Connect surfaces these only contextually.</li>
+    <li><strong>Paired-device management over table 2.</strong> List remembered devices (<code>36 02</code>), connect, disconnect or forget (<code>3C 02</code>), switch audio source (<code>3C 01</code>), enter pairing mode (<code>34 02</code>). A full multipoint broker the desktop ecosystem mostly lacks.</li>
+    <li><strong>Power inquired types</strong> beyond battery: caring charge, stamina, Bluetooth standby, battery safe mode. Which of these your model answers is untested.</li>
+    <li><strong>Specific to your ULT WEAR, declared and unimplemented by every desktop client:</strong> Adaptive Sound Control (AUTO_NCASM 0x70), NC/AMB button cycle configuration, Quick Access app assignment, Safe Listening (table 2, 0x50), voice assistant selection and voice-guide volume, general settings 1 to 3 (touch panel, service link and more; payloads only in Gadgetbridge's Java), LDAC connection-mode switching (0xE3), DSEE auto-off (0xE2), factory reset. Gadgetbridge on Android has several of these, so the byte layouts are knowable.</li>
+  </ul>
+
+  <h3>Layer 2: host-side logic the phone app brands as features</h3>
+  <p>Gadgetbridge's maintainer lists adaptive sound control, scene-based listening, auto-switch multipoint and Sound AR as "app-dependent": the phone detects activity or location and pushes an ordinary NC/ambient opcode. A desktop broker can do the same with the foreground app, time, location or audio focus as inputs. Nothing shipped does this yet.</p>
+  <ul>
+    <li>CLI, global hotkeys and automation: the most-reacted open request on mos9527. hush and overheard ship CLIs that talk to a daemon over a socket.</li>
+    <li>Native OS battery: overheard feeds battery to BlueZ's BatteryProvider1 so the desktop shows it like any device, plus low-battery notifications. Battery history is a trivial extension.</li>
+    <li>A connection broker: the headphones take one control connection, so the GUI, daemon, hotkey tool and phone app all compete. Device Center lists an ownership broker as unpaid technical debt. Every mature client converged on a daemon for this reason.</li>
+    <li>Scenes and per-app ambient, automatic multipoint switching on audio focus, pairing-mode hold-off so auto-reconnect does not race the user.</li>
+  </ul>
+
+  <h3>Out of reach, or a different project</h3>
+  <ul>
+    <li><strong>Firmware and voice packs</strong> are not Sony MDR at all. The MDR channel only toggles update mode; the transfer is Airoha RACE/FOTA over a second RFCOMM channel (UUID <code>8901dfa8-…</code>) or BLE GATT. The container format is parsed, official images are mirrored, per-model AES keys have been recovered from flash dumps, custom voice packs are PC-installable on the XM4, and downgrades are device-verified. Nobody runs non-Sony-signed firmware because of the integrity gate. ERNW's 2025 disclosure (CVE-2025-20700 to 20702) lists the ULT WEAR among affected Airoha devices. This is feasible but model-specific, riskier, and a second transport.</li>
+    <li><strong>Battery cycle count</strong> was not found as an opcode anywhere.</li>
+    <li><strong>LDAC on Windows and macOS</strong> is a host-stack limit no control app can fix. Linux via PipeWire can switch codecs, which pats01 verified on the ULT WEAR.</li>
+    <li><strong>Speak-to-Chat, Find Your Headphones</strong>: not features of this model.</li>
+  </ul>
+
+  <div class="note danger">
+    <h3>Safety rules every mature project converged on</h3>
+    <ul>
+      <li>Gate every write behind the model's declared capability from the <code>06/07</code> handshake, and honour "blocked" status codes before a SET. mos9527 issue #76 documents an XM6 crash-and-reboot from setting a mode the device reported as blocked. Recoverable, but real.</li>
+      <li>Keep a hard deny-list for destructive opcodes, as hush does: <code>F8</code> factory reset (on v2; on v1 the same byte is a harmless auto-power-off setting), <code>98</code> reboot, <code>24</code> power off, <code>2D</code> firmware transfer, <code>C4</code> JSON dump.</li>
+      <li>Read-modify-write EQ frames. One malformed EQ SET corrupted the custom slot on a ULT WEAR.</li>
+      <li>Treat any Airoha RACE flash write as high-risk and confine it to the device-reported FOTA partition. Stray writes are known to brick devices.</li>
+    </ul>
+  </div>
+  <p class="src">Sources: <a href="https://github.com/FireWall-code/Resonance-for-Sound-Connect/blob/main/docs/PROTOCOL.md">Resonance PROTOCOL.md</a>; <a href="https://github.com/ismoilovdevml/hush">hush README</a>; <a href="https://github.com/marconvcm/sony-device-center/issues/13">Device Center #13</a>; <a href="https://github.com/mos9527/SonyHeadphonesClient/blob/v1-compat/libmdr/include/mdr/Generated/ProtocolV2T1.hpp">libmdr ProtocolV2T1.hpp</a>; <a href="https://codeberg.org/Freeyourgadget/Gadgetbridge/issues/5934">Gadgetbridge #5934</a>; <a href="https://github.com/mos9527/SonyHeadphonesClient/issues/15">mos9527 #15</a>; <a href="https://github.com/mos9527/SonyHeadphonesClient/issues/76">mos9527 #76</a>; <a href="https://github.com/marconvcm/sony-device-center/blob/main/docs/technical-debt.md">Device Center technical-debt.md</a>; <a href="https://github.com/aaron-p1/fix-whxm4-voice">fix-whxm4-voice</a>; <a href="https://github.com/HelgeSverre/sony-vp-extract/blob/main/docs/WRITEUP.md">sony-vp-extract WRITEUP</a>; <a href="https://github.com/ramikg/airoha-firmware-parser">airoha-firmware-parser</a>; <a href="https://github.com/lzghzr/MDR_Proxy">MDR_Proxy</a>; <a href="https://github.com/randwardatake/wh1000xm4-anc-optimizer">wh1000xm4-anc-optimizer</a>; <a href="https://insinuator.net/2025/12/bluetooth-headphone-jacking-full-disclosure-of-airoha-race-vulnerabilities">ERNW disclosure</a>; <a href="https://github.com/mos9527/SonyHeadphonesClient/discussions/45">mos9527 discussion #45</a>.</p>
+</section>
+
+<section class="col">
+  <h2>Protocol and platform facts that shape the design</h2>
+  <dl class="facts">
+    <dt>No official SDK</dt>
+    <dd>Sony's support article says "There is no PC app available". The only public Sony API covers networked home audio over HTTP. Every project calls the headphone protocol unpublished.</dd>
+    <dt>One shared framer</dt>
+    <dd>Same wire format across generations, 8-bit sum checksum, stop-and-wait ARQ with one frame in flight. Every data frame must be acknowledged with the flipped sequence number or the device retransmits forever.</dd>
+    <dt>v1 vs v2</dt>
+    <dd>A different SDP UUID and a largely different opcode table, not a different protocol. Gadgetbridge detects the version from the init reply length. Opcode <code>0x22</code> means POWER_OFF in v1 and BATTERY in v2, which caused a real SonyBridge bug. Your ULT WEAR is v2 only.</dd>
+    <dt>Per-model quirks</dt>
+    <dd>Live inside v2, which is why runtime capability discovery beats static tables.</dd>
+    <dt>One connection</dt>
+    <dd>One control client at a time. The RFCOMM channel varies per model (18 on your unit, 9 and 15 elsewhere) and must come from SDP or a UUID connect.</dd>
+  </dl>
+<pre><code>0x3E | type | seq | len (u32 BE) | payload | checksum | 0x3C
+
+escape:   0x3C, 0x3D, 0x3E in the body  ->  0x3D, (b &amp; 0xEF)     (bites on e.g. EQ value 0x3E80)
+checksum: 8-bit sum, excluding the 0x3E header
+types:    ACK = 0x01   COMMAND_1 = 0x0C   COMMAND_2 = 0x0E
+init:     COMMAND_1 "00 00"  ->  reply length 4 = v1, 8 = v2
+
+v1 UUID:  96CC203E-5068-46ad-B32D-E316F5E069BA   (XM2/XM3/XM4, WF-1000XM3, XB900N and earlier)
+v2 UUID:  956C7B26-D49A-4BA8-B03F-B17D393CB6E2   (WF-1000XM4 and WH-1000XM5 onward, ULT WEAR, CH720N, LinkBuds, WF-C)</code></pre>
+  <h3>Transports must be native</h3>
+  <ul>
+    <li><strong>Windows:</strong> Winsock <code>AF_BTH</code>/<code>BTHPROTO_RFCOMM</code> with <code>serviceClassId</code> set, so the system resolves the channel with no SDP query and no manifest capability. WinRT's RfcommDeviceService only for packaged Store apps.</li>
+    <li><strong>macOS:</strong> IOBluetooth RFCOMM. Not thread-safe, delegates on the main run loop, which pushes toward a Swift or ObjC transport under a C++ or Rust core. All surveyed Mac apps ship outside the App Store.</li>
+    <li><strong>Linux:</strong> BlueZ RFCOMM sockets or the D-Bus Profile API; the <code>bluer</code> crate for Rust.</li>
+    <li><strong>Generic wrappers</strong> (32feet.NET, Dart bluetooth_rfcomm, Node bluetooth-serial-port) are unproven on Sony devices and lack reliable SDP on Linux. Every surveyed client wrote its own three backends. Web Serial works as a transport in Chrome 89+ and Firefox 151+.</li>
+  </ul>
+  <h3>Legal posture</h3>
+  <p>No project reports any action from Sony in more than five years and Plutoberth archived voluntarily. The shared stance: author from binaries you are authorized to use, publish derived facts and IR rather than Sony's code or assets, describe "bytes on the wire", disclaim affiliation, and keep "Sony" and "Sound Connect" out of the product name. No project has a lawyer-reviewed analysis of the Sound Connect terms or DMCA section 1201.</p>
+  <p class="src">Sources: <a href="https://www.sony.ca/en/electronics/support/software/00269130">Sony support 00269130</a>; <a href="https://codeberg.org/Freeyourgadget/Gadgetbridge/raw/branch/master/app/src/main/java/nodomain/freeyourgadget/gadgetbridge/service/devices/sony/headphones/protocol/Message.java">Gadgetbridge Message.java</a>; <a href="https://learn.microsoft.com/en-us/windows/win32/bluetooth/bluetooth-and-connect">Win32 Bluetooth connect</a>; <a href="https://docs.rs/bluer">bluer</a>; <a href="https://github.com/inthehand/32feet/wiki">32feet wiki</a>; <a href="https://www.soundguys.com/sony-bluetooth-headphone-control-mac-os-160060/">SoundGuys on macOS</a>; <a href="https://github.com/mos9527/SonyHeadphonesClient/blob/v1-compat/tooling/ida/README.md">mos9527 tooling README</a>; <a href="https://github.com/FireWall-code/Resonance-for-Sound-Connect/blob/main/CONTRIBUTING.md">Resonance CONTRIBUTING</a>.</p>
+</section>
+
+<section class="col">
+  <h2>A concrete starting plan for the ULT WEAR</h2>
+  <ol class="plan">
+    <li><div><strong>Vendor libmdr and its generated IR.</strong> Take a snapshot of mos9527's <code>libmdr</code>, <code>libmdr-bt</code> and <code>tooling/ida/generated/*.json</code> under MIT. Decide now whether your core stays C++ with a C ABI or you port the tables into a Rust workspace shaped like overheard.</div></li>
+    <li><div><strong>Capture a baseline session from your own unit.</strong> Run mos9527's Protocol Debugger with recording on, or sony-ult-ctl's monitor, against your WH-ULT900N. Scrub it into a fixture. This gives you replay tests for a model mos9527 has no fixtures for.</div></li>
+    <li><div><strong>Build a conformance suite from published bytes.</strong> owaiskaifi's verified frames, sony-ult-ctl's NCASM and ULT frames, and SonyBridge's golden multipoint fixture cover handshake, battery, NC/ambient, ULT, volume and multipoint without a second device.</div></li>
+    <li><div><strong>Resolve the EQ-type dispute on your hardware.</strong> Test whether <code>58 03</code> honours the preset byte or only the ULT byte, and whether <code>58 00</code> is needed for full EQ. Check libmdr's EQ reply parser against <code>57 03</code> and fix it upstream if the third-party claim holds.</div></li>
+    <li><div><strong>Probe what the device answers beyond what it declares.</strong> Walk the generated opcode table with GET-only commands inside a deny-list, log replies, and compare against the 06/07 list. Start with general settings 1 to 3, Adaptive Sound Control, power inquired types, logs and the table 2 peripheral commands. This is the catalogue nobody has made.</div></li>
+    <li><div><strong>Design the daemon first.</strong> One process owns the RFCOMM channel and exposes a socket or D-Bus API; the GUI, CLI, hotkeys and automation are clients. This is what unlocks scenes, per-app ambient and auto-switching, and it is how you hand the channel back to the phone app cleanly.</div></li>
+    <li><div><strong>Ship what nobody ships.</strong> Signed and notarized binaries, a store listing, and a CLI. BudsLink's Flathub numbers show the demand a listing unlocks.</div></li>
+    <li><div><strong>Leave Airoha RACE for a separate module.</strong> Only after the MDR library is solid, and only with the FOTA-partition restriction the voice-pack projects enforce.</div></li>
+  </ol>
+
+  <div class="note">
+    <h3>Limits of this research</h3>
+    <ul>
+      <li>Reddit was unreachable through every route, so community ranking rests on GitHub stats, Homebrew analytics and press coverage.</li>
+      <li>Sony support pages returned 403 and were read through search snippets; firmware dates were cross-checked with kunkoku.jp.</li>
+      <li>Model-support claims come from project READMEs and issues, not independent testing. The ULT WEAR chip identity rests on a blogger's reading of FCC photos.</li>
+      <li>Gadgetbridge's ULT coordinator source could not be fetched directly; its feature list comes from gadgetbridge.org and the merged pull request.</li>
+      <li>No public HCI capture exists for the ULT WEAR. Gadgetbridge's maintainer asked for one in 2024 and none was posted.</li>
+      <li>The claim that libmdr misparses the ULT EQ reply was not verified against current source.</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  Compiled 2026-11-07 from six research passes: the Plutoberth client, alternative desktop clients, the reverse-engineered protocol and libraries, community adoption signals, ULT WEAR support, and extending beyond Sony's app. Raw notes live in the research_notes folder beside this report.
+</footer>
+
+</div>
+</body>
+</html>

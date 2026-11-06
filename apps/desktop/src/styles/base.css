@@ -1,4 +1,6 @@
-/* Base reset and the shared Hairline pieces: rows, boxed switches, ticks, link list. */
+/* Base reset and the shared Hairline pieces: rows, boxed switches, ticks,
+   toggles, link list. Every colour comes from tokens.css. Status rules:
+   .pending striped and inert, .refused orange outline, .unavailable faded. */
 
 * {
   box-sizing: border-box;
@@ -29,11 +31,14 @@ button {
 
 /* No focus ring after a click; keyboard users (body.kbd, set on Tab) get a thin ink ring. */
 button:focus,
-button:focus-visible {
+button:focus-visible,
+a:focus,
+a:focus-visible {
   outline: none;
 }
 
-body.kbd button:focus-visible {
+body.kbd button:focus-visible,
+body.kbd a:focus-visible {
   outline: 1px solid var(--ink);
   outline-offset: 1px;
 }
@@ -108,10 +113,15 @@ body.kbd button:focus-visible {
   color: var(--paper);
 }
 
-.boxes.ult button.on {
+.boxes button.on.orange {
   background: var(--ult);
-  color: var(--ink);
+  color: var(--on-ult);
   font-weight: 500;
+}
+
+.boxes.lg button {
+  padding: 10px 6px;
+  font-size: 12px;
 }
 
 .boxes.pending button.on {
@@ -128,7 +138,8 @@ body.kbd button:focus-visible {
   opacity: 0.35;
 }
 
-.boxes button:disabled {
+.boxes.pending button,
+.boxes.unavailable button {
   cursor: default;
 }
 
@@ -160,8 +171,58 @@ body.kbd button:focus-visible {
   opacity: 0.35;
 }
 
-.ticks button:disabled,
+.ticks.lg button {
+  width: 9px;
+  height: 22px;
+}
+
+.ticks.pending button,
 .ticks.unavailable button {
+  cursor: default;
+}
+
+/* Toggle */
+.toggle {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.toggle::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  background: var(--hair);
+}
+
+.toggle.on::after {
+  left: 18px;
+  background: var(--ink);
+}
+
+.toggle.pending::after {
+  background: repeating-linear-gradient(45deg, var(--ink) 0 3px, var(--stripe) 3px 6px);
+}
+
+.toggle.refused {
+  border-color: var(--ult);
+}
+
+.toggle.unavailable {
+  opacity: 0.35;
+}
+
+.toggle.pending,
+.toggle.unavailable {
   cursor: default;
 }
 

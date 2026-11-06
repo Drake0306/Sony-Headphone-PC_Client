@@ -1,5 +1,6 @@
-// TypeScript mirror of `DeviceState` (crates/mdr-session/src/state.rs) and the
-// mdr-proto types it holds, as serde serialises them (externally tagged enums).
+// TypeScript mirror of `DeviceState` (crates/mdr-session/src/state.rs), the
+// mdr-proto types it holds and the app's `AppSettings`, as serde serialises
+// them (externally tagged enums).
 
 export type Status =
   | "Confirmed"
@@ -78,9 +79,34 @@ export interface DeviceState {
   volume: Tracked<number>;
   multipoint: Tracked<boolean>;
   auto_power_off: Tracked<number>;
+  dsee: Tracked<boolean>;
+  /** True when DSEE Extreme switches itself off automatically. */
+  dsee_auto_off: Tracked<boolean>;
+  connection_mode: Tracked<number>;
+  wear_pause: Tracked<boolean>;
+  voice_assistant: Tracked<number>;
+  quick_access: Tracked<number[]>;
+  /** Voice guide volume, -2..=2. */
+  voice_guide_volume: Tracked<number>;
+  /** Last reported `PlaybackStatus` (0x01 play, 0x02 pause, 0x03 stop); read-only. */
+  playback: number | null;
+  touch_panel: Tracked<boolean>;
+  sidetone: Tracked<boolean>;
   gs: GsSetting[];
   devices: PairedDevice[];
 }
+
+/** `AppSettings` (apps/desktop/src-tauri/src/settings.rs). */
+export type Theme = "paper" | "ink" | "system";
+
+export interface AppSettings {
+  theme: Theme;
+  launch_at_login: boolean;
+  hide_dock_icon: boolean;
+}
+
+/** `AppSettings::default()`. */
+export const defaultSettings = (): AppSettings => ({ theme: "system", launch_at_login: false, hide_dock_icon: true });
 
 const unavailable = <T>(): Tracked<T> => ({ value: null, status: "Unavailable" });
 
@@ -102,6 +128,16 @@ export function emptyState(): DeviceState {
     volume: unavailable(),
     multipoint: unavailable(),
     auto_power_off: unavailable(),
+    dsee: unavailable(),
+    dsee_auto_off: unavailable(),
+    connection_mode: unavailable(),
+    wear_pause: unavailable(),
+    voice_assistant: unavailable(),
+    quick_access: unavailable(),
+    voice_guide_volume: unavailable(),
+    playback: null,
+    touch_panel: unavailable(),
+    sidetone: unavailable(),
     gs: [],
     devices: [],
   };

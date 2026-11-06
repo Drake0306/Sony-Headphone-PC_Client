@@ -38,4 +38,31 @@
   --ult: #ff6600;
   --box: #f8f7f3;
   --stripe: #3a3a36;
+  /* Text on the orange ULT box: dark in both themes. */
+  --on-ult: #161614;
+  color-scheme: light;
+}
+
+/* Ink: paper and ink swap; Forest Gray and orange stay. Chosen explicitly,
+   or by "System" (no data-theme) when the system appearance is dark. */
+:root[data-theme="ink"] {
+  --paper: #161614;
+  --ink: #efede6;
+  --hair: #3a3a36;
+  --muted: #9a9a92;
+  --box: #1f1f1d;
+  --stripe: #9a9a92;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="paper"]) {
+    --paper: #161614;
+    --ink: #efede6;
+    --hair: #3a3a36;
+    --muted: #9a9a92;
+    --box: #1f1f1d;
+    --stripe: #9a9a92;
+    color-scheme: dark;
+  }
 }

@@ -158,6 +158,14 @@ pub fn connect(address: &str) -> io::Result<Box<dyn Transport>> {
             device.openRFCOMMChannelSync_withChannelID_delegate(Some(&mut channel), channel_id, Some(delegate_obj))
         };
         if ret != 0 {
+            if let Some(channel) = channel {
+                // SAFETY: the channel holds the delegate unretained; detach it before
+                // `delegate` is released at the end of this closure.
+                unsafe {
+                    channel.setDelegate(None);
+                    channel.closeChannel();
+                }
+            }
             return Err(io_err("openRFCOMMChannelSync", ret));
         }
         let channel = channel.ok_or_else(|| io::Error::other("openRFCOMMChannelSync returned no channel"))?;
@@ -182,11 +190,19 @@ impl Transport for MacTransport {
         let link = self.link.as_ref().filter(|_| !self.closed).ok_or_else(broken_pipe)?;
         on_main(|| {
             let channel = &link.0 .0;
+            // SAFETY: state query on the main queue.
+            if !unsafe { channel.isOpen() } {
+                return Err(broken_pipe());
+            }
             for chunk in bytes.chunks(WRITE_CHUNK) {
                 let mut buf = chunk.to_vec();
                 // SAFETY: `buf` is valid for `len` bytes for the duration of the call; len <= 512.
                 let ret = unsafe { channel.writeSync_length(buf.as_mut_ptr().cast(), buf.len() as u16) };
                 if ret != 0 {
+                    // A write that fails because the remote closed is link loss.
+                    if !unsafe { channel.isOpen() } {
+                        return Err(broken_pipe());
+                    }
                     return Err(io_err("writeSync", ret));
                 }
             }
@@ -216,8 +232,13 @@ impl Transport for MacTransport {
         self.closed = true;
         if let Some(link) = self.link.take() {
             on_main(move || {
-                // SAFETY: closing an open channel on the main queue; the link is released here.
-                unsafe { link.0 .0.closeChannel() };
+                let (channel, _delegate) = &link.0;
+                // SAFETY: on the main queue. The channel holds the delegate unretained,
+                // so detach it before the link (and the delegate) is released here.
+                unsafe {
+                    channel.setDelegate(None);
+                    channel.closeChannel();
+                }
                 drop(link);
             });
         }

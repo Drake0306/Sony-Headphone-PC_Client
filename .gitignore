@@ -13,3 +13,5 @@ src-tauri/gen/schemas/
 .idea/
 # Local captures (may contain device addresses)
 captures/local/
+# SDD scratch
+.superpowers/

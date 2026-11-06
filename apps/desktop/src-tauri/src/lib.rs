@@ -6,6 +6,7 @@ mod commands;
 pub mod dock;
 pub mod frame_log;
 mod popover;
+pub mod scenes;
 pub mod settings;
 mod tray;
 

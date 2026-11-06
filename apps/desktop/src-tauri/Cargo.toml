@@ -18,6 +18,8 @@ mdr-session = { path = "../../../crates/mdr-session" }
 mdr-transport = { path = "../../../crates/mdr-transport" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+log = "0.4"
 tauri = { version = "2.12", features = ["tray-icon", "image-png", "macos-private-api"] }
 tauri-plugin-positioner = { version = "2.4", features = ["tray-icon"] }
 tauri-plugin-autostart = "2"

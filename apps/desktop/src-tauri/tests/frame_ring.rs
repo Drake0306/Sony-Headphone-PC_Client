@@ -57,3 +57,35 @@ fn sent_frames_carry_their_table() {
     assert_eq!(snap[0].dir, FrameDir::Sent);
     assert_eq!(snap[0].table, Some(Table::T2));
 }
+
+#[test]
+fn a_burst_of_frames_is_emitted_at_most_every_200_ms() {
+    use hairline_lib::frame_ring::{FrameTap, Recorder, FRAMES_EVERY_MS};
+    use std::cell::RefCell;
+    use std::path::Path;
+
+    let emits: RefCell<Vec<usize>> = RefCell::new(Vec::new());
+    let dir = std::env::temp_dir().join(format!("hairline-throttle-{}", std::process::id()));
+    let mut tap = FrameTap::new(
+        dir,
+        Recorder::default(),
+        Box::new(|frames: &[FrameEntry]| emits.borrow_mut().push(frames.len())),
+        Box::new(|_: Option<&Path>| {}),
+    );
+    tap.watch(true);
+    emits.borrow_mut().clear();
+    // 50 frames within 100 ms, flushed after each as the broker loop does.
+    for i in 0..50u64 {
+        let t = i * 2;
+        tap.sent(t, &[0x3E, 0x0C, 0x00, 0x3C]);
+        tap.flush(t);
+    }
+    // Pending, not dropped: the next flush once the gap has passed emits it.
+    tap.flush(FRAMES_EVERY_MS - 1);
+    assert_eq!(emits.borrow().len(), 1);
+    tap.flush(FRAMES_EVERY_MS);
+    tap.flush(FRAMES_EVERY_MS + 500);
+    let emits = emits.borrow();
+    assert!(emits.len() <= 2, "{emits:?}");
+    assert_eq!(emits.last(), Some(&50));
+}

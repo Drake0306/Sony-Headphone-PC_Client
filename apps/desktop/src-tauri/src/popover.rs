@@ -10,7 +10,8 @@ use crate::dock::{self, ActivationPolicyKind};
 use crate::settings::AppSettings;
 
 const LABEL: &str = "popover";
-const MAIN: &str = "main";
+/// The main window's label.
+pub(crate) const MAIN: &str = "main";
 /// A tray click right after a focus-loss hide is the same click; don't reopen.
 const REOPEN_GUARD: Duration = Duration::from_millis(300);
 

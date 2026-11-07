@@ -461,7 +461,7 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
             host.tick(clock(), session.state().connected);
         }
         if let Some(tap) = frames.as_deref_mut() {
-            tap.flush();
+            tap.flush(clock());
         }
         if gave_up {
             end_probe(&mut probe, &mut session);
@@ -593,7 +593,8 @@ pub fn spawn_broker(
                 frame_log::default_dir(),
                 recorder,
                 Box::new(|frames: &[FrameEntry]| {
-                    let _ = app.emit("frames", frames);
+                    // Only the main window shows frames; the popover never gets them.
+                    let _ = app.emit_to(crate::popover::MAIN, "frames", frames);
                 }),
                 Box::new(|path: Option<&Path>| {
                     let _ = app.emit("recording", RecordingEvent::new(path));
@@ -640,6 +641,7 @@ pub fn spawn_broker(
                     }
                     Err(e) => Err(e),
                 };
+                tap.flush_pending();
                 let next = match result {
                     Ok(()) => wait_for_connect(&rx, None, &mut host, &mut tap, &probe),
                     Err(e) => {

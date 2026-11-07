@@ -18,6 +18,8 @@ const FRAME_START: u8 = 0x3E;
 const FRAME_END: u8 = 0x3C;
 /// Received bytes without a frame end are flushed as one entry past this size.
 const MAX_PARTIAL: usize = 4096;
+/// Shortest gap, in ms, between two `"frames"` emits while frames keep coming.
+pub const FRAMES_EVERY_MS: u64 = 200;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum FrameDir {
@@ -167,6 +169,8 @@ pub struct FrameTap<'a> {
     watching: bool,
     /// A frame arrived since the last `"frames"` emit.
     dirty: bool,
+    /// When `flush` last emitted, on the broker's clock.
+    last_emit_ms: Option<u64>,
     emit_frames: EmitFrames<'a>,
     emit_recording: EmitRecording<'a>,
 }
@@ -184,6 +188,7 @@ impl<'a> FrameTap<'a> {
             log_dir,
             watching: false,
             dirty: false,
+            last_emit_ms: None,
             emit_frames,
             emit_recording,
         }
@@ -238,8 +243,27 @@ impl<'a> FrameTap<'a> {
         }
     }
 
-    /// Emits one snapshot if frames arrived since the last one and the window watches.
-    pub fn flush(&mut self) {
+    /// Emits one snapshot if frames arrived since the last one and the window
+    /// watches, at most every `FRAMES_EVERY_MS`: frames that arrive sooner stay
+    /// pending for a later call. The broker calls this every loop (10 ms).
+    pub fn flush(&mut self, now_ms: u64) {
+        if !self.watching {
+            self.dirty = false;
+            return;
+        }
+        let due = self
+            .last_emit_ms
+            .is_none_or(|t| now_ms >= t + FRAMES_EVERY_MS);
+        if self.dirty && due {
+            (self.emit_frames)(&self.ring.snapshot());
+            self.dirty = false;
+            self.last_emit_ms = Some(now_ms);
+        }
+    }
+
+    /// Emits any pending snapshot now, ignoring the throttle (the link ended,
+    /// so no further `flush` is coming).
+    pub fn flush_pending(&mut self) {
         if self.watching && self.dirty {
             (self.emit_frames)(&self.ring.snapshot());
         }

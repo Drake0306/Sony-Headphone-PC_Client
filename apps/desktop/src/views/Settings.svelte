@@ -85,6 +85,7 @@
   const login = control<boolean>(appSource("launch_at_login"));
   const dock = control<boolean>(appSource("hide_dock_icon"));
   const theme = control<Theme>(appSource("theme"));
+  const advanced = control<boolean>(appSource("show_advanced"));
 
   function save<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
     const cur = $settings;
@@ -219,8 +220,13 @@
             onpick={(t) => theme.request(t, () => save("theme", t))}
           />
         </Row>
-        <Row label="Advanced" note="Phase 4">
-          <button class="btn unavailable" aria-disabled="true" tabindex="-1">Open…</button>
+        <Row label="Advanced panel" note="Frame log, capability list, raw commands">
+          <Toggle
+            on={advanced.shown}
+            status={advanced.status}
+            label="Advanced panel"
+            onpick={(on) => advanced.request(on, () => save("show_advanced", on))}
+          />
         </Row>
       </div>
       <div class="block">

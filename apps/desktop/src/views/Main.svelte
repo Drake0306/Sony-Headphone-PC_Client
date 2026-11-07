@@ -5,7 +5,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { getRuntimeInfo, onNavigate, OPEN_TAB_KEY, watchState } from "../lib/ipc";
+  import { settings } from "../lib/settings";
   import { emptyState, statusLabel, type DeviceState } from "../lib/state";
+  import Advanced from "./Advanced.svelte";
   import Devices from "./Devices.svelte";
   import Noise from "./Noise.svelte";
   import Overview from "./Overview.svelte";
@@ -20,10 +22,13 @@
     { id: "devices", label: "Devices" },
     { id: "scenes", label: "Scenes" },
     { id: "settings", label: "Settings" },
+    { id: "advanced", label: "Advanced" },
   ] as const;
   type Tab = (typeof TABS)[number]["id"];
 
-  const tabFromHash = (): Tab => TABS.find((t) => `#${t.id}` === location.hash)?.id ?? "overview";
+  // Advanced is listed (last) only while Settings enables it.
+  const tabs = $derived(TABS.filter((t) => t.id !== "advanced" || $settings?.show_advanced === true));
+  const hashTab = (): Tab => TABS.find((t) => `#${t.id}` === location.hash)?.id ?? "overview";
 
   // The popover asks for a tab with the "navigate" event, and leaves it in
   // localStorage for a window it has just created (`openMainWindowOn`).
@@ -46,14 +51,15 @@
     if (id !== null) show(id);
   }
 
-  let tab = $state<Tab>(tabFromHash());
+  let requested = $state<Tab>(hashTab());
+  const tab = $derived<Tab>(tabs.some((t) => t.id === requested) ? requested : "overview");
   let st = $state<DeviceState>(emptyState());
   let fake = $state(false);
 
   const status = $derived(statusLabel(st.connected, st.firmware, fake));
 
   onMount(() => {
-    const onHash = () => (tab = tabFromHash());
+    const onHash = () => (requested = hashTab());
     window.addEventListener("hashchange", onHash);
     takeRequestedTab();
     const unlisten = onNavigate(show);
@@ -71,7 +77,7 @@
 
 <div class="win">
   <nav class="tabs">
-    {#each TABS as t (t.id)}
+    {#each tabs as t (t.id)}
       <a href={`#${t.id}`} class:on={tab === t.id} aria-current={tab === t.id ? "page" : undefined}>{t.label}</a>
     {/each}
   </nav>
@@ -87,6 +93,8 @@
       <Scenes {st} />
     {:else if tab === "settings"}
       <Settings {st} />
+    {:else if tab === "advanced"}
+      <Advanced {st} />
     {:else}
       <Overview {st} />
     {/if}

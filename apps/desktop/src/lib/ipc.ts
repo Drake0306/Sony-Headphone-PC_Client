@@ -1,7 +1,9 @@
-// Typed wrappers around the Tauri commands and the "state", "settings" and "scenes" events.
+// Typed wrappers around the Tauri commands and the app events ("state",
+// "settings", "scenes", "frames", "recording").
 
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { CapabilityRow, FrameEntry, RecordingEvent } from "./advanced";
 import type { Scene, ScenesEvent } from "./scenes";
 import type { AppSettings, DeviceState, RuntimeInfo } from "./state";
 
@@ -75,6 +77,29 @@ export const applySceneCmd = (id: string) => invoke<void>("apply_scene", { id })
 
 export const onScenes = (handler: (e: ScenesEvent) => void): Promise<UnlistenFn> =>
   listen<ScenesEvent>("scenes", (event) => handler(event.payload));
+
+/** Every declared or proven support function, T1 then T2 (Advanced screen). */
+export const capabilityList = () => invoke<CapabilityRow[]>("capability_list");
+
+/** Streams "frames" snapshots while on; `true` emits one at once. */
+export const watchFrames = (on: boolean) => invoke<null>("watch_frames", { on });
+
+/** Starts or stops the frame recording; the file being written, or null once stopped. */
+export const recordFrames = (on: boolean) => invoke<string | null>("record_frames", { on });
+
+/**
+ * Queues raw bytes on table "t1" or "t2"; rejects with the reason (a non-GET
+ * without `confirm === "SEND"`, a deny-listed payload, malformed hex, or the
+ * Advanced panel switched off). The reply shows in the frame log.
+ */
+export const sendRaw = (table: "t1" | "t2", hex: string, confirm: string) =>
+  invoke<null>("send_raw", { table, hex, confirm });
+
+export const onFrames = (handler: (frames: FrameEntry[]) => void): Promise<UnlistenFn> =>
+  listen<FrameEntry[]>("frames", (event) => handler(event.payload));
+
+export const onRecording = (handler: (e: RecordingEvent) => void): Promise<UnlistenFn> =>
+  listen<RecordingEvent>("recording", (event) => handler(event.payload));
 
 /** Where the popover leaves the tab for a main window it has just created (not listening yet). */
 export const OPEN_TAB_KEY = "hairline.openTab";

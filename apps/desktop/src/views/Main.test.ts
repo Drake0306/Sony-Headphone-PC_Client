@@ -1,0 +1,48 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, waitFor } from "@testing-library/svelte";
+
+const backend = vi.hoisted(() => ({ showAdvanced: false }));
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn(async (cmd: string) => {
+    if (cmd === "get_settings")
+      return { theme: "paper", launch_at_login: false, hide_dock_icon: true, show_advanced: backend.showAdvanced };
+    if (cmd === "get_state") {
+      const { emptyState } = await import("../lib/state");
+      return emptyState();
+    }
+    if (cmd === "runtime_info") return { fake: true, version: "0" };
+    if (cmd === "capability_list") return [];
+    return null;
+  }),
+}));
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn(async () => () => {}),
+  emitTo: vi.fn(async () => {}),
+}));
+
+import Main from "./Main.svelte";
+
+const navLabels = (c: HTMLElement) => [...c.querySelectorAll("nav a")].map((a) => a.textContent);
+
+describe("Main nav", () => {
+  beforeEach(() => {
+    location.hash = "";
+  });
+
+  it("has no Advanced tab while the setting is off", async () => {
+    backend.showAdvanced = false;
+    const r = render(Main);
+    await waitFor(() => expect(navLabels(r.container)).toContain("Settings"));
+    await new Promise((done) => setTimeout(done, 10));
+    expect(navLabels(r.container)).not.toContain("Advanced");
+    r.unmount();
+  });
+
+  it("shows Advanced last when the setting is on", async () => {
+    backend.showAdvanced = true;
+    const r = render(Main);
+    await waitFor(() => expect(navLabels(r.container).at(-1)).toBe("Advanced"));
+    r.unmount();
+  });
+});

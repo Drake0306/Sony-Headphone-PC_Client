@@ -1,0 +1,15 @@
+[package]
+name = "mdr-cli"
+version = "0.1.0"
+description = "hairlinectl: control the running Hairline app from a terminal"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "hairlinectl"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde_json = "1"

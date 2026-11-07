@@ -22,6 +22,9 @@ pub enum Group {
     Playback,
     /// A hand-written debug request: not tracked, its reply is only logged.
     Raw,
+    /// An opcode-probe GET: not tracked and not logged; the probe matches
+    /// its reply on the session's `Event::Payload`.
+    Probe,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

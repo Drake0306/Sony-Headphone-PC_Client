@@ -36,7 +36,9 @@ Phase 2b: Modes (Scenes), described below. It is verified against the fake devic
 
 Phase 3a: Windows transport compiles and is unit-tested on Windows CI; the Windows tray app and hardware validation are next. It has not yet been run against the headphones on Windows.
 
-Next: the Windows tray app, then Linux.
+Phase 4: the Advanced panel, the opcode probe, battery history with a time-left estimate, and a local socket with the `hairlinectl` command-line tool, all described below. It is verified against the fake device and the unit tests; the checklist for the real headphones is section 8 of `docs/hardware-validation.md`.
+
+Next: the advanced equalizer (Phase 5), then the Windows tray app, then Linux. The pipeline is in [the equalizer research](<docs/research/reports/Advanced equalizer research.html>).
 
 The popover is validated on a real WH-ULT900N (firmware 2.1.4) on macOS 27.2; see `docs/hardware-validation.md`. The Phase 2 screens are verified against the fake device and still need a session with the real headphones. Use `--fake-device` (below) to run without headphones; a fake run says `FAKE` in the popover and the window so it is never mistaken for the real thing.
 
@@ -57,6 +59,43 @@ Every 2 seconds the broker thread checks the enabled scenes in list order, and t
 Actions use the existing controls only: noise control, ambient level and voice focus (sent as one request), ULT and an EQ preset (also one request), volume, and DSEE auto or off. "Keep" leaves a setting as it is. A setting the headphones refuse shows on the normal controls like any other refusal. Scenes send nothing new on the wire.
 
 Hotkeys are recorded in the scene editor as Tauri accelerators and registered with the global-shortcut plugin only while Hairline runs. If one conflicts or the OS refuses it, it shows as refused, with the reason, in the editor and in Settings. A scene hotkey needs Ctrl, Alt or Super (or is a lone F1–F24 key), so it cannot take over typing. `⌥⌘N` opens the window when macOS allows the shortcut; Settings shows it refused otherwise.
+
+## Advanced panel
+
+Settings has an "Advanced panel" switch; turning it on adds the Advanced screen. It is off by default and has three parts:
+
+- Capabilities: every function the headphones declare, with its name. A chip says DECLARED (the headphones listed it) or PROVEN (it answered the probe although it was not declared, for this unit).
+- Frame log: the frames going to and from the headphones, live. Record writes them to a file in `~/Library/Logs/com.drake0306.hairline/captures/` (macOS), and Stop ends the file.
+- Raw command: type the bytes in hex and pick the table. A GET is sent directly. Any other opcode needs you to type `SEND` first. The deny-list is absolute: a denied payload is refused even with `SEND`, and there is no reset anywhere in the app. Raw commands need the headphones connected. The note under Send says "Queued; reply shows in the frame log" once the request is queued, or why it was refused.
+
+## Probe
+
+The probe, on the Advanced screen, walks the read-only requests of the protocol to find functions the headphones answer but do not declare. It sends 46 GET opcodes, 441 requests in all, one at a time, waiting 1.5 s for a reply and 150 ms between requests. That is up to about 13 minutes (less when requests are answered). You start it by typing `RUN`, and Stop ends it at any time. It never sends a SET.
+
+Results go to `~/Library/Logs/com.drake0306.hairline/captures/probe-<secs>.json`. A function that answered although the headphones did not declare it becomes "proven" for this unit and is remembered in `devices/<address>.json`. Hairline may then read it, but never changes it. Two reads are left out: reset settings, and the LE Audio identity key (its reply is a pairing secret). The catalogue is in `crates/mdr-proto/src/probe.rs`.
+
+## Battery history
+
+While the headphones are connected, Hairline records the battery level to `battery.jsonl`, next to `settings.json`. The time left comes from a least-squares fit over the current discharge segment. It shows only after at least 30 minutes of discharge and a drop of at least 2 %. A gap of more than 2 hours, or charging, starts a new segment. The estimate is refreshed every 60 seconds. Clear in Settings deletes the history.
+
+## Command line
+
+While Hairline runs, it listens on a local socket, `hairline.sock`, in the app's config directory, next to `settings.json` (on macOS that is the same as the data directory, `~/Library/Application Support/com.drake0306.hairline/`). The protocol is JSON lines, and the commands are state, set, scene, scenes and battery. The socket has no raw, power or probe command. `hairlinectl` (crate `crates/mdr-cli`) talks to it. Install it once, then use it from any terminal:
+
+```
+cargo install --path crates/mdr-cli
+hairlinectl state
+hairlinectl nc ambient --level 12 --voice on
+hairlinectl ult 2
+hairlinectl volume 20
+hairlinectl eq "bass boost"
+hairlinectl scenes
+hairlinectl scene "At the desk"
+hairlinectl battery
+hairlinectl --json state
+```
+
+`state`, `nc`, `ult`, `volume`, `eq`, `scene`, `scenes` and `battery` are the subcommands. `--json` prints the app's raw answer, and `$HAIRLINE_SOCKET` points it at another socket. It exits with 1 when the app is not running or refuses the request. On Windows it prints that it is not supported yet.
 
 ## Run it
 
@@ -86,8 +125,8 @@ cd apps/desktop && pnpm check && pnpm test
 
 ## Debugging
 
-`HAIRLINE_FRAME_LOG=1` writes every frame and session log line to `captures/local/<YYYY-MM-DD-HHMMSS>.log` (time in UTC).
-`HAIRLINE_DEBUG=1` adds the Tauri command `debug_raw(table, hex)` (`table` is `"t1"` or `"t2"`, e.g. `invoke("debug_raw", { table: "t1", hex: "22 00" })`); the deny-list still applies and replies show up in the log.
+`HAIRLINE_FRAME_LOG=1` writes every frame and session log line to `<YYYY-MM-DD-HHMMSS>.log` (time in UTC) in the capture directory: `~/Library/Logs/com.drake0306.hairline/captures/` on macOS, `captures` in the app's `logs` directory under the local data directory on Windows and Linux (for example `%LOCALAPPDATA%\com.drake0306.hairline\logs\captures\`). The probe results and the Record button write there too.
+To record from a running app instead, turn on the Advanced panel and press Record in the frame log. Raw commands are sent from the same screen; the deny-list still applies.
 
 ## Layout
 
@@ -99,11 +138,11 @@ cd apps/desktop && pnpm check && pnpm test
 
 ## Safety
 
-Hairline never sends commands on the deny-list, and it only changes a setting the headphones declare as supported. No Advanced path exists yet: in this phase the deny-list cannot be bypassed, except for power off after the user confirms it. The details are in [docs/protocol-notes.md](docs/protocol-notes.md).
+Hairline never sends commands on the deny-list. The app, the scenes and the socket change a setting only when the headphones declare its function; a function the probe proved (it answered although it was not declared) unlocks reads, never changes. The only way to send a SET for anything else is a raw command in the Advanced panel, which asks you to type `SEND` first and cannot get past the deny-list. The probe sends only GETs, and neither the probe nor the socket can send a raw command. The one exception to the deny-list is power off, after the user confirms it. The details are in [docs/protocol-notes.md](docs/protocol-notes.md).
 
 ## Design
 
-The approved interface is in [docs/research/reports/Hairline design screens.html](<docs/research/reports/Hairline design screens.html>). The full design is in [the spec](docs/superpowers/specs/2026-11-07-ult-wear-desktop-app-design.md).
+The approved interface is in [docs/research/reports/Hairline design screens.html](<docs/research/reports/Hairline design screens.html>). The advanced equalizer plan is in [the research](<docs/research/reports/Advanced equalizer research.html>). The full design is in [the spec](docs/superpowers/specs/2026-11-07-ult-wear-desktop-app-design.md).
 
 ## License
 

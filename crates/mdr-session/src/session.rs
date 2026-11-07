@@ -2,6 +2,7 @@
 //! `poll_output` hands back.
 
 use mdr_frame::{Decoder, Frame, FrameType};
+use mdr_proto::function::{opcode_role, Role};
 use mdr_proto::opcode::{function, t1};
 use mdr_proto::request::{self, Group, Request};
 use mdr_proto::{decode, denied, EqUltState, Message, NcAsmState, Table, UltLevel};
@@ -21,6 +22,12 @@ pub enum Event {
     Connected,
     Disconnected,
     Log(String),
+    /// A data frame from the device, once (retransmits are dropped), whatever
+    /// the session made of it. The probe matches its replies on these.
+    Payload {
+        table: Table,
+        bytes: Vec<u8>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -71,7 +78,7 @@ fn refetch(group: Group) -> Option<Request> {
         Group::QuickAccess => Some(request::quick_access_get()),
         Group::VoiceGuide => Some(request::voice_guide_volume_get()),
         Group::Playback => Some(request::playback_status_get()),
-        Group::Connect | Group::Codec | Group::Power | Group::Raw => None,
+        Group::Connect | Group::Codec | Group::Power | Group::Raw | Group::Probe => None,
     }
 }
 
@@ -295,7 +302,8 @@ impl Session {
             return Err(SessionError::NotConnected);
         }
         let id = function::PRESET_EQ_AND_ULT_MODE;
-        if !self.is_capable(Table::T1, id) {
+        // Read-modify-write ends in a SET, which needs the declared function.
+        if !self.is_capable(Table::T1, id, false) {
             self.state.eq_ult.status = Status::Unavailable;
             return Err(SessionError::Unavailable(id));
         }
@@ -317,7 +325,21 @@ impl Session {
         vec![Event::Disconnected]
     }
 
-    /// Allows requests for a function the device works with but does not declare.
+    /// The request whose frame is on the wire and not yet ACKed: table,
+    /// payload, group. `None` while the next request is still queued.
+    pub fn in_flight(&self) -> Option<(Table, &[u8], Group)> {
+        self.arq.in_flight()
+    }
+
+    /// Drops a queued `Group::Probe` request with exactly this payload
+    /// before it reaches the wire (one already sent cannot be recalled);
+    /// true if one was dropped.
+    pub fn cancel_queued_probe(&mut self, table: Table, payload: &[u8]) -> bool {
+        self.arq.cancel_queued_probe(table, payload)
+    }
+
+    /// Allows GETs for a function the device answers but does not declare.
+    /// Typed SETs still need the function declared.
     pub fn mark_proven(&mut self, table: Table, function: u8) {
         if !self.state.proven.contains(&(table, function)) {
             self.state.proven.push((table, function));
@@ -343,7 +365,15 @@ impl Session {
                 return Err(SessionError::Denied(reason));
             }
         }
-        if let Some(id) = req.capability.filter(|&id| !self.is_capable(req.table, id)) {
+        // A proven (answered but undeclared) function unlocks reads only.
+        let is_get = req
+            .bytes
+            .first()
+            .is_some_and(|&op| opcode_role(req.table, op) == Role::Get);
+        if let Some(id) = req
+            .capability
+            .filter(|&id| !self.is_capable(req.table, id, is_get))
+        {
             if let Some(status) = self.state.status_mut(req.group) {
                 *status = Status::Unavailable;
             }
@@ -371,12 +401,14 @@ impl Session {
         }
     }
 
-    fn is_capable(&self, table: Table, id: u8) -> bool {
+    /// Whether the device declares the function, or, when `proven_ok` (the
+    /// request is a GET), the probe proved it answers.
+    fn is_capable(&self, table: Table, id: u8, proven_ok: bool) -> bool {
         let declared = match table {
             Table::T1 => &self.state.capabilities_t1,
             Table::T2 => &self.state.capabilities_t2,
         };
-        declared.contains(&id) || self.state.proven.contains(&(table, id))
+        declared.contains(&id) || (proven_ok && self.state.proven.contains(&(table, id)))
     }
 
     fn on_frame(&mut self, frame: Frame, events: &mut Vec<Event>) {
@@ -412,6 +444,10 @@ impl Session {
     }
 
     fn dispatch(&mut self, table: Table, payload: &[u8], events: &mut Vec<Event>) {
+        events.push(Event::Payload {
+            table,
+            bytes: payload.to_vec(),
+        });
         if std::mem::take(&mut self.raw_reply_due) {
             events.push(Event::Log(format!("raw reply {table:?} {}", hex(payload))));
         }

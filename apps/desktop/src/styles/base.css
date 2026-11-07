@@ -257,6 +257,29 @@ body.kbd a:focus-visible {
   border-bottom: none;
 }
 
+/* Text field (scene name, times, raw hex): mono, boxed, ink ring when focused. */
+.field {
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: var(--box);
+  color: var(--ink);
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  padding: 5px 6px;
+  outline: none;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.field::placeholder {
+  color: var(--muted);
+}
+
+.field:focus-visible {
+  outline: 1px solid var(--ink);
+  outline-offset: 1px;
+}
+
 .btn {
   border: 1px solid var(--ink);
   border-radius: 0;

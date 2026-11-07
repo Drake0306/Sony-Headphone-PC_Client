@@ -1,7 +1,10 @@
-// Typed wrappers around the Tauri commands and the "state", "settings" and "scenes" events.
+// Typed wrappers around the Tauri commands and the app events ("state",
+// "settings", "scenes", "frames", "recording", "raw", "battery").
 
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { BatteryEstimate } from "./battery";
+import type { CapabilityRow, FrameEntry, ProbeEvent, RawEvent, RecordingEvent } from "./advanced";
 import type { Scene, ScenesEvent } from "./scenes";
 import type { AppSettings, DeviceState, RuntimeInfo } from "./state";
 
@@ -75,6 +78,57 @@ export const applySceneCmd = (id: string) => invoke<void>("apply_scene", { id })
 
 export const onScenes = (handler: (e: ScenesEvent) => void): Promise<UnlistenFn> =>
   listen<ScenesEvent>("scenes", (event) => handler(event.payload));
+
+/** Every declared or proven support function, T1 then T2 (Advanced screen). */
+export const capabilityList = () => invoke<CapabilityRow[]>("capability_list");
+
+/** Streams "frames" snapshots while on; `true` emits one at once. */
+export const watchFrames = (on: boolean) => invoke<null>("watch_frames", { on });
+
+/** Starts or stops the frame recording; the file being written, or null once stopped. */
+export const recordFrames = (on: boolean) => invoke<string | null>("record_frames", { on });
+
+/**
+ * Hands raw bytes on table "t1" or "t2" to the broker; rejects with the
+ * reason (a non-GET without `confirm === "SEND"`, a deny-listed payload,
+ * malformed hex, not connected, or the Advanced panel switched off). The
+ * "raw" event then says whether the session queued it; the reply shows in
+ * the frame log.
+ */
+export const sendRaw = (table: "t1" | "t2", hex: string, confirm: string) =>
+  invoke<null>("send_raw", { table, hex, confirm });
+
+/** What the broker did with a raw request: queued, or refused and why. */
+export const onRaw = (handler: (e: RawEvent) => void): Promise<UnlistenFn> =>
+  listen<RawEvent>("raw", (event) => handler(event.payload));
+
+export const onFrames = (handler: (frames: FrameEntry[]) => void): Promise<UnlistenFn> =>
+  listen<FrameEntry[]>("frames", (event) => handler(event.payload));
+
+/**
+ * Starts the opcode probe; rejects unless the Advanced panel is on, the
+ * headphones are connected and `confirm === "RUN"`. Progress and results
+ * arrive as "probe" events.
+ */
+export const probeStart = (confirm: string) => invoke<null>("probe_start", { confirm });
+
+/** Stops the probe; the results so far are kept and emitted. */
+export const probeStop = () => invoke<null>("probe_stop");
+
+export const onProbe = (handler: (e: ProbeEvent) => void): Promise<UnlistenFn> =>
+  listen<ProbeEvent>("probe", (event) => handler(event.payload));
+
+/** The battery history's time-left estimate now; later ones arrive as "battery" events. */
+export const batteryEstimate = () => invoke<BatteryEstimate>("battery_estimate");
+
+/** Deletes the battery history; a "battery" event with the empty estimate follows. */
+export const clearBatteryHistory = () => invoke<null>("clear_battery_history");
+
+export const onBattery = (handler: (e: BatteryEstimate) => void): Promise<UnlistenFn> =>
+  listen<BatteryEstimate>("battery", (event) => handler(event.payload));
+
+export const onRecording = (handler: (e: RecordingEvent) => void): Promise<UnlistenFn> =>
+  listen<RecordingEvent>("recording", (event) => handler(event.payload));
 
 /** Where the popover leaves the tab for a main window it has just created (not listening yet). */
 export const OPEN_TAB_KEY = "hairline.openTab";

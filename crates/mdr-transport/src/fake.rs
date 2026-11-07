@@ -2,6 +2,7 @@
 
 use std::collections::VecDeque;
 use std::io;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use mdr_frame::{ack_for, encode, Decoder, Frame, FrameType};
@@ -107,6 +108,10 @@ fn echo(req: &[u8]) -> Vec<u8> {
     r
 }
 
+/// Every data frame the fake received, as (type, payload), shared so a test
+/// can read it after the fake has been handed to a broker.
+pub type ReceivedLog = Arc<Mutex<Vec<(FrameType, Vec<u8>)>>>;
+
 /// A data frame of the fake's own, sent stop-and-wait.
 #[derive(Debug)]
 struct InFlight {
@@ -131,6 +136,13 @@ pub struct FakeDevice {
     battery_sent: bool,
     received: usize,
     drop_after: Option<usize>,
+    /// Extra scripted replies: (type, request prefix, reply).
+    extra: Vec<(FrameType, Vec<u8>, Vec<u8>)>,
+    /// Requests whose ACK is held back: (request prefix, delay).
+    ack_delays: Vec<(Vec<u8>, Duration)>,
+    /// ACKs held back until their time.
+    held_acks: Vec<(Instant, Vec<u8>)>,
+    log: ReceivedLog,
 }
 
 impl FakeDevice {
@@ -147,6 +159,10 @@ impl FakeDevice {
             battery_sent: false,
             received: 0,
             drop_after: None,
+            extra: Vec::new(),
+            ack_delays: Vec::new(),
+            held_acks: Vec::new(),
+            log: ReceivedLog::default(),
         }
     }
 
@@ -159,6 +175,24 @@ impl FakeDevice {
     /// without that feature would.
     pub fn without_capability(&mut self, id: u8) {
         self.t1_caps.retain(|&c| c != id);
+    }
+
+    /// Answers requests of `frame_type` starting with `request` with
+    /// `reply`, ahead of the built-in script.
+    pub fn answer(&mut self, frame_type: FrameType, request: &[u8], reply: &[u8]) {
+        self.extra
+            .push((frame_type, request.to_vec(), reply.to_vec()));
+    }
+
+    /// Holds back the ACK for requests starting with `request` by `delay`
+    /// (a slow device keeps the host's one frame in flight that long).
+    pub fn delay_ack(&mut self, request: &[u8], delay: Duration) {
+        self.ack_delays.push((request.to_vec(), delay));
+    }
+
+    /// The shared log of data frames received from here on.
+    pub fn received_log(&self) -> ReceivedLog {
+        Arc::clone(&self.log)
     }
 
     /// Breaks the link once `n_frames` incoming frames have been received.
@@ -178,14 +212,29 @@ impl FakeDevice {
                 }
             }
             FrameType::Command1 | FrameType::Command2 => {
-                self.acks.push_back(encode(&ack_for(frame.seq)));
+                let ack = encode(&ack_for(frame.seq));
+                match self
+                    .ack_delays
+                    .iter()
+                    .find(|(req, _)| frame.payload.starts_with(req))
+                {
+                    Some((_, delay)) => self.held_acks.push((Instant::now() + *delay, ack)),
+                    None => self.acks.push_back(ack),
+                }
+                if let Ok(mut log) = self.log.lock() {
+                    log.push((frame.frame_type, frame.payload.clone()));
+                }
+                let scripted = self
+                    .extra
+                    .iter()
+                    .find(|(t, req, _)| *t == frame.frame_type && frame.payload.starts_with(req))
+                    .map(|(_, _, r)| r.clone());
                 let silenced = frame
                     .payload
                     .first()
                     .is_some_and(|op| self.silent.contains(op));
-                if let Some(r) =
-                    reply(frame.frame_type, &frame.payload, &self.t1_caps).filter(|_| !silenced)
-                {
+                let r = scripted.or_else(|| reply(frame.frame_type, &frame.payload, &self.t1_caps));
+                if let Some(r) = r.filter(|_| !silenced) {
                     self.data.push_back((frame.frame_type, r));
                 }
             }
@@ -206,6 +255,12 @@ impl FakeDevice {
 
     /// Next frame to send: ACKs first, then a data frame once the previous one is ACKed.
     fn next_outgoing(&mut self) -> Option<Vec<u8>> {
+        let now = Instant::now();
+        let (due, held): (Vec<_>, Vec<_>) = std::mem::take(&mut self.held_acks)
+            .into_iter()
+            .partition(|(at, _)| *at <= now);
+        self.held_acks = held;
+        self.acks.extend(due.into_iter().map(|(_, ack)| ack));
         if let Some(ack) = self.acks.pop_front() {
             return Some(ack);
         }

@@ -6,9 +6,10 @@ use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use hairline_lib::broker::{
-    is_playing, next_backoff, parse_raw, run_broker, run_broker_logged, BrokerCmd,
+    is_playing, next_backoff, parse_raw, run_broker, run_broker_logged, BrokerCmd, BrokerContext,
 };
-use hairline_lib::frame_log::{file_name, FrameLog};
+use hairline_lib::frame_log::file_name;
+use hairline_lib::frame_ring::{FrameTap, Recorder};
 use mdr_proto::Table;
 use mdr_proto::UltLevel;
 use mdr_session::{DeviceState, Status};
@@ -135,6 +136,7 @@ fn raw_command_parses_table_and_hex() {
     let want = Ok(BrokerCmd::Raw {
         table: Table::T1,
         bytes: vec![0x22, 0x00],
+        confirmed_set: false,
     });
     assert_eq!(parse_raw("t1", "22 00"), want);
     assert_eq!(parse_raw("T1", "2200"), want);
@@ -143,6 +145,7 @@ fn raw_command_parses_table_and_hex() {
         Ok(BrokerCmd::Raw {
             table: Table::T2,
             bytes: vec![0x06, 0x00],
+            confirmed_set: false,
         })
     );
     assert!(parse_raw("t3", "22 00").is_err());
@@ -158,28 +161,70 @@ fn frame_log_file_is_named_by_utc_time() {
 }
 
 #[test]
+fn captures_go_under_the_log_dir_else_the_config_dir() {
+    use hairline_lib::frame_log::capture_dir;
+    use std::path::PathBuf;
+    let log = PathBuf::from("/logs/app");
+    let config = PathBuf::from("/config/app");
+    assert_eq!(
+        capture_dir(Some(log.clone()), Some(config.clone())),
+        log.join("captures")
+    );
+    assert_eq!(
+        capture_dir(None, Some(config.clone())),
+        config.join("captures")
+    );
+    assert!(capture_dir(None, None).ends_with("captures"));
+}
+
+#[test]
+fn recording_from_the_tap_writes_into_its_capture_dir() {
+    // `HAIRLINE_FRAME_LOG=1` and the Record button both go through `record`.
+    let dir = std::env::temp_dir()
+        .join(format!("hairline-capture-dir-{}", std::process::id()))
+        .join("captures");
+    let recorder = Recorder::default();
+    let mut tap = FrameTap::new(
+        dir.clone(),
+        recorder.clone(),
+        Box::new(|_| {}),
+        Box::new(|_| {}),
+    );
+    tap.record(true);
+    let path = recorder.path().expect("recording");
+    assert_eq!(path.parent(), Some(dir.as_path()));
+    assert!(path.exists());
+    tap.record(false);
+    std::fs::remove_dir_all(dir.parent().unwrap()).unwrap();
+}
+
+#[test]
 fn broker_writes_frames_and_logs_to_the_frame_log() {
     let dir = std::env::temp_dir().join(format!("hairline-frame-log-{}", std::process::id()));
-    let mut log = FrameLog::create_in(&dir, 1_794_000_000).unwrap();
-    let path = log.path().to_owned();
+    let recorder = Recorder::default();
+    let path = recorder.set(&dir, true).unwrap().expect("a recording path");
     let (tx, rx) = channel();
     let (etx, erx) = channel();
     let t = Box::new(FakeDevice::ult_wear());
+    let tap_dir = dir.clone();
     let handle = std::thread::spawn(move || {
+        let mut tap = FrameTap::new(tap_dir, recorder, Box::new(|_| {}), Box::new(|_| {}));
         run_broker_logged(
             t,
             rx,
             |s| etx.send(s.clone()).unwrap(),
             monotonic_ms,
-            Some(&mut log),
-            None,
-            None,
+            BrokerContext {
+                frames: Some(&mut tap),
+                ..BrokerContext::default()
+            },
         )
     });
     wait_for(&erx, |s| s.connected);
     tx.send(BrokerCmd::Raw {
         table: Table::T1,
         bytes: vec![0x22, 0x00],
+        confirmed_set: false,
     })
     .unwrap();
     // Give the raw request time to be answered before disconnecting.

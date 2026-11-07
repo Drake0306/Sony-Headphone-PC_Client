@@ -114,10 +114,17 @@ export interface AppSettings {
   theme: Theme;
   launch_at_login: boolean;
   hide_dock_icon: boolean;
+  /** Shows the Advanced tab (frame log, capability list, raw commands). */
+  show_advanced: boolean;
 }
 
 /** `AppSettings::default()`. */
-export const defaultSettings = (): AppSettings => ({ theme: "paper", launch_at_login: false, hide_dock_icon: true });
+export const defaultSettings = (): AppSettings => ({
+  theme: "paper",
+  launch_at_login: false,
+  hide_dock_icon: true,
+  show_advanced: false,
+});
 
 const unavailable = <T>(): Tracked<T> => ({ value: null, status: "Unavailable" });
 

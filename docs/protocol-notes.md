@@ -32,6 +32,10 @@ Table 2 (COMMAND_2) used: `06`/`07` support functions; voice guidance `40..48` (
 
 `F8` with type `09` (RESET_SETTINGS; `F8 09 01` = factory reset), `98` (ALERT_SET_PARAM family, used for reboot/commit sequences), `24` (POWER_SET_STATUS; power off), `2D`/`30..3F` (UPDT firmware), `C4` (LOG_SET_STATUS). Note `98 00 06 01` is part of the multipoint-toggle sequence reported by Gadgetbridge/SonyBridge; it is allowed only inside that sequence.
 
+## Capability gating
+
+Every typed request names the support function it needs. The session sends it only if the headphones declared that function in the support-function reply. A function that is only *proven* (it answered the probe although it was not declared, stored per unit) satisfies the check for GETs only, by the opcode role table (`mdr_proto::function::opcode_role` is `Get`); a typed SET on a proven function is refused as unavailable and nothing is written. Raw requests from the Advanced panel name no function and are not gated: they are deny-listed like everything else, and anything but a GET needs the typed `SEND` confirmation.
+
 ## Handshake
 
 1. T1 `00 00` → `01 00 03 00 20 02 00 00` (`ConnectRetProtocolInfo`: type, protocolVersion i32 BE = 0x03002002, table1 enable, table2 enable). Reply length 8 ⇒ v2.
@@ -94,3 +98,7 @@ Support function bytes (T1 FunctionType) relevant to us: `12` CODEC_INDICATOR, `
 ## Things to probe later (Advanced → opcode probe)
 
 GET-only walk of declared and undeclared inquired types: `70` AUTO_NCASM wire format, `C9` action logs (passive), Power types `0B..0E` (battery safe mode, caring charge, BT standby, stamina), Audio `00`/`02`/`05`, T2 safe listening `56 …`. Never SET during a probe.
+
+## Probe catalogue
+
+The probe walks `GET_CATALOGUE` in `crates/mdr-proto/src/probe.rs`: 46 GET opcodes with the inquired types libmdr defines for each, 441 requests. It is GET-only; `probe_points` re-checks each entry against the opcode role table and the deny-list, so a wrong edit cannot make it send a SET. Excluded reads: the protocol-info and support-function requests (the handshake already sent them), System RESET_SETTINGS (nothing near a reset is sent, not even its read), and T2 LEA GET_IDENTITY_RESOLVING_KEY (the reply is a pairing secret). A function that answers although it was not declared is "proven" and stored per unit in `devices/<address>.json`, never globally.

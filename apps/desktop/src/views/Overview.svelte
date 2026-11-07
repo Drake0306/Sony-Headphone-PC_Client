@@ -8,6 +8,7 @@
   import LinkList from "../lib/controls/LinkList.svelte";
   import Row from "../lib/controls/Row.svelte";
   import Ticks from "../lib/controls/Ticks.svelte";
+  import { battery as estimate, timeLeft } from "../lib/battery";
   import { control } from "../lib/control.svelte";
   import { setUlt } from "../lib/ipc";
   import * as noise from "../lib/noise";
@@ -44,6 +45,7 @@
 
   const ncShown = $derived(nc.shown);
   const battery = $derived(st.battery.value);
+  const left = $derived(st.connected && battery ? timeLeft($estimate.minutes_left) : "");
   const eq = $derived(st.eq_ult.value);
   const top = $derived(Math.max(1, (st.eq_capability?.steps ?? 21) - 1));
   const onOff = (v: boolean | null) => (v === null ? "--" : v ? "On" : "Off");
@@ -67,6 +69,7 @@
       <Row kind="overview" label="Battery">
         {#if battery}
           <span class="dot big">{battery[0]}<small>%</small></span>
+          {#if left}<small class="left">{left}</small>{/if}
         {:else}
           <span class="dot big">--</span>
         {/if}
@@ -152,6 +155,13 @@
 
   .links {
     margin-top: 14px;
+  }
+
+  .left {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 12px;
   }
 
   .num {

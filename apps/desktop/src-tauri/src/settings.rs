@@ -8,6 +8,8 @@ use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
+use crate::broker::BrokerCmd;
+
 const FILE_NAME: &str = "settings.json";
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -26,6 +28,9 @@ pub struct AppSettings {
     pub theme: Theme,
     pub launch_at_login: bool,
     pub hide_dock_icon: bool,
+    /// Shows the Advanced screen (frame log, capabilities, raw command).
+    #[serde(default)]
+    pub show_advanced: bool,
 }
 
 impl Default for AppSettings {
@@ -34,7 +39,29 @@ impl Default for AppSettings {
             theme: Theme::Paper,
             launch_at_login: false,
             hide_dock_icon: true,
+            show_advanced: false,
         }
+    }
+}
+
+/// Raw commands are allowed only while the Advanced panel is enabled.
+pub fn raw_allowed(s: &AppSettings) -> Result<(), String> {
+    if s.show_advanced {
+        Ok(())
+    } else {
+        Err("enable the Advanced panel in Settings first".into())
+    }
+}
+
+/// What to tell the broker when the settings change from `before` to
+/// `after`: switching the Advanced panel off stops the probe and the frame
+/// recording. Other saves send nothing (so a `HAIRLINE_FRAME_LOG=1`
+/// recording survives a theme change).
+pub fn advanced_off_commands(before: &AppSettings, after: &AppSettings) -> Vec<BrokerCmd> {
+    if before.show_advanced && !after.show_advanced {
+        vec![BrokerCmd::ProbeStop, BrokerCmd::RecordFrames(false)]
+    } else {
+        Vec::new()
     }
 }
 
@@ -51,10 +78,15 @@ pub fn load(dir: &Path) -> AppSettings {
 }
 
 /// Writes the settings to `dir` as pretty JSON, creating `dir` if needed.
+/// Written to a `.tmp` file first and renamed, so a crash never leaves a
+/// half-written file.
 pub fn save(dir: &Path, s: &AppSettings) -> io::Result<()> {
     std::fs::create_dir_all(dir)?;
     let text = serde_json::to_string_pretty(s).map_err(io::Error::other)?;
-    std::fs::write(path_in(dir), text)
+    let path = path_in(dir);
+    let tmp = path.with_extension("json.tmp");
+    std::fs::write(&tmp, text)?;
+    std::fs::rename(&tmp, &path)
 }
 
 /// The app's settings directory.
@@ -67,8 +99,9 @@ pub fn get_settings(state: State<'_, Mutex<AppSettings>>) -> AppSettings {
     state.lock().map(|s| s.clone()).unwrap_or_default()
 }
 
-/// Saves the settings, applies launch-at-login and the Dock policy, and tells
-/// every window to re-read them.
+/// Saves the settings, applies launch-at-login and the Dock policy, stops
+/// the probe and the recording when the Advanced panel is switched off, and
+/// tells every window to re-read them.
 #[tauri::command]
 pub fn set_settings(
     app: AppHandle,
@@ -77,8 +110,17 @@ pub fn set_settings(
 ) -> Result<(), String> {
     let dir = dir(&app).map_err(|e| e.to_string())?;
     save(&dir, &s).map_err(|e| format!("could not save settings: {e}"))?;
+    let mut before = None;
     if let Ok(mut current) = state.lock() {
-        *current = s.clone();
+        before = Some(std::mem::replace(&mut *current, s.clone()));
+    }
+    let stop = before.map_or_else(Vec::new, |b| advanced_off_commands(&b, &s));
+    if let Some(broker) = app.try_state::<crate::commands::Broker>() {
+        for cmd in stop {
+            if let Err(e) = broker.send(cmd) {
+                eprintln!("hairline: {e}");
+            }
+        }
     }
     apply_launch_at_login(&app, s.launch_at_login);
     crate::dock::apply_for(

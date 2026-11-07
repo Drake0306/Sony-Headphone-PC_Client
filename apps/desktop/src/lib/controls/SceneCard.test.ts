@@ -18,9 +18,9 @@ describe("SceneCard", () => {
     expect(getByText("At the desk")).toBeInTheDocument();
     expect(getByText("Between 22:00 and 07:00")).toBeInTheDocument();
     const chips = [...container.querySelectorAll(".then span")].map((c) => c.textContent);
-    expect(chips).toEqual(["AMB 14", "VOICE", "ULT 1"]);
+    expect(chips).toEqual(["Ambient 14", "Voice focus", "ULT 1"]);
     expect(getByText("ULT 1")).toHaveClass("u");
-    expect(getByText("AMB 14")).not.toHaveClass("u");
+    expect(getByText("Ambient 14")).not.toHaveClass("u");
     expect(getByText("Active")).toBeInTheDocument();
     expect(container.querySelector(".scene")).toHaveClass("on");
   });

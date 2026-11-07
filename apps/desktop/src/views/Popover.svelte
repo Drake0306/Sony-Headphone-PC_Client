@@ -64,14 +64,17 @@
     st.devices.map((d) => ({ label: d.name, value: d.playing ? "▶ Playing" : "Idle", live: d.playing })),
   );
 
+  const boxes = $derived(modeBoxes($scenes.scenes));
   const modeOptions = $derived.by(() => {
-    const { shown, more } = modeBoxes($scenes.scenes);
+    const { shown, more } = boxes;
     return [
       ...shown.map((s) => ({ label: s.name, value: s.id, title: s.name })),
       ...(more ? [{ label: "…", value: MORE, title: "All scenes" }] : []),
     ];
   });
-  const modeStatus = $derived<Status>($mode.want !== null ? PENDING : "Confirmed");
+  const modeStatus = $derived<Status>(
+    $mode.want !== null ? PENDING : $mode.refused ? { Refused: { reason: $mode.refused.reason } } : "Confirmed",
+  );
 
   $effect(() => {
     void $scenes;
@@ -83,7 +86,10 @@
       openMainWindowOn("scenes").catch((e) => console.error(e));
       return;
     }
-    mode.request(id, () => applyScene(id));
+    // A failed apply is shown as refused on that box (held for a few seconds).
+    mode.request(id, () =>
+      applyScene(id).catch((e) => mode.receive({ Refused: { reason: typeof e === "string" ? e : String(e) } })),
+    );
   }
 
   function receive(next: DeviceState) {
@@ -208,12 +214,13 @@
 {/if}
 
 {#snippet modeRow()}
-  {#if $scenes.scenes.length > 0}
+  {#if boxes.shown.length > 0}
     <div class="row mode">
       <span class="lab">Mode</span>
       <Boxes
         options={modeOptions}
         value={$mode.want ?? $scenes.active}
+        attempted={$mode.refused?.value ?? null}
         status={modeStatus}
         width="190px"
         onpick={pickMode}
@@ -265,12 +272,5 @@
     padding-top: 12px;
     font-size: 12px;
     color: var(--muted);
-  }
-
-  .btnrow {
-    display: flex;
-    gap: 6px;
-    justify-content: flex-end;
-    margin-top: 8px;
   }
 </style>

@@ -58,8 +58,14 @@ export const EQ_PRESETS = [0x00, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
 export const VOLUME_MAX = 30;
 export const AMBIENT_MAX = 20;
 
+// Counts "scenes" events, so a `get_scenes` reply older than an event is dropped.
+let events = 0;
+
 const view = writable<ScenesView>({ scenes: [], active: null }, () => {
-  const unlisten = onScenes(({ scenes, active }) => view.set({ scenes, active }));
+  const unlisten = onScenes(({ scenes, active }) => {
+    events += 1;
+    view.set({ scenes, active });
+  });
   loadScenes().catch((e) => console.error(e));
   return () => {
     unlisten.then((stop) => stop()).catch(() => {});
@@ -71,8 +77,9 @@ export const scenes: Readable<ScenesView> = { subscribe: view.subscribe };
 
 /** Reads the list; the "scenes" event that follows brings the active id. */
 export async function loadScenes(): Promise<Scene[]> {
+  const seen = events;
   const list = await getScenes();
-  view.update((v) => ({ ...v, scenes: list }));
+  if (events === seen) view.update((v) => ({ ...v, scenes: list }));
   return list;
 }
 
@@ -97,7 +104,7 @@ export function triggerSentence(t: Trigger): string {
     case "time_range":
       return `Between ${t.from} and ${t.to}`;
     case "frontmost_app":
-      return `${t.name} is in front`;
+      return t.name.trim() === "" ? "An app is in front" : `${t.name.trim()} is in front`;
     case "mic_in_use":
       return "Microphone is in use";
     case "manual":
@@ -111,22 +118,19 @@ export interface Chip {
   ult?: boolean;
 }
 
-const NC_CHIP: Record<NcMode, string> = { NoiseCancelling: "NC", Ambient: "AMB", Off: "OFF" };
-
-/** The chips a scene card shows, in a fixed order; Keep fields show nothing. */
+/** The chips a scene card shows, in a fixed order (the mockup's wording); Keep fields show nothing. */
 export function actionChips(a: Actions): Chip[] {
   const chips: Chip[] = [];
-  if (a.ambient_level !== null && (a.nc === null || a.nc === "Ambient")) {
-    chips.push({ label: `AMB ${a.ambient_level}` });
-  } else if (a.nc !== null) {
-    chips.push({ label: NC_CHIP[a.nc] });
-    if (a.ambient_level !== null) chips.push({ label: `AMB ${a.ambient_level}` });
-  }
-  if (a.voice_focus !== null) chips.push({ label: a.voice_focus ? "VOICE" : "VOICE OFF" });
-  if (a.ult !== null) chips.push(a.ult === 0 ? { label: "ULT OFF" } : { label: `ULT ${a.ult}`, ult: true });
+  const level = a.ambient_level !== null ? { label: `Ambient ${a.ambient_level}` } : null;
+  if (a.nc === "NoiseCancelling") chips.push({ label: "NC" });
+  if (a.nc === "Off") chips.push({ label: "Off" });
+  if (level) chips.push(level);
+  else if (a.nc === "Ambient") chips.push({ label: "Ambient" });
+  if (a.voice_focus !== null) chips.push({ label: a.voice_focus ? "Voice focus" : "Voice focus off" });
+  if (a.ult !== null) chips.push(a.ult === 0 ? { label: "ULT off" } : { label: `ULT ${a.ult}`, ult: true });
   if (a.eq_preset !== null) chips.push({ label: presetName(a.eq_preset) });
-  if (a.volume !== null) chips.push({ label: `VOL ${a.volume}` });
-  if (a.dsee_auto_off !== null) chips.push({ label: a.dsee_auto_off ? "DSEE AUTO" : "DSEE OFF" });
+  if (a.volume !== null) chips.push({ label: `Volume ${a.volume}` });
+  if (a.dsee_auto_off !== null) chips.push({ label: a.dsee_auto_off ? "DSEE auto" : "DSEE off" });
   return chips;
 }
 
@@ -247,5 +251,5 @@ export const MODE_BOXES_MAX = 4;
 /** The popover's MODE boxes: the first four enabled scenes, and whether a "…" box leads to the rest. */
 export function modeBoxes(list: Scene[]): { shown: Scene[]; more: boolean } {
   const enabled = list.filter((s) => s.enabled);
-  return { shown: enabled.slice(0, MODE_BOXES_MAX), more: enabled.length === 0 || enabled.length > MODE_BOXES_MAX };
+  return { shown: enabled.slice(0, MODE_BOXES_MAX), more: enabled.length > MODE_BOXES_MAX };
 }

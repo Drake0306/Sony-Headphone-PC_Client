@@ -41,6 +41,11 @@ describe("triggerSentence", () => {
     expect(triggerSentence({ kind: "mic_in_use" })).toBe("Microphone is in use");
     expect(triggerSentence({ kind: "manual" })).toBe("By hand only");
   });
+
+  it("trigger_sentence_without_an_app_name_never_starts_blank", () => {
+    expect(triggerSentence({ kind: "frontmost_app", name: "" })).toBe("An app is in front");
+    expect(triggerSentence({ kind: "frontmost_app", name: "  " })).toBe("An app is in front");
+  });
 });
 
 describe("actionChips", () => {
@@ -60,27 +65,31 @@ describe("actionChips", () => {
     });
     expect(chips).toEqual([
       { label: "NC" },
-      { label: "VOICE" },
+      { label: "Voice focus" },
       { label: "ULT 1", ult: true },
       { label: "Bass Boost" },
-      { label: "VOL 12" },
-      { label: "DSEE AUTO" },
+      { label: "Volume 12" },
+      { label: "DSEE auto" },
     ]);
   });
 
   it("action_chips_merge_ambient_mode_and_level", () => {
-    expect(actionChips({ ...KEEP, nc: "Ambient", ambient_level: 14 })).toEqual([{ label: "AMB 14" }]);
-    expect(actionChips({ ...KEEP, nc: "Ambient" })).toEqual([{ label: "AMB" }]);
-    expect(actionChips({ ...KEEP, ambient_level: 5 })).toEqual([{ label: "AMB 5" }]);
-    expect(actionChips({ ...KEEP, nc: "Off" })).toEqual([{ label: "OFF" }]);
+    expect(actionChips({ ...KEEP, nc: "Ambient", ambient_level: 14 })).toEqual([{ label: "Ambient 14" }]);
+    expect(actionChips({ ...KEEP, nc: "Ambient" })).toEqual([{ label: "Ambient" }]);
+    expect(actionChips({ ...KEEP, ambient_level: 5 })).toEqual([{ label: "Ambient 5" }]);
+    expect(actionChips({ ...KEEP, nc: "Off" })).toEqual([{ label: "Off" }]);
+    expect(actionChips({ ...KEEP, nc: "NoiseCancelling", ambient_level: 3 })).toEqual([
+      { label: "NC" },
+      { label: "Ambient 3" },
+    ]);
   });
 
   it("action_chips_name_the_off_values", () => {
     expect(actionChips({ ...KEEP, voice_focus: false, ult: 0, dsee_auto_off: false, volume: 0 })).toEqual([
-      { label: "VOICE OFF" },
-      { label: "ULT OFF" },
-      { label: "VOL 0" },
-      { label: "DSEE OFF" },
+      { label: "Voice focus off" },
+      { label: "ULT off" },
+      { label: "Volume 0" },
+      { label: "DSEE off" },
     ]);
     expect(actionChips({ ...KEEP, ult: 2 })).toEqual([{ label: "ULT 2", ult: true }]);
   });
@@ -205,11 +214,12 @@ describe("modeBoxes", () => {
     expect(modeBoxes(list)).toEqual({ shown: [list[0], list[2]], more: false });
   });
 
-  it("mode_boxes_add_more_past_four_or_when_none_is_enabled", () => {
+  it("mode_boxes_add_more_only_past_four", () => {
     const list = ["a", "b", "c", "d", "e"].map((id) => scene(id));
     const boxes = modeBoxes(list);
     expect(boxes.shown.map((s) => s.id)).toEqual(["a", "b", "c", "d"]);
     expect(boxes.more).toBe(true);
-    expect(modeBoxes([scene("a", { enabled: false })])).toEqual({ shown: [], more: true });
+    expect(modeBoxes([scene("a", { enabled: false })])).toEqual({ shown: [], more: false });
+    expect(modeBoxes(["a", "b", "c", "d"].map((id) => scene(id))).more).toBe(false);
   });
 });

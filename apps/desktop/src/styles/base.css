@@ -275,6 +275,13 @@ body.kbd a:focus-visible {
   color: var(--paper);
 }
 
+.btnrow {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
 .btn.unavailable {
   opacity: 0.35;
   cursor: default;
@@ -327,6 +334,11 @@ body.kbd a:focus-visible {
   margin: 6px 0 0;
   color: var(--muted);
   font-size: 11px;
+}
+
+/* An error under a control: orange, like the refused outline. */
+.block .note.live {
+  color: var(--ult);
 }
 
 .unavailable-block {

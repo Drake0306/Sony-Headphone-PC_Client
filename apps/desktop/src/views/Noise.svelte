@@ -96,12 +96,6 @@
 </div>
 
 <style>
-  .btnrow {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 8px;
-  }
-
   .level {
     display: flex;
     align-items: center;

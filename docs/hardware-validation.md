@@ -115,3 +115,13 @@ Run with the real headphones connected. Use `HAIRLINE_FRAME_LOG=1` if you also w
 - [ ] Time left appears after an hour of listening (30 minutes and a 2 % drop at least), and Clear in Settings empties it.
 - [ ] From a terminal, `hairlinectl state` and `hairlinectl battery` print the same values as the window.
 - [ ] `hairlinectl volume 31` is refused with the same text as the window.
+
+## 9. Phase 5 (owner present)
+
+Run with the real headphones connected.
+
+- [ ] Sound: press Advanced. Set a visible curve (for example +6 on the three lowest bands, 0 above), and page with ‹ and › through 1–4, 5–8 and 7–10.
+- [ ] Press Send best fit to headphones. With the frame log on, the NTFY `59 03 …` carries the six fitted values (raw = level + 10) and the preset and ULT bytes are the same as before the send.
+- [ ] "On the headphones now" in the Advanced view matches the fit, and the Sound screen faders show the same six values.
+- [ ] Back on the Sound screen, the fader knobs snap to the 21 segments and the +10, 0 and −10 labels are not clipped in the real window.
+- [ ] Restart Hairline; the Advanced curve is still there (`eq_curve.json` in the config directory).

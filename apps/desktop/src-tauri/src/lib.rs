@@ -6,6 +6,7 @@ pub mod broker;
 pub mod commands;
 pub mod device_record;
 pub mod dock;
+pub mod eq_curve;
 pub mod frame_log;
 pub mod frame_ring;
 pub mod hotkeys;
@@ -77,6 +78,10 @@ pub fn run() {
             commands::probe_stop,
             commands::battery_estimate,
             commands::clear_battery_history,
+            eq_curve::get_eq_curve,
+            eq_curve::set_eq_curve,
+            eq_curve::best_fit_preview,
+            eq_curve::send_best_fit,
             settings::get_settings,
             settings::set_settings,
         ])
@@ -104,6 +109,11 @@ pub fn run() {
             // Read by the broker thread when it starts.
             hotkeys::apply(app.handle(), &scenes);
             app.manage(Mutex::new(scenes));
+            let curve = match &dir {
+                Ok(dir) => eq_curve::load(dir),
+                Err(_) => eq_curve::EqCurve::default(),
+            };
+            app.manage(Mutex::new(curve));
             let capture_dir = frame_log::app_capture_dir(app.handle());
             app.manage(frame_log::CaptureDir(capture_dir.clone()));
             tray::create(app.handle())?;

@@ -2,6 +2,7 @@
 //! Knows nothing about framing; see `mdr-frame` for that.
 
 mod deny;
+pub mod eq;
 pub mod function;
 mod message;
 pub mod opcode;

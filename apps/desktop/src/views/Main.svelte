@@ -1,6 +1,9 @@
 <!--
   The main window shell: nav tabs, the connection status, and one screen per
-  tab chosen from location.hash (#sound ...; Overview by default).
+  tab chosen from location.hash (#sound ...; Overview by default). The
+  Advanced equalizer opens from Sound in place of the screen, with the nav
+  hidden; it is not a tab or a hash, so a reload or any tab change goes back
+  to the screens.
 -->
 <script lang="ts">
   import { onMount } from "svelte";
@@ -8,6 +11,7 @@
   import { settings } from "../lib/settings";
   import { emptyState, statusLabel, type DeviceState } from "../lib/state";
   import Advanced from "./Advanced.svelte";
+  import AdvancedEq from "./AdvancedEq.svelte";
   import Devices from "./Devices.svelte";
   import Noise from "./Noise.svelte";
   import Overview from "./Overview.svelte";
@@ -33,6 +37,8 @@
   // The popover asks for a tab with the "navigate" event, and leaves it in
   // localStorage for a window it has just created (`openMainWindowOn`).
   function show(id: string) {
+    // Same tab or not, a request from the popover leaves the Advanced equalizer.
+    advancedEq = false;
     try {
       localStorage.removeItem(OPEN_TAB_KEY);
     } catch {
@@ -53,13 +59,18 @@
 
   let requested = $state<Tab>(hashTab());
   const tab = $derived<Tab>(tabs.some((t) => t.id === requested) ? requested : "overview");
+  let advancedEq = $state(false);
+  const eqOpen = $derived(advancedEq && tab === "sound");
   let st = $state<DeviceState>(emptyState());
   let fake = $state(false);
 
   const status = $derived(statusLabel(st.connected, st.firmware, fake));
 
   onMount(() => {
-    const onHash = () => (requested = hashTab());
+    const onHash = () => {
+      advancedEq = false;
+      requested = hashTab();
+    };
     window.addEventListener("hashchange", onHash);
     takeRequestedTab();
     const unlisten = onNavigate(show);
@@ -76,15 +87,19 @@
 </script>
 
 <div class="win">
-  <nav class="tabs">
-    {#each tabs as t (t.id)}
-      <a href={`#${t.id}`} class:on={tab === t.id} aria-current={tab === t.id ? "page" : undefined}>{t.label}</a>
-    {/each}
-  </nav>
+  {#if !eqOpen}
+    <nav class="tabs">
+      {#each tabs as t (t.id)}
+        <a href={`#${t.id}`} class:on={tab === t.id} aria-current={tab === t.id ? "page" : undefined}>{t.label}</a>
+      {/each}
+    </nav>
+  {/if}
   <span class="status lab">{status}</span>
   <main>
-    {#if tab === "sound"}
-      <Sound {st} />
+    {#if eqOpen}
+      <AdvancedEq {st} onback={() => (advancedEq = false)} />
+    {:else if tab === "sound"}
+      <Sound {st} onadvanced={() => (advancedEq = true)} />
     {:else if tab === "noise"}
       <Noise {st} />
     {:else if tab === "devices"}

@@ -317,9 +317,11 @@ export function hotkeyList(list: Scene[], mac: boolean, errors: Record<string, s
 }
 
 /** Up to two scenes for the Noise screen: the active one, then the first enabled other one. */
-export function relevantScenes(v: ScenesView): Scene[] {
-  const active = v.scenes.find((s) => s.id === v.active);
-  const other = v.scenes.find((s) => s.enabled && s.id !== v.active);
+export function relevantScenes(v: ScenesView | null | undefined): Scene[] {
+  // A store value that has not arrived (or arrived without a list) shows no scenes.
+  const list = v?.scenes ?? [];
+  const active = list.find((s) => s.id === v?.active);
+  const other = list.find((s) => s.enabled && s.id !== v?.active);
   return [active, other].filter((s): s is Scene => s !== undefined);
 }
 

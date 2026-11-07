@@ -38,7 +38,9 @@ Phase 3a: Windows transport compiles and is unit-tested on Windows CI; the Windo
 
 Phase 4: the Advanced panel, the opcode probe, battery history with a time-left estimate, and a local socket with the `hairlinectl` command-line tool, all described below. It is verified against the fake device and the unit tests; the checklist for the real headphones is section 8 of `docs/hardware-validation.md`.
 
-Next: the advanced equalizer (Phase 5), then the Windows tray app, then Linux. The pipeline is in [the equalizer research](<docs/research/reports/Advanced equalizer research.html>).
+Phase 5: the Advanced equalizer, described below, and a redesigned Sound fader (21 segments with a zero line, an orange knob and a dot-matrix value). It is verified against the fake device and the unit tests; the checklist for the real headphones is section 9 of `docs/hardware-validation.md`.
+
+Next: the Windows tray app, then Linux. The in-app audio engine (Phase 6) is undecided; see [the equalizer research](<docs/research/reports/Advanced equalizer research.html>).
 
 The popover is validated on a real WH-ULT900N (firmware 2.1.4) on macOS 27.2; see `docs/hardware-validation.md`. The Phase 2 screens are verified against the fake device and still need a session with the real headphones. Use `--fake-device` (below) to run without headphones; a fake run says `FAKE` in the popover and the window so it is never mistaken for the real thing.
 
@@ -59,6 +61,14 @@ Every 2 seconds the broker thread checks the enabled scenes in list order, and t
 Actions use the existing controls only: noise control, ambient level and voice focus (sent as one request), ULT and an EQ preset (also one request), volume, and DSEE auto or off. "Keep" leaves a setting as it is. A setting the headphones refuse shows on the normal controls like any other refusal. Scenes send nothing new on the wire.
 
 Hotkeys are recorded in the scene editor as Tauri accelerators and registered with the global-shortcut plugin only while Hairline runs. If one conflicts or the OS refuses it, it shows as refused, with the reason, in the editor and in Settings. A scene hotkey needs Ctrl, Alt or Super (or is a lone F1–F24 key), so it cannot take over typing. `⌥⌘N` opens the window when macOS allows the shortcut; Settings shows it refused otherwise.
+
+## Advanced equalizer
+
+The headphones have six EQ bands. The Advanced equalizer is a ten-band curve (31 Hz to 16 kHz) that Hairline keeps itself. Open it with the "Advanced" button next to the Equalizer heading on the Sound screen; it takes the whole content area and "‹ Sound" returns. It shows four of the ten bands at a time, and ‹ and › page through them (1–4, 5–8, 7–10).
+
+Every change is saved to `eq_curve.json`, next to `settings.json` in the app's config directory. Nothing is sent to the headphones while you edit. These bands run in Hairline only; the headphones keep their six-band curve.
+
+"Send best fit to headphones" fits the ten bands onto the six: Clear Bass is the mean of the four lowest bands, 1 kHz and 16 kHz are taken directly, and 400 Hz, 2.5 kHz and 6.3 kHz are interpolated in log frequency between their neighbours (rounded half away from zero, clamped to −10..+10). The result is written through the normal EQ command, which keeps the preset and ULT as they are, and the view shows the headphones' current six values beside the fit. Nothing new goes on the wire.
 
 ## Advanced panel
 

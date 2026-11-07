@@ -180,7 +180,9 @@ fn with_nc(mut nc: NcAsmState, a: &Actions) -> NcAsmState {
     if let Some(level) = a.ambient_level {
         nc.level = level;
     }
-    if let Some(on) = a.voice_focus {
+    // Voice focus belongs to Ambient; in any other mode the headphones would
+    // switch, so the request leaves it as it is.
+    if let (Some(on), NcMode::Ambient) = (a.voice_focus, nc.mode) {
         nc.voice_focus = on;
     }
     nc
@@ -192,5 +194,29 @@ fn ult_level(v: u8) -> Option<UltLevel> {
         1 => Some(UltLevel::Ult1),
         2 => Some(UltLevel::Ult2),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn voice_focus_is_only_applied_in_ambient() {
+        let base = NcAsmState {
+            mode: NcMode::NoiseCancelling,
+            level: 10,
+            voice_focus: false,
+        };
+        let voice = Actions {
+            voice_focus: Some(true),
+            ..Actions::default()
+        };
+        assert!(!with_nc(base, &voice).voice_focus);
+        let ambient = Actions {
+            nc: Some(Nc::Ambient),
+            ..voice.clone()
+        };
+        assert!(with_nc(base, &ambient).voice_focus);
     }
 }

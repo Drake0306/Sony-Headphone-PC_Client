@@ -27,7 +27,10 @@ export function pickLevel(nc: Nc, cur: NcAsmState | null, level: number) {
   request(nc, { mode: "Ambient", level, voice_focus: cur?.voice_focus ?? false });
 }
 
-/** Sets voice focus (Ambient only), keeping the level on screen. */
+/** Sets voice focus, keeping the level on screen. Voice focus belongs to
+ *  Ambient: sending it in another mode makes the headphones switch, so any
+ *  other mode is ignored here. */
 export function pickVoice(nc: Nc, shown: NcAsmState | null, on: boolean) {
-  request(nc, { mode: "Ambient", level: clampLevel(shown?.level), voice_focus: on });
+  if (shown?.mode !== "Ambient") return;
+  request(nc, { mode: "Ambient", level: clampLevel(shown.level), voice_focus: on });
 }

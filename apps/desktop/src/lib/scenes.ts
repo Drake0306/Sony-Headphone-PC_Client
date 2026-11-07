@@ -173,6 +173,7 @@ export function validateScene(s: Scene): string | null {
   const a = s.actions;
   if (a.ambient_level !== null && !inRange(a.ambient_level, 1, AMBIENT_MAX))
     return bad("ambient_level", `${a.ambient_level} is outside 1..=${AMBIENT_MAX}`);
+  if (a.voice_focus !== null && a.nc !== "Ambient") return bad("voice_focus", "needs Noise set to Ambient");
   if (a.ult !== null && !inRange(a.ult, 0, 2)) return bad("ult", `${a.ult} is outside 0..=2`);
   if (a.eq_preset !== null && !EQ_PRESETS.includes(a.eq_preset))
     return bad("eq_preset", `${hex(a.eq_preset)} is not a known preset`);

@@ -101,6 +101,8 @@
 
   function act<K extends keyof Actions>(key: K, value: Actions[K]) {
     draft.actions[key] = value;
+    // Voice focus belongs to Ambient; any other noise choice drops it to Keep.
+    if (key === "nc" && value !== "Ambient") draft.actions.voice_focus = null;
   }
 
   function setKind(kind: TriggerKind) {
@@ -237,9 +239,14 @@
       />
     </div>
   </Row>
-  <Row label="Focus on voice">
+  <Row label="Focus on voice" note={draft.actions.nc === "Ambient" ? undefined : "Needs Noise set to Ambient"}>
     <div class="line">
-      <Toggle on={draft.actions.voice_focus} label="Focus on voice" onpick={(on) => act("voice_focus", on)} />
+      <Toggle
+        on={draft.actions.voice_focus}
+        disabled={draft.actions.nc !== "Ambient"}
+        label="Focus on voice"
+        onpick={(on) => act("voice_focus", on)}
+      />
       <Boxes
         options={keepBox}
         value={draft.actions.voice_focus === null ? KEEP : null}

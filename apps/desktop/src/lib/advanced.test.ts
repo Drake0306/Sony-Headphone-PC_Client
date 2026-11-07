@@ -69,12 +69,14 @@ describe("parseHex", () => {
     expect(parseHex("58 03 01")).toEqual([0x58, 0x03, 0x01]);
     expect(parseHex("580301")).toEqual([0x58, 0x03, 0x01]);
     expect(parseHex(" 66:17-0a ")).toEqual([0x66, 0x17, 0x0a]);
+    // Separators are ignored before pairing, as the backend does.
+    expect(parseHex("5 8")).toEqual([0x58]);
   });
 
   it("refuses odd digits, non-hex and empty input", () => {
     expect(parseHex("583")).toBeNull();
     expect(parseHex("zz")).toBeNull();
-    expect(parseHex("5 8")).toBeNull();
+    expect(parseHex("58\t03")).toBeNull();
     expect(parseHex("")).toBeNull();
     expect(parseHex("   ")).toBeNull();
   });

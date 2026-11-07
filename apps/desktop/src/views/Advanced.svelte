@@ -28,12 +28,19 @@
   ];
   const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-  // Capabilities: re-read whenever the device state changes.
+  // Capabilities: re-read when the link, the model or the declared/proven
+  // lists change; an older reply arriving late is dropped.
   let rows = $state<CapabilityRow[]>([]);
+  let request = 0;
+  // A string, so a new state object with the same facts does not refetch.
+  const capsKey = $derived(
+    [st.connected, st.model, st.capabilities_t1.length, st.capabilities_t2.length, st.proven.length].join("|"),
+  );
   $effect(() => {
-    void st;
+    void capsKey;
+    const mine = ++request;
     capabilityList()
-      .then((r) => (rows = r))
+      .then((r) => mine === request && (rows = r))
       .catch((e) => console.error(e));
   });
   const byTable = $derived(TABLES.map((t) => ({ table: t.value, rows: rows.filter((r) => r.table === t.value) })));
@@ -63,10 +70,13 @@
   let frames = $state<FrameEntry[]>([]);
   let mark = $state<FrameEntry | null>(null);
   const shown = $derived(afterMark(frames, mark));
+  // The time shown as +0: the first frame seen, or the first after Clear.
   let origin = $state<number | null>(null);
-  $effect(() => {
-    if (origin === null && shown.length > 0) origin = shown[0].t_ms;
-  });
+
+  function takeFrames(f: FrameEntry[]) {
+    frames = f;
+    if (origin === null) origin = afterMark(f, mark)[0]?.t_ms ?? null;
+  }
 
   function clear() {
     mark = frames.at(-1) ?? null;
@@ -84,12 +94,15 @@
   }
 
   onMount(() => {
-    const offFrames = onFrames((f) => (frames = f));
+    let alive = true;
+    const offFrames = onFrames(takeFrames);
     const offRecording = onRecording((e) => (recording = e.path));
+    // Watch only once listening, and never after the screen has gone.
     offFrames
-      .then(() => watchFrames(true))
+      .then(() => (alive ? watchFrames(true) : null))
       .catch((e) => console.error(e));
     return () => {
+      alive = false;
       watchFrames(false).catch((e) => console.error(e));
       for (const off of [offFrames, offRecording]) off.then((stop) => stop()).catch(() => {});
     };
@@ -121,7 +134,7 @@
         <div class="raw">
           <Boxes options={TABLES} value={table} status="Confirmed" width="90px" onpick={(t) => (table = t)} />
           <input
-            class="mono"
+            class="field"
             aria-label="Raw bytes"
             placeholder="66 17"
             spellcheck="false"
@@ -132,7 +145,7 @@
         </div>
         {#if needsConfirm}
           <input
-            class="mono confirm"
+            class="field confirm"
             aria-label="Confirm"
             placeholder="type SEND"
             spellcheck="false"
@@ -209,23 +222,9 @@
     align-items: stretch;
   }
 
-  input {
+  .raw .field {
     flex: 1;
     min-width: 0;
-    padding: 5px 8px;
-    border: 1px solid var(--ink);
-    border-radius: 0;
-    background: var(--box);
-    color: var(--ink);
-    font-family: "DM Mono", monospace;
-    font-size: 11px;
-    outline: none;
-    -webkit-user-select: text;
-    user-select: text;
-  }
-
-  input::placeholder {
-    color: var(--muted);
   }
 
   .confirm {

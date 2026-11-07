@@ -379,23 +379,6 @@
     font-size: 13px;
   }
 
-  .field {
-    border: 1px solid var(--ink);
-    border-radius: 0;
-    background: var(--box);
-    color: var(--ink);
-    font-family: "DM Mono", monospace;
-    font-size: 11px;
-    padding: 5px 6px;
-    -webkit-user-select: text;
-    user-select: text;
-  }
-
-  .field:focus {
-    outline: 1px solid var(--ink);
-    outline-offset: 1px;
-  }
-
   .name {
     width: 200px;
   }

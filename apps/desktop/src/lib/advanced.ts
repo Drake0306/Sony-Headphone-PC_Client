@@ -59,15 +59,15 @@ const GETS: Record<TableName, ReadonlySet<number>> = {
 /** True when the payload's opcode is not a GET (SET, RET, NTFY or unknown). */
 export const isSetOpcode = (table: TableName, bytes: number[]) => bytes.length > 0 && !GETS[table].has(bytes[0]);
 
-/** Hex pairs, optionally separated by spaces, ":" or "-"; null when malformed or empty. */
+/**
+ * Hex digits with spaces, ":" and "-" ignored, read in pairs (as the
+ * backend's `parse_table_hex` does); null when empty, odd or not hex.
+ */
 export function parseHex(text: string): number[] | null {
-  const groups = text.trim().split(/[\s:-]+/).filter((g) => g !== "");
-  if (groups.length === 0) return null;
+  const digits = text.replace(/[ :-]/g, "");
+  if (digits === "" || digits.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(digits)) return null;
   const out: number[] = [];
-  for (const g of groups) {
-    if (!/^(?:[0-9a-fA-F]{2})+$/.test(g)) return null;
-    for (let i = 0; i < g.length; i += 2) out.push(parseInt(g.slice(i, i + 2), 16));
-  }
+  for (let i = 0; i < digits.length; i += 2) out.push(parseInt(digits.slice(i, i + 2), 16));
   return out;
 }
 

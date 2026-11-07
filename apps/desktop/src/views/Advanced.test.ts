@@ -5,6 +5,8 @@ import { fireEvent, render, waitFor } from "@testing-library/svelte";
 const backend = vi.hoisted(() => ({
   rows: [] as unknown[],
   handlers: {} as Record<string, (e: { payload: unknown }) => void>,
+  // When set, listen("frames") waits for this before resolving.
+  hold: null as Promise<void> | null,
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -24,6 +26,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(async (name: string, h: (e: { payload: unknown }) => void) => {
+    if (name === "frames" && backend.hold) await backend.hold;
     backend.handlers[name] = h;
     return () => delete backend.handlers[name];
   }),
@@ -45,6 +48,7 @@ describe("Advanced", () => {
       { table: "T2", id: 0x50, name: "Safe listening (HBS 1)", declared: false, proven: false },
     ];
     backend.handlers = {};
+    backend.hold = null;
     vi.mocked(invoke).mockClear();
   });
 
@@ -132,5 +136,26 @@ describe("Advanced", () => {
     await waitFor(() => expect(calls("watch_frames")).toEqual([{ on: true }]));
     r.unmount();
     expect(calls("watch_frames")).toEqual([{ on: true }, { on: false }]);
+  });
+
+  it("never starts watching once unmounted before listening", async () => {
+    let release = () => {};
+    backend.hold = new Promise<void>((done) => (release = done));
+    const r = renderIt();
+    r.unmount();
+    release();
+    await new Promise((done) => setTimeout(done, 10));
+    expect(calls("watch_frames")).toEqual([{ on: false }]);
+  });
+
+  it("re-reads capabilities only when the link or the lists change", async () => {
+    const st = emptyState();
+    const r = render(Advanced, { st });
+    await waitFor(() => expect(calls("capability_list")).toHaveLength(1));
+    await r.rerender({ st: { ...st, volume: { value: 12, status: "Confirmed" } } });
+    await new Promise((done) => setTimeout(done, 10));
+    expect(calls("capability_list")).toHaveLength(1);
+    await r.rerender({ st: { ...st, connected: true, model: "ULT WEAR" } });
+    await waitFor(() => expect(calls("capability_list")).toHaveLength(2));
   });
 });

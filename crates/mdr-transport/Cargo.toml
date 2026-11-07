@@ -17,3 +17,6 @@ objc2 = "0.6"
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSArray", "NSString", "NSData", "NSObject"] }
 objc2-io-bluetooth = { version = "0.3", default-features = false, features = ["std", "objc2", "objc2-foundation", "Bluetooth", "IOBluetoothObject", "IOBluetoothDevice", "IOBluetoothRFCOMMChannel", "IOBluetoothSDPUUID", "IOBluetoothSDPServiceRecord"] }
 dispatch2 = "0.3"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Networking_WinSock", "Win32_Devices_Bluetooth"] }

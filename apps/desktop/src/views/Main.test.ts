@@ -21,6 +21,7 @@ vi.mock("@tauri-apps/api/event", () => ({
   emitTo: vi.fn(async () => {}),
 }));
 
+import { listen } from "@tauri-apps/api/event";
 import Main from "./Main.svelte";
 
 const navLabels = (c: HTMLElement) => [...c.querySelectorAll("nav a")].map((a) => a.textContent);
@@ -81,6 +82,25 @@ describe("Advanced equalizer from Sound", () => {
     window.dispatchEvent(new HashChangeEvent("hashchange"));
     await waitFor(() => expect(r.container.querySelector(".eq")).not.toBeNull());
     expect(r.queryByText("Advanced equalizer")).toBeNull();
+    r.unmount();
+  });
+});
+
+describe("Advanced equalizer and the popover", () => {
+  beforeEach(() => {
+    location.hash = "#sound";
+  });
+
+  it("a popover navigate closes it, even to Sound", async () => {
+    const r = render(Main);
+    await fireEvent.click(await r.findByRole("button", { name: "Advanced" }));
+    expect(r.getByText("Advanced equalizer")).toBeTruthy();
+    const calls = vi.mocked(listen).mock.calls.filter(([name]) => name === "navigate");
+    const handler = calls.at(-1)![1] as (e: { payload: string }) => void;
+    handler({ payload: "sound" });
+    await waitFor(() => expect(r.queryByText("Advanced equalizer")).toBeNull());
+    expect(r.container.querySelector(".eq")).not.toBeNull();
+    expect(navLabels(r.container)).toContain("Sound");
     r.unmount();
   });
 });

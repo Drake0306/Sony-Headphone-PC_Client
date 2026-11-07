@@ -65,6 +65,8 @@
     eq.refused?.reason ?? (sent ? "Sent" : busy && sentRaw !== null ? "Sending" : null),
   );
   const levelText = (v: number | null | undefined) => faderText(v, 0);
+  /** The headphones' six levels now, from state; null while disconnected or unknown. */
+  const onDevice = $derived(st.connected && st.eq_ult.value ? st.eq_ult.value.bands.map(fromRaw) : null);
 
   onMount(() => {
     getEqCurve()
@@ -94,17 +96,24 @@
     change(i, raw);
     if (curve === null) return;
     const mine = edits;
-    saver
-      .save(curve)
-      .then(() => getBestFitPreview())
-      .then((stored) => {
-        problem = null;
-        if (mine === edits && Array.isArray(stored)) fit = stored;
-      })
-      .catch((e) => {
+    saver.save(curve).then(
+      () =>
+        getBestFitPreview().then(
+          (stored) => {
+            problem = null;
+            if (mine === edits && Array.isArray(stored)) fit = stored;
+          },
+          (e) => {
+            // Saved; the fit shown stays the local mirror.
+            problem = "Saved; preview unavailable";
+            console.error(e);
+          },
+        ),
+      (e) => {
         problem = `Not saved: ${e}`;
         console.error(e);
-      });
+      },
+    );
   }
 
   function go(step: number) {
@@ -172,13 +181,20 @@
 
   <div class="bottom">
     <div>
+      <!-- One column per device value: label, the headphones now, the best fit. -->
       <div class="fit">
-        {#each DEVICE_BAND_LABELS as label, k (label)}
-          <div>
-            <span class="lab">{label}</span>
-            <span class="dot">{levelText(fit?.[k])}</span>
-          </div>
-        {/each}
+        <div class="r">
+          <span></span>
+          {#each DEVICE_BAND_LABELS as label (label)}<span class="lab dev">{label}</span>{/each}
+        </div>
+        <div class="r now">
+          <span class="lab">On the headphones now</span>
+          {#each DEVICE_BAND_LABELS as label, k (label)}<span class="dot">{levelText(onDevice?.[k])}</span>{/each}
+        </div>
+        <div class="r best">
+          <span class="lab">Best fit</span>
+          {#each DEVICE_BAND_LABELS as label, k (label)}<span class="dot">{levelText(fit?.[k])}</span>{/each}
+        </div>
       </div>
       <p class="hold">What the headphones will hold</p>
     </div>
@@ -260,29 +276,40 @@
     background: var(--ult);
   }
 
+  /* Values and the Send block side by side; the Send block wraps under when narrow. */
   .bottom {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 24px;
-    align-items: end;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px 28px;
+    align-items: flex-end;
+    justify-content: space-between;
   }
 
   .fit {
     display: grid;
-    grid-template-columns: repeat(6, auto);
-    gap: 14px;
+    grid-template-columns: auto repeat(6, auto);
+    gap: 4px 14px;
+    align-items: baseline;
     justify-content: start;
   }
 
-  .fit div {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
+  .fit .r {
+    display: contents;
+  }
+
+  .fit .dev {
+    color: var(--ink);
+    text-align: center;
   }
 
   .fit .dot {
     font-size: 16px;
     line-height: 18px;
+    text-align: center;
+  }
+
+  .fit .now .dot {
+    color: var(--muted);
   }
 
   .hold {
@@ -296,6 +323,7 @@
     flex-direction: column;
     gap: 8px;
     align-items: flex-end;
+    margin-left: auto;
     max-width: 360px;
   }
 

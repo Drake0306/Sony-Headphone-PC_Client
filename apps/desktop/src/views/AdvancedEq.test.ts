@@ -5,6 +5,8 @@ const backend = vi.hoisted(() => ({
   curve: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] as number[],
   /** When set, get_eq_curve never answers. */
   hang: false,
+  previewFails: false,
+  saveFails: false,
   calls: [] as { cmd: string; args?: Record<string, unknown> }[],
 }));
 
@@ -17,10 +19,15 @@ vi.mock("@tauri-apps/api/core", () => ({
       return { bands: [...backend.curve] };
     }
     if (cmd === "set_eq_curve") {
+      if (backend.saveFails) throw "disk full";
       backend.curve = [...(args!.bands as number[])];
       return null;
     }
-    if (cmd === "best_fit_preview") return bestFitPreview(backend.curve);
+    if (cmd === "best_fit_preview") {
+      if (backend.previewFails) throw "no preview";
+      return bestFitPreview(backend.curve);
+    }
+    if (cmd === "never") return bestFitPreview(backend.curve);
     if (cmd === "send_best_fit") return bestFitPreview(backend.curve);
     return null;
   }),
@@ -46,7 +53,8 @@ const connected = (status: Status = "Confirmed", bands = [10, 10, 10, 10, 10, 10
 
 const sliderLabels = (c: HTMLElement) =>
   [...c.querySelectorAll("[role=slider]")].map((s) => s.getAttribute("aria-label"));
-const fitTexts = (c: HTMLElement) => [...c.querySelectorAll(".fit .dot")].map((n) => n.textContent);
+const fitTexts = (c: HTMLElement) => [...c.querySelectorAll(".fit .best .dot")].map((n) => n.textContent);
+const nowTexts = (c: HTMLElement) => [...c.querySelectorAll(".fit .now .dot")].map((n) => n.textContent);
 const levelText = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${-v}` : "0");
 const calls = (cmd: string) => backend.calls.filter((c) => c.cmd === cmd);
 
@@ -54,6 +62,8 @@ describe("Advanced equalizer", () => {
   beforeEach(() => {
     backend.curve = [6, 3, 0, -2, 0, 0, 0, 0, 0, 0];
     backend.hang = false;
+    backend.previewFails = false;
+    backend.saveFails = false;
     backend.calls = [];
   });
 
@@ -171,6 +181,37 @@ describe("Advanced equalizer", () => {
     r.unmount();
   });
 
+  it("shows the headphones' current bands beside the best fit", async () => {
+    const r = render(AdvancedEq, { st: connected("Confirmed", [16, 12, 10, 7, 3, 20]), onback: () => {} });
+    await r.findByRole("slider", { name: "31 Hz" });
+    expect(r.getByText("On the headphones now")).toBeTruthy();
+    expect(r.getByText("Best fit")).toBeTruthy();
+    expect(nowTexts(r.container)).toEqual(["+6", "+2", "0", "−3", "−7", "+10"]);
+    expect(fitTexts(r.container)).toHaveLength(6);
+    await r.rerender({ st: connected("Confirmed", [10, 10, 11, 10, 10, 0]), onback: () => {} });
+    expect(nowTexts(r.container)).toEqual(["0", "0", "+1", "0", "0", "−10"]);
+    await r.rerender({ st: { ...connected("Confirmed", [16, 12, 10, 7, 3, 20]), connected: false }, onback: () => {} });
+    expect(nowTexts(r.container)).toEqual(Array(6).fill("--"));
+    await r.rerender({ st: emptyState(), onback: () => {} });
+    expect(nowTexts(r.container)).toEqual(Array(6).fill("--"));
+    r.unmount();
+  });
+
+  it("a failed preview after a save does not say the curve was not saved", async () => {
+    backend.previewFails = true;
+    const r = render(AdvancedEq, { st: connected(), onback: () => {} });
+    const low = await r.findByRole("slider", { name: "31 Hz" });
+    await fireEvent.keyDown(low, { key: "ArrowUp" });
+    await waitFor(() => expect(r.getByText("Saved; preview unavailable")).toBeTruthy());
+    expect(r.queryByText(/Not saved/)).toBeNull();
+    backend.previewFails = false;
+    backend.saveFails = true;
+    await fireEvent.keyDown(low, { key: "ArrowUp" });
+    await waitFor(() => expect(r.getByText(/^Not saved/)).toBeTruthy());
+    backend.saveFails = false;
+    r.unmount();
+  });
+
   it("back returns to Sound", async () => {
     const onback = vi.fn();
     const r = render(AdvancedEq, { st: connected(), onback });
@@ -184,7 +225,7 @@ describe("Advanced equalizer", () => {
     expect(r.getByText(NOTE).classList.contains("live")).toBe(true);
     expect(r.getByText("Advanced equalizer")).toBeTruthy();
     expect(r.getByText("What the headphones will hold")).toBeTruthy();
-    const labels = [...r.container.querySelectorAll(".fit .lab")].map((n) => n.textContent);
+    const labels = [...r.container.querySelectorAll(".fit .dev")].map((n) => n.textContent);
     expect(labels).toEqual(["Clear Bass", "400 Hz", "1 kHz", "2.5 kHz", "6.3 kHz", "16 kHz"]);
     r.unmount();
   });

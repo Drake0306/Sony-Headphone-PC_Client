@@ -37,6 +37,8 @@
   // The popover asks for a tab with the "navigate" event, and leaves it in
   // localStorage for a window it has just created (`openMainWindowOn`).
   function show(id: string) {
+    // Same tab or not, a request from the popover leaves the Advanced equalizer.
+    advancedEq = false;
     try {
       localStorage.removeItem(OPEN_TAB_KEY);
     } catch {

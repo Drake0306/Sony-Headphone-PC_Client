@@ -24,6 +24,7 @@ chrono = "0.4"
 tauri = { version = "2.12", features = ["tray-icon", "image-png", "macos-private-api"] }
 tauri-plugin-positioner = { version = "2.4", features = ["tray-icon"] }
 tauri-plugin-autostart = "2"
+tauri-plugin-global-shortcut = "2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-nspanel = "2.1"

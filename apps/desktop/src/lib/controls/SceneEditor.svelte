@@ -12,7 +12,7 @@
     accelerator,
     AMBIENT_MAX,
     EQ_PRESETS,
-    keyLabel,
+    hotkeyChips,
     triggerSentence,
     VOLUME_MAX,
     type Actions,
@@ -29,11 +29,21 @@
     /** A save or delete is in flight. */
     busy?: boolean;
     error?: string | null;
+    /** Why the saved hotkey was not registered. */
+    hotkeyError?: string | null;
     onSave: (scene: Scene) => void;
     onDelete: () => void;
   }
 
-  let { draft: initial, isNew = false, busy = false, error = null, onSave, onDelete }: Props = $props();
+  let {
+    draft: initial,
+    isNew = false,
+    busy = false,
+    error = null,
+    hotkeyError = null,
+    onSave,
+    onDelete,
+  }: Props = $props();
 
   type Keep = "keep";
   const KEEP: Keep = "keep";
@@ -76,7 +86,9 @@
   let picking = $state(isNew);
   let recording = $state(false);
 
-  const hotkeyParts = $derived(draft.hotkey ? draft.hotkey.split("+") : []);
+  const hotkeyParts = $derived(hotkeyChips(draft.hotkey, mac));
+  // The error is about the saved hotkey; a newly recorded one has not been tried yet.
+  const refused = $derived(hotkeyError !== null && draft.hotkey === initial.hotkey ? hotkeyError : null);
 
   const orKeep = <T,>(v: T | null): T | Keep => (v === null ? KEEP : v);
   const unKeep = <T,>(v: T | Keep): T | null => (v === KEEP ? null : (v as T));
@@ -279,8 +291,8 @@
   <Row label="Hotkey" note="Apply this scene by hand">
     <div class="line">
       {#if hotkeyParts.length > 0}
-        <div class="keys" aria-label="Hotkey">
-          {#each hotkeyParts as part, i (i)}<span>{keyLabel(part, mac)}</span>{/each}
+        <div class="keys" class:refused={refused !== null} aria-label="Hotkey" title={refused ?? undefined}>
+          {#each hotkeyParts as part, i (i)}<span>{part}</span>{/each}
         </div>
       {/if}
       <button class="btn" class:fill={recording} onclick={() => (recording = !recording)}
@@ -294,6 +306,7 @@
       >
     </div>
   </Row>
+  {#if refused}<p class="note live">{refused}</p>{/if}
   <div class="btnrow">
     <button class="btn" class:unavailable={busy} aria-disabled={busy} onclick={() => busy || onDelete()}>Delete</button>
     <button class="btn fill" class:unavailable={busy} aria-disabled={busy} onclick={save}>Save scene</button>

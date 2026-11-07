@@ -5,6 +5,7 @@ pub mod broker;
 mod commands;
 pub mod dock;
 pub mod frame_log;
+pub mod hotkeys;
 mod popover;
 pub mod scenes;
 mod sensors_macos;
@@ -77,12 +78,14 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
-        ));
+        ))
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build());
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init());
     builder
         .manage(Mutex::new(DeviceState::default()))
         .manage(commands::Runtime { fake })
+        .manage(hotkeys::HotkeyErrors::default())
         .invoke_handler(invoke_handler(wants_debug()))
         .setup(move |app| {
             let dir = settings::dir(app.handle());
@@ -106,6 +109,7 @@ pub fn run() {
                 Err(_) => scenes::store::seed_scenes(),
             };
             // Read by the broker thread when it starts.
+            hotkeys::apply(app.handle(), &scenes);
             app.manage(Mutex::new(scenes));
             tray::create(app.handle())?;
             popover::create(app.handle())?;

@@ -6,7 +6,16 @@
 <script lang="ts">
   import SceneCard from "../lib/controls/SceneCard.svelte";
   import SceneEditor from "../lib/controls/SceneEditor.svelte";
-  import { applyScene, moveScene, newScene, saveScenes, scenes, validateScene, type Scene } from "../lib/scenes";
+  import {
+    applyScene,
+    hotkeyError,
+    moveScene,
+    newScene,
+    saveScenes,
+    scenes,
+    validateScene,
+    type Scene,
+  } from "../lib/scenes";
 
   let draft = $state<Scene | null>(null);
   // Bumped on every open, so the editor starts a fresh working copy.
@@ -127,7 +136,15 @@
     <div class="col">
       {#if draft}
         {#key opened}
-          <SceneEditor {draft} {isNew} busy={saving} {error} onSave={save} onDelete={remove} />
+          <SceneEditor
+            {draft}
+            {isNew}
+            busy={saving}
+            {error}
+            hotkeyError={isNew ? null : hotkeyError($scenes, draft.id)}
+            onSave={save}
+            onDelete={remove}
+          />
         {/key}
       {/if}
     </div>

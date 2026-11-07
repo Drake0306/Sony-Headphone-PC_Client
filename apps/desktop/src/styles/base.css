@@ -399,6 +399,11 @@ body.kbd a:focus-visible {
   font-size: 10px;
 }
 
+.keys.refused span {
+  border-color: var(--ult);
+  color: var(--ult);
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;

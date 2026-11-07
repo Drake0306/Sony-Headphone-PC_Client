@@ -207,8 +207,9 @@ pub fn get_scenes(broker: State<'_, Broker>, scenes: State<'_, Mutex<Vec<Scene>>
     list
 }
 
-/// Validates and saves the whole list, then hands it to the broker, which
-/// emits the `"scenes"` event.
+/// Validates and saves the whole list, re-registers the hotkeys, then hands
+/// the list to the broker, which emits the `"scenes"` event (with any hotkey
+/// errors).
 #[tauri::command]
 pub fn set_scenes(
     app: AppHandle,
@@ -224,6 +225,7 @@ pub fn set_scenes(
         .map_err(|_| "scene list unavailable".to_string())?;
     store::save(&dir, &scenes).map_err(|e| format!("could not save scenes: {e}"))?;
     *current = scenes.clone();
+    crate::hotkeys::apply(&app, &scenes);
     broker.send(BrokerCmd::SetScenes(scenes))
 }
 

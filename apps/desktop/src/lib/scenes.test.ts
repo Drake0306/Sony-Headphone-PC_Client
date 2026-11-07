@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   accelerator,
   actionChips,
+  hotkeyChips,
+  hotkeyError,
+  hotkeyList,
   modeBoxes,
   moveScene,
   newScene,
@@ -221,5 +224,35 @@ describe("modeBoxes", () => {
     expect(boxes.more).toBe(true);
     expect(modeBoxes([scene("a", { enabled: false })])).toEqual({ shown: [], more: false });
     expect(modeBoxes(["a", "b", "c", "d"].map((id) => scene(id))).more).toBe(false);
+  });
+});
+
+describe("hotkeys", () => {
+  it("hotkey_chips_use_mac_symbols_on_a_mac", () => {
+    expect(hotkeyChips("Ctrl+Alt+Shift+Super+1", true)).toEqual(["⌃", "⌥", "⇧", "⌘", "1"]);
+    expect(hotkeyChips("Alt+Super+ArrowUp", false)).toEqual(["Alt", "Super", "ArrowUp"]);
+    expect(hotkeyChips(null, true)).toEqual([]);
+  });
+
+  it("hotkey_error_reads_the_refusal_for_a_scene", () => {
+    const v = { scenes: [], active: null, hotkey_errors: { b: 'already used by scene "A"' } };
+    expect(hotkeyError(v, "b")).toBe('already used by scene "A"');
+    expect(hotkeyError(v, "a")).toBeNull();
+    expect(hotkeyError({ scenes: [], active: null }, "b")).toBeNull();
+  });
+
+  it("hotkey_list_is_the_window_shortcut_then_enabled_scenes_with_a_hotkey", () => {
+    const list = [
+      scene("a", { name: "Desk", hotkey: "Alt+Super+1" }),
+      scene("b", { enabled: false, hotkey: "Alt+Super+2" }),
+      scene("c"),
+      scene("d", { name: "Walk", hotkey: "Ctrl+F5" }),
+    ];
+    expect(hotkeyList(list, true)).toEqual([
+      { label: "Open window", keys: ["⌥", "⌘", "N"] },
+      { label: "Desk", keys: ["⌥", "⌘", "1"] },
+      { label: "Walk", keys: ["⌃", "F5"] },
+    ]);
+    expect(hotkeyList([scene("c")], true)).toEqual([{ label: "Open window", keys: ["⌥", "⌘", "N"] }]);
   });
 });

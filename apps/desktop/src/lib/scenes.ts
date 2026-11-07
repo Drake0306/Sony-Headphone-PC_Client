@@ -44,13 +44,14 @@ export interface Scene {
 export interface ScenesEvent {
   scenes: Scene[];
   active: string | null;
-  /** Hotkey registration errors by scene id (arrives with the hotkeys task; not shown yet). */
+  /** Refused or failed hotkeys by scene id; empty when none. */
   hotkey_errors?: Record<string, string>;
 }
 
 export interface ScenesView {
   scenes: Scene[];
   active: string | null;
+  hotkey_errors?: Record<string, string>;
 }
 
 /** Preset ids the backend accepts (commands.rs `EQ_PRESETS`). */
@@ -62,9 +63,9 @@ export const AMBIENT_MAX = 20;
 let events = 0;
 
 const view = writable<ScenesView>({ scenes: [], active: null }, () => {
-  const unlisten = onScenes(({ scenes, active }) => {
+  const unlisten = onScenes(({ scenes, active, hotkey_errors }) => {
     events += 1;
-    view.set({ scenes, active });
+    view.set({ scenes, active, hotkey_errors: hotkey_errors ?? {} });
   });
   loadScenes().catch((e) => console.error(e));
   return () => {
@@ -238,6 +239,26 @@ const MAC_KEYS: Record<string, string> = { Ctrl: "⌃", Alt: "⌥", Shift: "⇧"
 
 /** One accelerator part as a key chip: the macOS symbols on a Mac, the names elsewhere. */
 export const keyLabel = (part: string, mac: boolean): string => (mac ? (MAC_KEYS[part] ?? part) : part);
+
+/** An accelerator as key chips (empty for no hotkey). */
+export const hotkeyChips = (accelerator: string | null, mac: boolean): string[] =>
+  accelerator ? accelerator.split("+").map((part) => keyLabel(part, mac)) : [];
+
+/** Why a scene's hotkey was not registered, or null. */
+export const hotkeyError = (v: ScenesView, id: string): string | null => v.hotkey_errors?.[id] ?? null;
+
+/** The fixed shortcut that opens the main window (hotkeys.rs `WINDOW_SHORTCUT`). */
+export const WINDOW_SHORTCUT = "Alt+Super+N";
+
+/** Settings' Hotkeys list: the window shortcut, then each enabled scene with a hotkey. */
+export function hotkeyList(list: Scene[], mac: boolean): { label: string; keys: string[] }[] {
+  return [
+    { label: "Open window", keys: hotkeyChips(WINDOW_SHORTCUT, mac) },
+    ...list
+      .filter((s) => s.enabled && s.hotkey && s.hotkey.trim() !== "")
+      .map((s) => ({ label: s.name, keys: hotkeyChips(s.hotkey, mac) })),
+  ];
+}
 
 /** Up to two scenes for the Noise screen: the active one, then the first enabled other one. */
 export function relevantScenes(v: ScenesView): Scene[] {

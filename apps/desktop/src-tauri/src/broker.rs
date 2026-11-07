@@ -404,6 +404,7 @@ pub fn spawn_broker(app: AppHandle, fake: bool) -> Sender<BrokerCmd> {
                         ScenesEvent {
                             scenes: engine.scenes(),
                             active: engine.active(),
+                            hotkey_errors: crate::hotkeys::latest_errors(&app),
                         },
                     );
                 }),
@@ -451,6 +452,8 @@ pub fn spawn_broker(app: AppHandle, fake: bool) -> Sender<BrokerCmd> {
 struct ScenesEvent<'a> {
     scenes: &'a [Scene],
     active: Option<&'a str>,
+    /// Refused or failed hotkeys by scene id; empty when none.
+    hotkey_errors: std::collections::HashMap<String, String>,
 }
 
 /// Trigger inputs from the desktop: local time and the macOS sensors.

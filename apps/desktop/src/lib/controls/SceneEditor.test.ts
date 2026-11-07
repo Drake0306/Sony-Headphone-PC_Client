@@ -52,4 +52,21 @@ describe("SceneEditor", () => {
     await fireEvent.click(getByText("Save scene"));
     expect(onSave.mock.calls[1][0].actions.volume).toBeNull();
   });
+
+  it("scene_editor_shows_a_refused_hotkey", async () => {
+    const draft = { ...newScene(), hotkey: "Alt+Super+1" };
+    const { getByText, getByLabelText, queryByText } = render(SceneEditor, {
+      draft,
+      hotkeyError: 'already used by scene "Desk"',
+      onSave: () => {},
+      onDelete: () => {},
+    });
+    expect(getByLabelText("Hotkey")).toHaveClass("refused");
+    expect(getByText('already used by scene "Desk"')).toHaveClass("live");
+    // A newly recorded hotkey is not the refused one.
+    await fireEvent.click(getByText("Record"));
+    await fireEvent.keyDown(window, { code: "Digit2", key: "2", altKey: true, metaKey: true });
+    expect(getByLabelText("Hotkey")).not.toHaveClass("refused");
+    expect(queryByText('already used by scene "Desk"')).toBeNull();
+  });
 });

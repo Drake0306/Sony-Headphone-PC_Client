@@ -35,10 +35,10 @@ describe("scenes store", () => {
   it("scenes_store_drops_a_get_reply_older_than_an_event", async () => {
     const stop = scenes.subscribe(() => {});
     await vi.waitFor(() => expect(io.handler).not.toBeNull());
-    io.handler!({ payload: { scenes: [scene("new")], active: "new" } });
+    io.handler!({ payload: { scenes: [scene("new")], active: "new", hotkey_errors: { new: "taken" } } });
     io.reply!([scene("old")]);
     await new Promise((done) => setTimeout(done, 0));
-    expect(get(scenes)).toEqual({ scenes: [scene("new")], active: "new" });
+    expect(get(scenes)).toEqual({ scenes: [scene("new")], active: "new", hotkey_errors: { new: "taken" } });
     stop();
   });
 });

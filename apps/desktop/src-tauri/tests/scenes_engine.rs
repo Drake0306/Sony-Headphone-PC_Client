@@ -377,6 +377,32 @@ fn saving_unchanged_active_scene_sends_nothing() {
     assert_eq!(engine.active(), Some("walk"));
 }
 
+#[test]
+fn disabling_the_active_scene_sends_nothing_and_clears_active() {
+    let mut engine = Engine::new(vec![nc_ambient_scene("call", Trigger::MicInUse)]);
+    let on = Inputs {
+        connected: true,
+        now_minutes: 0,
+        frontmost_app: None,
+        mic_in_use: true,
+    };
+    assert!(engine.tick(&on).is_some());
+    let mut off = engine.scenes().to_vec();
+    off[0].enabled = false;
+    off[0].actions.volume = Some(9);
+    assert_eq!(engine.set_scenes(off), None);
+    assert_eq!(engine.active(), None);
+    // It cannot match any more, so the next tick applies nothing.
+    assert_eq!(engine.tick(&on), None);
+    assert_eq!(engine.active(), None);
+
+    // A scene that was already off and applied by hand stays active.
+    assert!(engine.apply_manual("call").is_some());
+    let same = engine.scenes().to_vec();
+    assert_eq!(engine.set_scenes(same), None);
+    assert_eq!(engine.active(), Some("call"));
+}
+
 // ---- The broker loop with a scene host and scripted sensors ----
 
 mod broker_level {

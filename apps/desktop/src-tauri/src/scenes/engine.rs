@@ -37,16 +37,24 @@ impl Engine {
         self.active.as_deref()
     }
 
-    /// Replaces the list. A deleted active scene is cleared without a revert;
-    /// a deleted evaluated scene is forgotten so the next tick re-evaluates.
-    /// Returns the active scene's actions when they were edited, so the
-    /// change reaches the headphones; `None` when they are unchanged.
+    /// Replaces the list. A deleted or just-disabled active scene is cleared
+    /// without a revert; a deleted evaluated scene is forgotten so the next
+    /// tick re-evaluates. Returns the active scene's actions when they were
+    /// edited, so the change reaches the headphones; `None` when they are
+    /// unchanged or the scene was cleared.
     pub fn set_scenes(&mut self, scenes: Vec<Scene>) -> Option<Actions> {
         let known = |id: &Option<String>| {
             id.as_ref()
                 .is_some_and(|id| scenes.iter().any(|s| &s.id == id))
         };
-        if !known(&self.active) {
+        // A scene just switched off can no longer match and must not fire. One
+        // that was already off (applied by hand) stays active.
+        let enabled = |list: &[Scene], id: &str| list.iter().any(|s| s.id == id && s.enabled);
+        let switched_off = self
+            .active
+            .as_deref()
+            .is_some_and(|id| enabled(&self.scenes, id) && !enabled(&scenes, id));
+        if switched_off || !known(&self.active) {
             self.active = None;
         }
         if !known(&self.evaluated) {

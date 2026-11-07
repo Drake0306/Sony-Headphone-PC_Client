@@ -13,6 +13,7 @@ vi.mock("@tauri-apps/api/core", () => ({
     }
     if (cmd === "runtime_info") return { fake: true, version: "0" };
     if (cmd === "capability_list") return [];
+    if (cmd === "get_scenes") return [];
     return null;
   }),
 }));

@@ -261,6 +261,9 @@ describe("relevantScenes", () => {
     expect(relevantScenes({ scenes: list, active: "b" }).map((s) => s.id)).toEqual(["b", "c"]);
     expect(relevantScenes({ scenes: list, active: null }).map((s) => s.id)).toEqual(["b"]);
     expect(relevantScenes({ scenes: [scene("a", { enabled: false })], active: null })).toEqual([]);
+    // A store value that has not arrived never throws.
+    expect(relevantScenes(null)).toEqual([]);
+    expect(relevantScenes({ scenes: null as unknown as [], active: null })).toEqual([]);
   });
 });
 

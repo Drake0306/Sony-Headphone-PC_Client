@@ -8,7 +8,7 @@ use hairline_lib::popover::{tray_click_action, TrayAction};
 use hairline_lib::sensors_windows::app_name_from_path;
 
 #[test]
-fn popover_hides_on_focus_loss() {
+fn tray_click_after_focus_loss_hide_does_not_reopen() {
     let now = Instant::now();
     // A visible popover: the tray click hides it.
     assert_eq!(tray_click_action(None, now, true), TrayAction::Hide);

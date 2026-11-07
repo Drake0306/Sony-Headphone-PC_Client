@@ -131,8 +131,10 @@ Run with the real headphones connected.
 The app builds and its tests pass on Windows CI; it has not been started on a Windows machine or run against the headphones on Windows. Nothing below is verified. Do section 7 (the transport) first.
 
 - [ ] `HAIRLINE_FAKE=1`: the app starts, the tray icon appears in the notification area, and a left click opens the popover centred above the icon with the `FAKE` label.
+- [ ] The tray icon is visible on both light and dark taskbars.
 - [ ] The popover has no title bar, stays on top, and does not appear in the taskbar.
-- [ ] Clicking outside the popover hides it. Clicking the tray icon while it is open hides it and does not reopen it at once; the next click opens it.
+- [ ] With the taskbar on the left, right or top, the popover opens by the icon and fully on screen.
+- [ ] Clicking outside hides the popover (set_focus takes the foreground, so focus loss arrives). Clicking the tray icon while it is open hides it and does not reopen it at once; the next click opens it.
 - [ ] Right click on the tray icon shows Quit, and Quit ends the app.
 - [ ] The popover footer opens the main window; it appears in the taskbar like an ordinary window, and closing it leaves the tray icon running.
 - [ ] With the headphones paired and connected, the popover shows battery, noise control and ULT, and a change from the popover takes effect on the headphones.

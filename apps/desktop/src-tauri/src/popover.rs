@@ -103,9 +103,11 @@ pub fn toggle(app: &AppHandle) {
 }
 
 /// Places the popover by the tray icon: centred under the menu-bar icon on
-/// macOS, centred above the notification-area icon on Windows (the positioner
-/// puts it below when there is no room above), clamped to the screen there
-/// as a safety net.
+/// macOS. On Windows it is centred on the notification-area icon with its
+/// bottom at the icon's top; the positioner moves it below the icon only when
+/// that would put it above the screen (y < 0), and `move_window_constrained`
+/// then clamps it inside the monitor's bounds (so with a side taskbar it can
+/// overlap the icon).
 fn place(window: &WebviewWindow) {
     #[cfg(target_os = "windows")]
     let _ = window.move_window_constrained(Position::TrayCenter);

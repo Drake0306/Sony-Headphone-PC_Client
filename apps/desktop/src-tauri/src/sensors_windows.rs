@@ -24,16 +24,20 @@ pub fn frontmost_app_name() -> Option<String> {
     use std::sync::Once;
 
     static FAILED: Once = Once::new();
-    let name = foreground_image_path().and_then(|path| app_name_from_path(&path));
-    if name.is_none() {
-        FAILED.call_once(|| eprintln!("hairline: frontmost app unknown; app triggers stay off"));
+    match foreground_image_path() {
+        Ok(path) => path.and_then(|path| app_name_from_path(&path)),
+        Err(what) => {
+            FAILED.call_once(|| eprintln!("hairline: frontmost app unknown ({what})"));
+            None
+        }
     }
-    name
 }
 
-/// The full image path of the process that owns the foreground window.
+/// The full image path of the process that owns the foreground window:
+/// `Ok(None)` when no window has the foreground (nothing to log), `Err` when
+/// the process could not be read.
 #[cfg(windows)]
-fn foreground_image_path() -> Option<String> {
+fn foreground_image_path() -> Result<Option<String>, &'static str> {
     use windows_sys::Win32::Foundation::CloseHandle;
     use windows_sys::Win32::System::Threading::{
         OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
@@ -46,18 +50,18 @@ fn foreground_image_path() -> Option<String> {
     // SAFETY: no arguments; returns null when no window has the foreground.
     let window = unsafe { GetForegroundWindow() };
     if window.is_null() {
-        return None;
+        return Ok(None);
     }
     let mut pid: u32 = 0;
     // SAFETY: `window` is a window handle and `pid` a valid u32 to write to.
     unsafe { GetWindowThreadProcessId(window, &mut pid) };
     if pid == 0 {
-        return None;
+        return Ok(None);
     }
     // SAFETY: plain call; returns null on failure (e.g. access denied).
     let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
     if process.is_null() {
-        return None;
+        return Err("OpenProcess failed");
     }
     let mut buf = [0u16; 1024];
     let mut len = buf.len() as u32;
@@ -68,9 +72,11 @@ fn foreground_image_path() -> Option<String> {
     // SAFETY: `process` is the open handle from `OpenProcess`, closed once.
     unsafe { CloseHandle(process) };
     if ok == 0 {
-        return None;
+        return Err("QueryFullProcessImageNameW failed");
     }
-    String::from_utf16(buf.get(..len as usize)?).ok()
+    Ok(buf
+        .get(..len as usize)
+        .and_then(|name| String::from_utf16(name).ok()))
 }
 
 /// Whether any app is using the microphone: always `false` on Windows for

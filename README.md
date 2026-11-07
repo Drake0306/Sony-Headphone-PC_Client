@@ -66,13 +66,23 @@ Actions use the existing controls only: noise control, ambient level and voice f
 
 Hotkeys are recorded in the scene editor as Tauri accelerators and registered with the global-shortcut plugin only while Hairline runs. If one conflicts or the OS refuses it, it shows as refused, with the reason, in the editor and in Settings. A scene hotkey needs Ctrl, Alt or Super (or is a lone F1–F24 key), so it cannot take over typing. `⌥⌘N` opens the window when macOS allows the shortcut; Settings shows it refused otherwise.
 
+## Sound
+
+The Sound screen shows the headphones' six EQ bands as faders, the preset grid, ULT, the codec and DSEE, all as the headphones report them. The faders can be moved only on Manual, Custom 1 and Custom 2. On Sony's fixed presets (Bright, Excited, Mellow, Relaxed, Vocal, Treble Boost, Bass Boost, Speech) the headphones apply the curve inside and report every band at 0, so the faders are read-only and say so: "Sony applies this preset inside the headphones and does not report its band values. Choose Manual, Custom 1 or Custom 2 to shape your own." On Off the faders are disabled ("Equalizer off."). Hairline never makes up band values for a fixed preset.
+
 ## Advanced equalizer
 
 The headphones have six EQ bands. The Advanced equalizer is a ten-band curve (31 Hz to 16 kHz) that Hairline keeps itself. Open it with the "Advanced" button next to the Equalizer heading on the Sound screen; it takes the whole content area and "‹ Sound" returns. It shows four of the ten bands at a time, and ‹ and › page through them (1–4, 5–8, 7–10).
 
 Every change is saved to `eq_curve.json`, next to `settings.json` in the app's config directory. Nothing is sent to the headphones while you edit. These bands run in Hairline only; the headphones keep their six-band curve.
 
-"Send best fit to headphones" fits the ten bands onto the six: Clear Bass is the mean of the four lowest bands, 1 kHz and 16 kHz are taken directly, and 400 Hz, 2.5 kHz and 6.3 kHz are interpolated in log frequency between their neighbours (rounded half away from zero, clamped to −10..+10). The result is written through the normal EQ command, which keeps the preset and ULT as they are, and the view shows the headphones' current six values beside the fit. Nothing new goes on the wire.
+"Send best fit to headphones" fits the ten bands onto the six: Clear Bass is the mean of the four lowest bands, 1 kHz and 16 kHz are taken directly, and 400 Hz, 2.5 kHz and 6.3 kHz are interpolated in log frequency between their neighbours (rounded half away from zero, clamped to −10..+10). The view shows the headphones' current six values beside the fit.
+
+Send asks first. A dialog, "Send best fit to the headphones?", says that the headphones hold six bands (Clear Bass, 400 Hz, 1 kHz, 2.5 kHz, 6.3 kHz, 16 kHz), not ten, that Hairline fits the ten onto those six, which preset they go into, and lists the six fitted values. Nothing is sent until you press Send in the dialog; Cancel, Escape or a click outside it sends nothing.
+
+Which preset: if the headphones are on Manual, Custom 1 or Custom 2, the fit is written into that preset. On any other preset (a fixed Sony preset or Off) it is written into Custom 1, and the dialog says "Custom 1 (the headphones will switch to it)". The write is one normal EQ command (`58 03`) that carries the target preset and the six bands together and keeps ULT as it is; no new command goes on the wire.
+
+Reset, beside Send, puts all ten bands back to 0 and saves that curve. It does not touch the headphones.
 
 ## Advanced panel
 

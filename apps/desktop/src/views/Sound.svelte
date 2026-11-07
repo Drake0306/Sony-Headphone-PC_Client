@@ -19,6 +19,7 @@
   import Toggle from "../lib/controls/Toggle.svelte";
   import { control } from "../lib/control.svelte";
   import { setConnectionMode, setDseeAutoOff, setEqBands, setEqPreset, setUlt } from "../lib/ipc";
+  import { shapeProblem } from "../lib/eqCurve";
   import { encodeSound, presetSlot } from "../lib/presetCode";
   import {
     codecLabel,
@@ -69,6 +70,8 @@
   const shareable = $derived.by(() => {
     const eq = st.eq_ult.value;
     if (!st.connected || eq === null || eqBusy || presetSlot(eq.preset) === 3) return null;
+    // A code holds six bands of 21 steps.
+    if (shapeProblem(st.eq_capability) !== null) return null;
     try {
       return encodeSound({ bands: eq.bands, ult: ULT_ARG[eq.ult], slot: presetSlot(eq.preset) });
     } catch {

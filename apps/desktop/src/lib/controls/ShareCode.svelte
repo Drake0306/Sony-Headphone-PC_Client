@@ -1,7 +1,9 @@
 <!--
   Share a setting: a modal like Confirm with the QR of the code (the code
   text itself, drawn at open time), the code in mono with its dashes, a muted
-  line, then Copy (clipboard; says "Copied") and Close. Focus starts on Copy
+  line, then Copy (clipboard; says "Copied", or selects the code when the
+  clipboard refuses) and Close. The QR uses --qr-dark on --qr-light, dark on
+  light in either theme. Focus starts on Copy
   and stays inside the panel; Escape or a click on the backdrop closes.
 -->
 <script lang="ts">
@@ -12,6 +14,7 @@
 
   let panel: HTMLElement;
   let copyButton: HTMLButtonElement;
+  let codeText: HTMLElement;
   let copied = $state<string | null>(null);
   const id = `share-${Math.random().toString(36).slice(2)}`;
 
@@ -31,7 +34,13 @@
       await navigator.clipboard.writeText(code);
       copied = "Copied";
     } catch (e) {
-      copied = "Copy failed; select the code instead";
+      // Leave the code selected so Cmd/Ctrl+C copies it.
+      const range = document.createRange();
+      range.selectNodeContents(codeText);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      copied = "Selected; press Cmd/Ctrl+C to copy";
       console.error(e);
     }
   }
@@ -57,10 +66,10 @@
   <div class="panel" role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} bind:this={panel}>
     <h4 id={`${id}-title`}>{title}</h4>
     <svg class="qr" viewBox={`0 0 ${box} ${box}`} role="img" aria-label={`QR code for ${code}`} shape-rendering="crispEdges">
-      <rect width={box} height={box} class="paper" />
-      <path d={qrPath(qr.dark)} class="ink" />
+      <rect width={box} height={box} class="light" />
+      <path d={qrPath(qr.dark)} class="dark" />
     </svg>
-    <p class="code">{code}</p>
+    <p class="code" bind:this={codeText}>{code}</p>
     <p class="hint">Anyone with Hairline can paste this code</p>
     <div class="actions">
       {#if copied}<span class="lab" role="status">{copied}</span>{/if}
@@ -106,12 +115,12 @@
     height: 180px;
   }
 
-  .qr .paper {
-    fill: var(--paper);
+  .qr .light {
+    fill: var(--qr-light);
   }
 
-  .qr .ink {
-    fill: var(--ink);
+  .qr .dark {
+    fill: var(--qr-dark);
   }
 
   .code {

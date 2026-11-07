@@ -152,7 +152,7 @@ fn check_bands(bands: &[u8]) -> Result<(), String> {
 /// (Manual, Custom 1 or Custom 2) in one EQ frame. The UI calls it only after
 /// the confirmation dialog.
 #[tauri::command]
-pub fn set_eq_preset_bands(
+pub fn set_eq_preset_ult_bands(
     broker: State<'_, Broker>,
     device: State<'_, Mutex<DeviceState>>,
     preset: u8,
@@ -164,7 +164,7 @@ pub fn set_eq_preset_bands(
         .map_err(|_| "the device state is unavailable".to_string())?
         .eq_capability
         .clone();
-    broker.send(crate::eq_curve::prepare_preset_bands(
+    broker.send(crate::eq_curve::prepare_preset_ult_bands(
         cap.as_ref(),
         preset,
         ult,

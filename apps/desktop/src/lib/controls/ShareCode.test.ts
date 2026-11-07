@@ -30,9 +30,24 @@ describe("Share a code", () => {
     r.unmount();
   });
 
-  it("draws the QR in tokens", () => {
-    expect(shareSrc).toMatch(/var\(--ink\)/);
-    expect(shareSrc).toMatch(/var\(--paper\)/);
+  it("draws the QR only in the QR tokens", () => {
+    const qrRules = [...shareSrc.matchAll(/\.qr[^{]*\{([^}]*)\}/g)].map((m) => m[1]).join("\n");
+    const fills = [...qrRules.matchAll(/(?:fill|color|background|stroke)\s*:\s*([^;]+);/g)].map((m) => m[1].trim());
+    expect(fills.sort()).toEqual(["var(--qr-dark)", "var(--qr-light)"]);
+    // No colour set on the SVG markup itself.
+    expect(shareSrc).not.toMatch(/<(svg|rect|path)[^>]*\s(fill|stroke|style)=/);
+  });
+
+  it("selects the code when the clipboard refuses", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: vi.fn(async () => Promise.reject(new Error("denied"))) },
+      configurable: true,
+    });
+    const r = render(ShareCode, { title: "Share this curve", code: CODE, onclose: () => {} });
+    await fireEvent.click(r.getByRole("button", { name: "Copy" }));
+    expect(await r.findByText("Selected; press Cmd/Ctrl+C to copy")).toBeTruthy();
+    expect(window.getSelection()?.toString()).toBe(CODE);
+    r.unmount();
   });
 
   it("qr encodes the code text", () => {

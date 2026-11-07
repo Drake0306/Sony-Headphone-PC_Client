@@ -86,6 +86,9 @@ describe("preset share codes", () => {
     expect(decode(SOUND_CODE.toLowerCase())).toEqual(decode(SOUND_CODE));
     expect(decode(plain)).toEqual(decode(SOUND_CODE));
     expect(decode(`  ${plain.slice(0, 5)} ${plain.slice(5, 10)}\t${plain.slice(10)}\n`)).toEqual(decode(SOUND_CODE));
+    // Any Unicode dash, as a word processor may turn the hyphens into.
+    expect(decode(SOUND_CODE.replaceAll("-", "\u2013"))).toEqual(decode(SOUND_CODE));
+    expect(decode(SOUND_CODE.replaceAll("-", "\u2014 "))).toEqual(decode(SOUND_CODE));
     // I and L read as 1, O as 0, in either case.
     expect(normalise("ilo-ILO")).toBe("110110");
     const zeros = ADVANCED_CODE.replaceAll("0", "o");

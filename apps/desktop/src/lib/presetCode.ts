@@ -68,10 +68,10 @@ export function crc10(bits: readonly number[]): number {
   return reg;
 }
 
-/** Drops whitespace and dashes, upper-cases, reads I and L as 1 and O as 0. */
+/** Drops whitespace and any dash (hyphen, en/em dash…), upper-cases, reads I and L as 1 and O as 0. */
 export function normalise(text: string): string {
   return text
-    .replace(/[\s-]+/g, "")
+    .replace(/[\s\p{Pd}]+/gu, "")
     .toUpperCase()
     .replace(/[IL]/g, "1")
     .replace(/O/g, "0");

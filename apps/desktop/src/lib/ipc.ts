@@ -53,8 +53,8 @@ export const sendBestFit = (bands: number[], preset: number) =>
  * `preset` (Manual, Custom 1 or Custom 2) in one EQ write. Only called after
  * the confirmation dialog.
  */
-export const setEqPresetBands = (preset: number, ult: 0 | 1 | 2, bands: number[]) =>
-  invoke<void>("set_eq_preset_bands", { preset, ult, bands });
+export const setEqPresetUltBands = (preset: number, ult: 0 | 1 | 2, bands: number[]) =>
+  invoke<void>("set_eq_preset_ult_bands", { preset, ult, bands });
 
 /** Volume 0..=30. */
 export const setVolume = (volume: number) => invoke<void>("set_volume", { volume });

@@ -12,7 +12,7 @@ import { encodeAdvanced, encodeSound } from "../presetCode";
 import { emptyState, type DeviceState } from "../state";
 import PasteCode from "./PasteCode.svelte";
 
-const DEVICE_WRITES = ["set_eq_preset_bands", "set_eq_bands", "send_best_fit", "set_eq_preset", "set_ult"];
+const DEVICE_WRITES = ["set_eq_preset_ult_bands", "set_eq_preset_bands", "set_eq_bands", "send_best_fit", "set_eq_preset", "set_ult"];
 const writes = () => vi.mocked(invoke).mock.calls.filter(([cmd]) => DEVICE_WRITES.includes(cmd));
 const calls = (cmd: string) => vi.mocked(invoke).mock.calls.filter(([c]) => c === cmd);
 
@@ -35,8 +35,8 @@ describe("Paste a code", () => {
 
   it("shows errors live and keeps Apply off until the code is valid", async () => {
     const r = render(PasteCode, { st: connected(), onclose: () => {} });
-    const dialog = r.getByRole("dialog");
-    expect(within(dialog).getByText("Paste a code")).toBeTruthy();
+    const dialog = r.getByRole("dialog", { name: "Paste a code" });
+    expect(dialog).toBeTruthy();
     const apply = r.getByRole("button", { name: "Apply" });
     expect(apply.getAttribute("aria-disabled")).toBe("true");
     await type(r, "hello");
@@ -61,23 +61,49 @@ describe("Paste a code", () => {
     await type(r, encodeSound(SOUND));
     // A fixed preset now, no slot in the code: Custom 1, as Send best fit.
     expect(r.getByText(/Custom 1 \(the headphones will switch to it\)/)).toBeTruthy();
-    await fireEvent.click(r.getByRole("button", { name: "Apply" }));
-    const dialog = r.getByRole("dialog");
-    expect(within(dialog).getByText("Apply this preset to the headphones?")).toBeTruthy();
+    const apply = r.getByRole("button", { name: "Apply" });
+    apply.focus();
+    await fireEvent.click(apply);
+    const dialog = r.getByRole("dialog", { name: "Apply this preset to the headphones?" });
     expect(
       within(dialog).getByText(
         "Hairline writes these six bands and ULT 1 into Custom 1 (the headphones will switch to it).",
       ),
     ).toBeTruthy();
     expect(writes()).toEqual([]);
-    // Cancel goes back to the code; still nothing sent.
+    // The panel stays under the confirmation.
+    expect(r.getByRole("dialog", { name: "Paste a code" })).toBeTruthy();
+    // Cancel goes back to the code with focus on Apply; still nothing sent.
     await fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(r.queryByRole("dialog", { name: "Apply this preset to the headphones?" })).toBeNull();
+    expect(document.activeElement).toBe(apply);
     expect(writes()).toEqual([]);
     expect(onclose).not.toHaveBeenCalled();
-    await fireEvent.click(r.getByRole("button", { name: "Apply" }));
-    await fireEvent.click(within(r.getByRole("dialog")).getByRole("button", { name: "Apply" }));
+    // The values asked about are the ones sent, even if the field changes meanwhile.
+    await fireEvent.click(apply);
+    await fireEvent.input(r.getByRole("textbox"), { target: { value: encodeSound({ ...SOUND, ult: 2, slot: 2 }) } });
+    await fireEvent.click(
+      within(r.getByRole("dialog", { name: "Apply this preset to the headphones?" })).getByRole("button", { name: "Apply" }),
+    );
     await vi.waitFor(() => expect(onclose).toHaveBeenCalled());
-    expect(writes()).toEqual([["set_eq_preset_bands", { preset: 0xa1, ult: 1, bands: SOUND.bands }]]);
+    expect(writes()).toEqual([["set_eq_preset_ult_bands", { preset: 0xa1, ult: 1, bands: SOUND.bands }]]);
+    r.unmount();
+  });
+
+  it("a refused write leaves the panel open with the reason and focus on Apply", async () => {
+    vi.mocked(invoke).mockImplementationOnce(async () => Promise.reject("not connected"));
+    const onclose = vi.fn();
+    const r = render(PasteCode, { st: connected(), onclose });
+    await type(r, encodeSound(SOUND));
+    const apply = r.getByRole("button", { name: "Apply" });
+    apply.focus();
+    await fireEvent.click(apply);
+    await fireEvent.click(
+      within(r.getByRole("dialog", { name: "Apply this preset to the headphones?" })).getByRole("button", { name: "Apply" }),
+    );
+    expect(await r.findByText("Not sent: not connected")).toBeTruthy();
+    expect(onclose).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(apply);
     r.unmount();
   });
 
@@ -85,7 +111,9 @@ describe("Paste a code", () => {
     const r = render(PasteCode, { st: connected(0xa0), onclose: () => {} });
     await type(r, encodeSound({ ...SOUND, slot: 2 }));
     await fireEvent.click(r.getByRole("button", { name: "Apply" }));
-    await fireEvent.click(within(r.getByRole("dialog")).getByRole("button", { name: "Apply" }));
+    await fireEvent.click(
+      within(r.getByRole("dialog", { name: "Apply this preset to the headphones?" })).getByRole("button", { name: "Apply" }),
+    );
     await vi.waitFor(() => expect(writes()).toHaveLength(1));
     expect(writes()[0][1]).toMatchObject({ preset: 0xa2 });
     r.unmount();

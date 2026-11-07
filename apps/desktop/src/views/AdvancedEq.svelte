@@ -11,8 +11,8 @@
   one EQ write of that preset and the fitted bands, ULT kept, with the EQ
   group's status (`eq_ult`): pending, then "Sent" once the device reports the
   fitted bands, or the refusal. Takes the whole content area, sized so nothing
-  scrolls at 880×560; "‹ Sound" goes back. Share shows the curve as a code
-  and QR; Paste a code takes one (an Advanced code replaces and saves the
+  scrolls at 880×560; "‹ Sound" goes back. Share and Paste a code, at the
+  right of the top row: Share shows the curve as a code and QR; Paste takes one (an Advanced code replaces and saves the
   curve; a Sound code goes to the headphones only after its confirmation).
 -->
 <script lang="ts">
@@ -173,25 +173,36 @@
     if (curve !== null) sharing = encodeAdvanced(curve);
   }
 
-  /** A pasted curve: drawn at once, then saved (and its fit shown) as an edit would be. */
+  /**
+   * A pasted curve: saved first, then drawn with its fit, as an edit would
+   * be. A failed save leaves the drawn curve alone, sets the note and rejects
+   * (the paste panel then says it was not saved).
+   */
   function adopt(bands: number[]): Promise<void> {
-    curve = [...bands];
-    sentRaw = null;
-    edits++;
-    fit = bestFitPreview(curve);
-    const mine = edits;
-    return saver.save(curve).then(() => {
-      problem = null;
-      getBestFitPreview().then(
-        (stored) => {
-          if (mine === edits && Array.isArray(stored)) fit = stored;
-        },
-        (e) => {
-          problem = "Saved; preview unavailable";
-          console.error(e);
-        },
-      );
-    });
+    const next = [...bands];
+    return saver.save(next).then(
+      () => {
+        curve = next;
+        sentRaw = null;
+        edits++;
+        fit = bestFitPreview(next);
+        problem = null;
+        const mine = edits;
+        getBestFitPreview().then(
+          (stored) => {
+            if (mine === edits && Array.isArray(stored)) fit = stored;
+          },
+          (e) => {
+            problem = "Saved; preview unavailable";
+            console.error(e);
+          },
+        );
+      },
+      (e) => {
+        problem = `Not saved: ${e}`;
+        throw e;
+      },
+    );
   }
 
   function go(step: number) {
@@ -229,6 +240,16 @@
     <button class="btn" onclick={onback}>‹ Sound</button>
     <h3>Advanced equalizer</h3>
     <span class="lab range">Bands {visible[0] + 1}–{visible[visible.length - 1] + 1} of {BAND_COUNT}</span>
+    <div class="codes">
+      <button
+        class="btn"
+        class:unavailable={curve === null}
+        aria-disabled={curve === null}
+        tabindex={curve === null ? -1 : 0}
+        onclick={share}>Share</button
+      >
+      <button class="btn" onclick={() => (pasting = true)}>Paste a code</button>
+    </div>
   </div>
 
   <div class="faders" class:pending={busy} class:unavailable={curve === null}>
@@ -292,17 +313,6 @@
       {#if shape}<p class="note err">{shape}</p>{/if}
       {#if unlisted}<p class="note err">{unlisted}</p>{/if}
       {#if problem}<p class="note err">{problem}</p>{/if}
-      <!-- Its own row: beside Send the column (≈310 px at 880 wide) would overflow. -->
-      <div class="codes">
-        <button
-          class="btn"
-          class:unavailable={curve === null}
-          aria-disabled={curve === null}
-          tabindex={curve === null ? -1 : 0}
-          onclick={share}>Share</button
-        >
-        <button class="btn" onclick={() => (pasting = true)}>Paste a code</button>
-      </div>
       <div class="send">
         {#if sendNote}<span class="lab" class:live={eq.refused !== null}>{sendNote}</span>{/if}
         <button
@@ -345,8 +355,9 @@
 
 <style>
   /* Height at 880×560 (no scroll): 20 + top ≈26 + 8 + faders (the rest,
-     ≈360) + 8 + strip 17 + 8 + bottom ≈86–99 + 16. Each rail takes the
-     faders' height less the 58 px foot and 8 px gap: ≈295. */
+     ≈385) + 8 + strip 17 + 8 + bottom ≈60–73 + 16 (Share and Paste a code
+     sit in the top row, so the bottom stays one row). Each rail takes the
+     faders' height less the 58 px foot and 8 px gap: ≈320. */
   .adv {
     display: flex;
     flex-direction: column;
@@ -366,6 +377,17 @@
 
   .top .range {
     margin-left: auto;
+  }
+
+  /* Share and Paste a code, at the right of the top row (the bottom row has no room). */
+  .codes {
+    display: flex;
+    gap: 6px;
+    align-self: center;
+  }
+
+  .codes .btn {
+    padding: 2px 8px;
   }
 
   /* The faders take every free pixel; each rail fills its column. */
@@ -502,7 +524,6 @@
     color: var(--muted);
   }
 
-  .codes,
   .send {
     display: flex;
     gap: 6px;

@@ -59,7 +59,7 @@ pub fn run() {
             commands::set_multipoint,
             commands::set_eq_preset,
             commands::set_eq_bands,
-            commands::set_eq_preset_bands,
+            commands::set_eq_preset_ult_bands,
             commands::set_volume,
             commands::set_dsee_auto_off,
             commands::set_connection_mode,

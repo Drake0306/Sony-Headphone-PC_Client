@@ -128,7 +128,7 @@ describe("Sound equalizer", () => {
 });
 
 describe("Sound share codes", () => {
-  const DEVICE_WRITES = ["set_eq_preset_bands", "set_eq_bands", "send_best_fit", "set_eq_preset", "set_ult"];
+  const DEVICE_WRITES = ["set_eq_preset_ult_bands", "set_eq_preset_bands", "set_eq_bands", "send_best_fit", "set_eq_preset", "set_ult"];
   const writes = () => vi.mocked(invoke).mock.calls.filter(([cmd]) => DEVICE_WRITES.includes(cmd));
   const custom1 = (): DeviceState => {
     const st = withEq(0xa1);
@@ -153,7 +153,9 @@ describe("Sound share codes", () => {
   });
 
   it("share is unavailable on a fixed preset, Off or disconnected", async () => {
-    for (const st of [withEq(0x10), withEq(0x00), { ...custom1(), connected: false }]) {
+    const otherShape = { ...custom1(), eq_capability: { bands: 10, steps: 21, ult2_additional_step: 0, presets: [] } };
+    const pending = { ...custom1(), eq_ult: { ...custom1().eq_ult, status: { Pending: { since_ms: 0 } } } } as DeviceState;
+    for (const st of [withEq(0x10), withEq(0x00), { ...custom1(), connected: false }, otherShape, pending]) {
       const r = render(Sound, { st });
       const share = r.getByRole("button", { name: "Share" });
       expect(share.getAttribute("aria-disabled")).toBe("true");
@@ -169,15 +171,14 @@ describe("Sound share codes", () => {
     await fireEvent.click(r.getByRole("button", { name: "Paste a code" }));
     const bands = [0, 20, 10, 10, 5, 15];
     await fireEvent.input(r.getByRole("textbox"), { target: { value: encodeSound({ bands, ult: 2, slot: 3 }) } });
-    await fireEvent.click(within(r.getByRole("dialog")).getByRole("button", { name: "Apply" }));
-    const confirm = r.getByRole("dialog");
-    expect(within(confirm).getByText("Apply this preset to the headphones?")).toBeTruthy();
+    await fireEvent.click(within(r.getByRole("dialog", { name: "Paste a code" })).getByRole("button", { name: "Apply" }));
+    const confirm = r.getByRole("dialog", { name: "Apply this preset to the headphones?" });
     expect(within(confirm).getByText("Hairline writes these six bands and ULT 2 into Custom 1.")).toBeTruthy();
     await new Promise((done) => setTimeout(done, 50));
     expect(writes()).toEqual([]);
     await fireEvent.click(within(confirm).getByRole("button", { name: "Apply" }));
     await vi.waitFor(() => expect(r.queryByRole("dialog")).toBeNull());
-    expect(writes()).toEqual([["set_eq_preset_bands", { preset: 0xa1, ult: 2, bands }]]);
+    expect(writes()).toEqual([["set_eq_preset_ult_bands", { preset: 0xa1, ult: 2, bands }]]);
     r.unmount();
   });
 

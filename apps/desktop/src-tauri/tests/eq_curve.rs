@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use hairline_lib::broker::{run_broker, BrokerCmd};
 use hairline_lib::eq_curve::{
-    check_curve, check_shape, check_target_preset, fit_command, load, prepare_preset_bands,
+    check_curve, check_shape, check_target_preset, fit_command, load, prepare_preset_ult_bands,
     prepare_send, save, EqCurve,
 };
 use mdr_frame::FrameType;
@@ -266,7 +266,7 @@ fn preset_code_checks_preset_ult_and_bands() {
     let six = [6, 0, 20, 10, 13, 16];
     for preset in [MANUAL, CUSTOM_1, CUSTOM_2] {
         assert_eq!(
-            prepare_preset_bands(None, preset, 1, &six),
+            prepare_preset_ult_bands(None, preset, 1, &six),
             Ok(BrokerCmd::SetEqPresetUltBands(
                 preset,
                 UltLevel::Ult1,
@@ -277,39 +277,40 @@ fn preset_code_checks_preset_ult_and_bands() {
     let only = "a preset code can only be written into Manual, Custom 1 or Custom 2".to_string();
     for preset in [0x00, BRIGHT, 0x17, 0xA3] {
         assert_eq!(
-            prepare_preset_bands(None, preset, 0, &six),
+            prepare_preset_ult_bands(None, preset, 0, &six),
             Err(only.clone())
         );
     }
     assert_eq!(
-        prepare_preset_bands(Some(&listed(6, 21, &[0x00, MANUAL])), CUSTOM_2, 0, &six),
+        prepare_preset_ult_bands(Some(&listed(6, 21, &[0x00, MANUAL])), CUSTOM_2, 0, &six),
         Err("the headphones do not list Custom 2".to_string())
     );
     assert!(
-        prepare_preset_bands(Some(&listed(6, 21, &[MANUAL, CUSTOM_2])), CUSTOM_2, 0, &six).is_ok()
+        prepare_preset_ult_bands(Some(&listed(6, 21, &[MANUAL, CUSTOM_2])), CUSTOM_2, 0, &six)
+            .is_ok()
     );
     assert_eq!(
-        prepare_preset_bands(None, MANUAL, 3, &six),
+        prepare_preset_ult_bands(None, MANUAL, 3, &six),
         Err("unknown ULT level 3".to_string())
     );
     assert_eq!(
-        prepare_preset_bands(None, MANUAL, 0, &six[..5]),
+        prepare_preset_ult_bands(None, MANUAL, 0, &six[..5]),
         Err("expected 6 bands, got 5".to_string())
     );
     assert_eq!(
-        prepare_preset_bands(None, MANUAL, 0, &[0, 0, 0, 0, 0, 21]),
+        prepare_preset_ult_bands(None, MANUAL, 0, &[0, 0, 0, 0, 0, 21]),
         Err("band level 21 is outside 0..=20".to_string())
     );
     // The headphones' own shape wins over the defaults.
     assert_eq!(
-        prepare_preset_bands(Some(&cap(5, 11)), MANUAL, 0, &six),
+        prepare_preset_ult_bands(Some(&cap(5, 11)), MANUAL, 0, &six),
         Err("expected 5 bands, got 6".to_string())
     );
     assert_eq!(
-        prepare_preset_bands(Some(&cap(6, 11)), MANUAL, 0, &six),
+        prepare_preset_ult_bands(Some(&cap(6, 11)), MANUAL, 0, &six),
         Err("band level 20 is outside 0..=10".to_string())
     );
-    assert!(prepare_preset_bands(Some(&cap(6, 11)), MANUAL, 0, &[0, 1, 2, 3, 4, 10]).is_ok());
+    assert!(prepare_preset_ult_bands(Some(&cap(6, 11)), MANUAL, 0, &[0, 1, 2, 3, 4, 10]).is_ok());
 }
 
 #[test]
@@ -330,7 +331,7 @@ fn preset_code_writes_preset_ult_and_bands_in_one_frame() {
         s.connected && s.eq_capability.is_some() && matches!(s.eq_ult.status, Status::Confirmed)
     });
     let bands = vec![6, 0, 20, 10, 13, 16];
-    let cmd = prepare_preset_bands(ready.eq_capability.as_ref(), CUSTOM_2, 1, &bands).unwrap();
+    let cmd = prepare_preset_ult_bands(ready.eq_capability.as_ref(), CUSTOM_2, 1, &bands).unwrap();
     let eq_sets = |log: &[(FrameType, Vec<u8>)]| -> Vec<Vec<u8>> {
         log.iter()
             .filter(|(t, p)| *t == FrameType::Command1 && p.first() == Some(&0x58))

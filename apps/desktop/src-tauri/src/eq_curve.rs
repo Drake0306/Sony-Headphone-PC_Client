@@ -161,7 +161,7 @@ pub fn prepare_send(
 /// Manual, Custom 1 or Custom 2 (and listed by the headphones when they list
 /// presets), `ult` 0..=2, and `bands` exactly the headphones' band count
 /// (6 if unknown), each at most steps − 1 (20 if unknown). One EQ frame.
-pub fn prepare_preset_bands(
+pub fn prepare_preset_ult_bands(
     cap: Option<&EqUltCapability>,
     preset: u8,
     ult: u8,

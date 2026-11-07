@@ -2,7 +2,8 @@
   Paste a code: a modal with a field, the code decoded as it is typed (the
   error in muted text, or a preview of the values), and Apply. A Sound code
   (six bands, ULT, maybe a slot) goes to the headphones only through the
-  Confirm dialog, in one EQ write into the slot it names (Manual, Custom 1 or
+  Confirm dialog (drawn over the panel, which stays mounted so focus comes
+  back to Apply), in one EQ write into the slot it names (Manual, Custom 1 or
   Custom 2) or else the preset Send best fit would use. An Advanced code (ten
   bands) is saved into the app's curve through `savecurve` and nothing is
   sent; `onsaved` then lets the owner show it. Escape, Close or a click on the
@@ -21,8 +22,8 @@
     targetProblem,
     type TargetPreset,
   } from "../eqCurve";
-  import { setEqCurve, setEqPresetBands } from "../ipc";
-  import { decode, slotPreset, type Decoded, type SoundCode } from "../presetCode";
+  import { setEqCurve, setEqPresetUltBands } from "../ipc";
+  import { decode, slotPreset, type Decoded, type SoundCode, type Ult } from "../presetCode";
   import { isPending, presetName, type DeviceState } from "../state";
 
   interface Props {
@@ -39,7 +40,8 @@
   let panel = $state<HTMLElement>();
   let field = $state<HTMLInputElement>();
   let text = $state("");
-  let asking = $state(false);
+  /** The write the confirmation is asking about, fixed when it opened. */
+  let asking = $state<{ target: TargetPreset; bands: number[]; ult: Ult } | null>(null);
   let working = $state(false);
   let problem = $state<string | null>(null);
   const id = `paste-${Math.random().toString(36).slice(2)}`;
@@ -102,8 +104,8 @@
   async function apply() {
     if (applyOff) return;
     problem = null;
-    if (sound) {
-      asking = true;
+    if (sound && soundTarget) {
+      asking = { target: soundTarget, bands: [...sound.bands], ult: sound.ult };
       return;
     }
     if (!advanced) return;
@@ -122,11 +124,12 @@
   }
 
   async function send() {
-    asking = false;
-    if (!sound || !soundTarget || soundBlock !== null || busy) return;
+    const req = asking;
+    asking = null;
+    if (req === null || soundBlock !== null || busy) return;
     working = true;
     try {
-      await setEqPresetBands(soundTarget.id, sound.ult, [...sound.bands]);
+      await setEqPresetUltBands(req.target.id, req.ult, req.bands);
       onclose();
     } catch (e) {
       problem = `Not sent: ${e}`;
@@ -139,63 +142,64 @@
 
 <svelte:window onkeydown={key} />
 
-{#if asking && sound && soundTarget}
-  <Confirm
-    title="Apply this preset to the headphones?"
-    body={`Hairline writes these six bands and ${ultText(sound.ult)} into ${soundTarget.label}.`}
-    details={DEVICE_BAND_LABELS.map((label, k) => ({ label, value: level(fromRaw(sound?.bands[k] ?? 10)) }))}
-    confirmLabel="Apply"
-    onconfirm={send}
-    oncancel={() => (asking = false)}
-  />
-{:else}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && onclose()}>
-    <div class="panel" role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} bind:this={panel}>
-      <h4 id={`${id}-title`}>Paste a code</h4>
-      <input
-        class="field"
-        type="text"
-        aria-label="Share code"
-        placeholder="XXXXX-XXXXX-XXXXX"
-        spellcheck="false"
-        autocomplete="off"
-        bind:this={field}
-        bind:value={text}
-      />
-      <div class="result" aria-live="polite">
-        {#if error}
-          <p class="note">{error}</p>
-        {:else if sound}
-          <dl class="preview six">
-            {#each DEVICE_BAND_LABELS as label, k (label)}
-              <div><dt class="lab">{label}</dt><dd class="dot">{level(fromRaw(sound.bands[k]))}</dd></div>
-            {/each}
-          </dl>
-          <p class="note">{ultText(sound.ult)} · into {soundTarget?.label}</p>
-          {#if soundBlock}<p class="note">{soundBlock}</p>{/if}
-        {:else if advanced}
-          <dl class="preview ten">
-            {#each ADVANCED_BAND_LABELS as label, k (label)}
-              <div><dt class="lab">{label}</dt><dd class="dot">{level(advanced.bands[k])}</dd></div>
-            {/each}
-          </dl>
-          <p class="note">Saved into the Advanced equalizer; nothing is sent to the headphones.</p>
-        {/if}
-        {#if problem}<p class="note">{problem}</p>{/if}
-      </div>
-      <div class="actions">
-        <button class="btn" onclick={onclose}>Close</button>
-        <button
-          class="btn fill"
-          class:unavailable={applyOff}
-          aria-disabled={applyOff}
-          tabindex={applyOff ? -1 : 0}
-          onclick={apply}>Apply</button
-        >
-      </div>
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<div class="backdrop" role="presentation" onclick={(e) => e.target === e.currentTarget && onclose()}>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} bind:this={panel}>
+    <h4 id={`${id}-title`}>Paste a code</h4>
+    <input
+      class="field"
+      type="text"
+      aria-label="Share code"
+      placeholder="XXXXX-XXXXX-XXXXX"
+      spellcheck="false"
+      autocomplete="off"
+      bind:this={field}
+      bind:value={text}
+    />
+    <div class="result" aria-live="polite">
+      {#if error}
+        <p class="note">{error}</p>
+      {:else if sound}
+        <dl class="preview six">
+          {#each DEVICE_BAND_LABELS as label, k (label)}
+            <div><dt class="lab">{label}</dt><dd class="dot">{level(fromRaw(sound.bands[k]))}</dd></div>
+          {/each}
+        </dl>
+        <p class="note">{ultText(sound.ult)} · into {soundTarget?.label}</p>
+        {#if soundBlock}<p class="note">{soundBlock}</p>{/if}
+      {:else if advanced}
+        <dl class="preview ten">
+          {#each ADVANCED_BAND_LABELS as label, k (label)}
+            <div><dt class="lab">{label}</dt><dd class="dot">{level(advanced.bands[k])}</dd></div>
+          {/each}
+        </dl>
+        <p class="note">Saved into the Advanced equalizer; nothing is sent to the headphones.</p>
+      {/if}
+      {#if problem}<p class="note">{problem}</p>{/if}
+    </div>
+    <div class="actions">
+      <button class="btn" onclick={onclose}>Close</button>
+      <button
+        class="btn fill"
+        class:unavailable={applyOff}
+        aria-disabled={applyOff}
+        tabindex={applyOff ? -1 : 0}
+        onclick={apply}>Apply</button
+      >
     </div>
   </div>
+</div>
+
+<!-- Over the panel, which stays mounted so focus returns to Apply after Cancel or a failure. -->
+{#if asking}
+  <Confirm
+    title="Apply this preset to the headphones?"
+    body={`Hairline writes these six bands and ${ultText(asking.ult)} into ${asking.target.label}.`}
+    details={DEVICE_BAND_LABELS.map((label, k) => ({ label, value: level(fromRaw(asking?.bands[k] ?? 10)) }))}
+    confirmLabel="Apply"
+    onconfirm={send}
+    oncancel={() => (asking = null)}
+  />
 {/if}
 
 <style>

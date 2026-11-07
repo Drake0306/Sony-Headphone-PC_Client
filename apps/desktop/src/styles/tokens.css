@@ -40,6 +40,10 @@
   --stripe: #3a3a36;
   /* Text on the orange ULT box: dark in both themes. */
   --on-ult: #161614;
+  /* QR modules: dark on a light quiet zone in both themes (the light theme's
+     ink and paper), so every scanner reads it. Not redefined for Ink. */
+  --qr-dark: #161614;
+  --qr-light: #efede6;
   color-scheme: light;
 }
 

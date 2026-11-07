@@ -88,14 +88,14 @@ Reset, beside Send, puts all ten bands back to 0 and saves that curve. It does n
 
 An equalizer setting can be passed to someone else as a 15-character code, shown as `XXXXX-XXXXX-XXXXX`, with a QR of the same text.
 
-**Share.** On the Sound screen, "Share" (in the Presets block) is available on Manual, Custom 1 and Custom 2 while the headphones are connected; it encodes the six bands the headphones report, the ULT level and which of the three presets it came from. On a fixed Sony preset, Off, or with no headphones it is unavailable (Sony does not report a fixed preset's bands). In the Advanced equalizer, "Share" encodes the ten-band curve. Either opens "Share this preset" / "Share this curve" with the QR, the code and Copy.
+**Share.** On the Sound screen, "Share" (in the Presets block) is available on Manual, Custom 1 and Custom 2 while the headphones are connected; it encodes the six bands the headphones report, the ULT level and which of the three presets it came from. It is unavailable on a fixed Sony preset or Off (Sony does not report a fixed preset's bands), with no headphones, while an EQ change is still pending, and on headphones whose equalizer is not six bands of 21 steps. In the Advanced equalizer, "Share" and "Paste a code" sit at the right of the top row; "Share" encodes the ten-band curve. Either opens "Share this preset" / "Share this curve" with the QR, the code and Copy.
 
-**Paste.** "Paste a code" (on the Sound screen and in the Advanced equalizer) opens a field. The code is checked as you type, with or without dashes, in any case; the values it carries are shown under it, or "That code is not a Hairline preset." / "That code has a typo (check failed).". Apply then:
+**Paste.** "Paste a code" (on the Sound screen and in the Advanced equalizer) opens a field. The code is checked as you type, with or without dashes (any kind of dash), in any case; the values it carries are shown under it, or "That code is not a Hairline preset." / "That code has a typo (check failed).". Apply then:
 
 - a Sound code goes to the headphones only after the dialog "Apply this preset to the headphones?", which names the target preset and the ULT level and lists the six values. The target is the preset the code came from (Manual, Custom 1 or Custom 2); a code without one follows the Send best fit rule (the current preset if it is Manual, Custom 1 or Custom 2, otherwise Custom 1). The write is the same single `58 03 <preset> <ULT> 06 <six bands>` frame the app already uses; Cancel or Escape sends nothing.
-- an Advanced code replaces and saves the ten-band curve and opens the Advanced equalizer. Nothing is sent to the headphones.
+- an Advanced code is saved as the ten-band curve (drawn once the save succeeds) and opens the Advanced equalizer. Nothing is sent to the headphones.
 
-**The code.** The alphabet is Crockford base32, `0123456789ABCDEFGHJKMNPQRSTVWXYZ` (no I, L, O or U). When reading, whitespace and dashes are dropped, letters are upper-cased, I and L read as 1 and O as 0. Each symbol is 5 bits, 75 bits in all, most significant bit first:
+**The code.** The alphabet is Crockford base32, `0123456789ABCDEFGHJKMNPQRSTVWXYZ` (no I, L, O or U). When reading, whitespace and any dash (hyphen, en or em dash) are dropped, letters are upper-cased, I and L read as 1 and O as 0. Each symbol is 5 bits, 75 bits in all, most significant bit first:
 
 | Symbols | Bits | Content |
 | --- | --- | --- |

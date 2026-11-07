@@ -5,6 +5,8 @@ mod discover;
 mod fake;
 #[cfg(target_os = "macos")]
 mod macos;
+#[cfg(any(windows, test))]
+mod windows;
 
 use std::io;
 use std::time::Duration;

@@ -38,3 +38,18 @@ jobs:
         working-directory: apps/desktop
       - name: Build transport
         run: cargo build -p mdr-transport
+
+  windows-crates:
+    # Protocol crates and the Windows transport only; the Tauri app is not
+    # built on Windows yet.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Test
+        run: cargo test -p mdr-frame -p mdr-proto -p mdr-session -p mdr-transport
+      - name: Clippy
+        run: cargo clippy -p mdr-transport --all-targets -- -D warnings

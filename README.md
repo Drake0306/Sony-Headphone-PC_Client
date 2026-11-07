@@ -34,7 +34,9 @@ Phase 2: the full window, opened from the popover footer (it loads the app with 
 
 Phase 2b: Modes (Scenes), described below. It is verified against the fake device and still needs a session with the real headphones.
 
-Next: Windows, then Linux.
+Phase 3a: Windows transport compiles and is unit-tested on Windows CI; the Windows tray app and hardware validation are next. It has not yet been run against the headphones on Windows.
+
+Next: the Windows tray app, then Linux.
 
 The popover is validated on a real WH-ULT900N (firmware 2.1.4) on macOS 27.2; see `docs/hardware-validation.md`. The Phase 2 screens are verified against the fake device and still need a session with the real headphones. Use `--fake-device` (below) to run without headphones; a fake run says `FAKE` in the popover and the window so it is never mistaken for the real thing.
 

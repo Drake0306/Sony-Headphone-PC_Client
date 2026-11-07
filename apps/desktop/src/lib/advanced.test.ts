@@ -7,6 +7,7 @@ import {
   isSetOpcode,
   parseHex,
   probeChip,
+  probeEstimate,
   probeRow,
   type FrameEntry,
   type ProbeResult,
@@ -152,5 +153,14 @@ describe("probe helpers", () => {
     expect(canRunProbe(true, "run", "Idle")).toBe(false);
     expect(canRunProbe(true, " RUN", "Idle")).toBe(false);
     expect(canRunProbe(true, "RUN", "Running")).toBe(false);
+  });
+});
+
+describe("probeEstimate", () => {
+  it("counts the requests and rounds the worst case up to whole minutes", () => {
+    expect(probeEstimate(441, 1500, 150)).toBe("441 requests, up to about 13 minutes");
+    expect(probeEstimate(10, 1500, 150)).toBe("10 requests, up to about 1 minute");
+    expect(probeEstimate(1, 1500, 150)).toBe("1 request, up to about 1 minute");
+    expect(probeEstimate(0, 1500, 150)).toBeNull();
   });
 });

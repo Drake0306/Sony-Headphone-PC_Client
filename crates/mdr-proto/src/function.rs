@@ -76,6 +76,45 @@ fn t2_name(id: u8) -> Option<&'static str> {
     })
 }
 
+/// Whether `id` is a libmdr `FunctionType` value for `table`
+/// (`ProtocolV2.hpp`, `t1::FunctionType` / `t2::FunctionType`).
+pub fn is_function_type(table: Table, id: u8) -> bool {
+    match table {
+        Table::T1 => matches!(
+            id,
+            0x10..=0x1B
+                | 0x20..=0x2F
+                | 0x30
+                | 0x32
+                | 0x34..=0x38
+                | 0x40..=0x4F
+                | 0x50..=0x59
+                | 0x61..=0x6D
+                | 0x70..=0x75
+                | 0x80..=0x84
+                | 0x90..=0x94
+                | 0xA1..=0xA4
+                | 0xB0..=0xB3
+                | 0xB5..=0xB8
+                | 0xC1..=0xC3
+                | 0xD1..=0xD4
+                | 0xE1..=0xED
+                | 0xF0..=0xFF
+        ),
+        Table::T2 => matches!(
+            id,
+            0x20..=0x24
+                | 0x30..=0x34
+                | 0x40..=0x48
+                | 0x50..=0x55
+                | 0x60..=0x64
+                | 0x6F
+                | 0x70..=0x75
+                | 0xF0..=0xFF
+        ),
+    }
+}
+
 /// The role of an opcode (the first payload byte) in `table`.
 pub fn opcode_role(table: Table, opcode: u8) -> Role {
     match table {
@@ -128,9 +167,14 @@ fn t2_role(op: u8) -> Role {
 /// enums are in `ProtocolV2T1.hpp` / `ProtocolV2T2.hpp`; `FunctionType` is
 /// in `ProtocolV2.hpp`). The pairs the session already sends agree (battery
 /// `22 00` → `20`, NC/ASM `66 17` → `6B`, volume `A6 20` → `A1`, voice
-/// guidance volume T2 `46 20` → `42`, ...). Connect reads, inquired types
-/// without a same-named function (T1 power `07` link control, NC/ASM `30`
-/// and `40`, play `40`) and opcodes that are not GETs prove nothing.
+/// guidance volume T2 `46 20` → `42`, ...). NC/ASM names differ only in
+/// wording ("mode switch" = dual, "seamless" = level adjustment). Groups
+/// whose enums drift apart (T1 COMMON, EQEBB, AUDIO; T2 POWER, PERI, VOICE
+/// GUIDANCE, SYSTEM) are written out pair by pair. Connect reads, inquired
+/// types without a same-named function (T1 power `07` link control, NC/ASM
+/// `30` and `40`, play `40`, T2 system `06` and `07`) and opcodes that are
+/// not GETs prove nothing. Every id returned is a libmdr `FunctionType`
+/// (`is_function_type`; tested over the whole probe catalogue).
 pub fn for_opcode(table: Table, opcode: u8, inquired: Option<u8>) -> Option<u8> {
     if opcode_role(table, opcode) != Role::Get {
         return None;
@@ -217,10 +261,24 @@ fn t2_function(group: u8, i: u8) -> Option<u8> {
         (0x60, 0xFE) => 0x6F,
         // PARTY.
         (0x70, 0x00..=0x05) => 0x70 + i,
-        // SYSTEM: wearing status checker F0 .. setup-link voice assistant FD,
-        // default lighting colour FE.
-        (0xF0, 0x00..=0x0F) => 0xF0 + i,
-        (0xF0, 0x10 | 0x11) => 0xFE,
+        // SYSTEM, by name (`SystemInquiredType` vs `FunctionType`); the two
+        // stop lining up after 05.
+        (0xF0, 0x00) => 0xF0, // WEARING_STATUS_CHECKER
+        (0xF0, 0x01) => 0xF1, // REPEAT_TAP_TRAINING_MODE
+        (0xF0, 0x02) => 0xF2, // QUICK_ACCESS_EASY_SETTING
+        (0xF0, 0x03) => 0xF3, // AUTO_VOLUME_OPTIMIZER
+        (0xF0, 0x04) => 0xF4, // AUTO_VOLUME_WITH_LIMITATION
+        (0xF0, 0x05) => 0xF5, // SONY_VOICE_ASSISTANT(_SETTING_...)
+        // 06 SONY_VOICE_ASSISTANT_COMMAND, 07 WEARING_DEVICE_INFORMATION: no function.
+        (0xF0, 0x08) => 0xF6,        // WEARING_POSITION(_JUDGMENT_BY_SENSOR)
+        (0xF0, 0x09) => 0xF7,        // LINK_AUTO_SWITCH_FOR_SPEAKER
+        (0xF0, 0x0A) => 0xF8,        // LINK_AUTO_SWITCH_FOR_HEADSETS
+        (0xF0, 0x0B) => 0xF9,        // MIC_ON_OFF_BY_HEADPHONE_OPERATION
+        (0xF0, 0x0C) => 0xFA,        // FUNCTION_CHANGE
+        (0xF0, 0x0D) => 0xFB,        // USB_BROWSER
+        (0xF0, 0x0E) => 0xFC,        // LIGHTING_MODE
+        (0xF0, 0x0F) => 0xFD,        // VOICE_ASSISTANT_WITH_SPECIFIC_SETUP_LINK_SUPPORT
+        (0xF0, 0x10 | 0x11) => 0xFE, // LIGHTING_DEFAULT_COLOR(_COLOR_TYPE / _CUSTOM_COLOR)
         _ => return None,
     })
 }
@@ -316,6 +374,13 @@ mod tests {
         assert_eq!(for_opcode(Table::T2, 0x56, Some(0x05)), Some(0x55));
         assert_eq!(for_opcode(Table::T2, 0x60, Some(0xFE)), Some(0x6F));
         assert_eq!(for_opcode(Table::T2, 0xF6, Some(0x11)), Some(0xFE));
+        // T2 SYSTEM stops lining up after 05: 06 and 07 have no function.
+        assert_eq!(for_opcode(Table::T2, 0xF6, Some(0x05)), Some(0xF5));
+        assert_eq!(for_opcode(Table::T2, 0xF6, Some(0x06)), None);
+        assert_eq!(for_opcode(Table::T2, 0xF6, Some(0x07)), None);
+        assert_eq!(for_opcode(Table::T2, 0xF6, Some(0x08)), Some(0xF6));
+        assert_eq!(for_opcode(Table::T2, 0xF2, Some(0x0C)), Some(0xFA));
+        assert_eq!(for_opcode(Table::T2, 0xFA, Some(0x0F)), Some(0xFD));
         // Nothing to prove: connect reads, unmatched names, no inquired byte, not a GET.
         assert_eq!(for_opcode(Table::T1, 0x04, Some(0x01)), None);
         assert_eq!(for_opcode(Table::T1, 0x26, Some(0x07)), None);
@@ -323,5 +388,31 @@ mod tests {
         assert_eq!(for_opcode(Table::T1, 0x22, None), None);
         assert_eq!(for_opcode(Table::T1, 0x24, Some(0x00)), None);
         assert_eq!(for_opcode(Table::T2, 0x48, Some(0x20)), None);
+    }
+
+    #[test]
+    fn every_catalogue_read_maps_to_a_libmdr_function_type_or_none() {
+        for spec in crate::probe::GET_CATALOGUE {
+            for &i in spec.inquired {
+                if let Some(id) = for_opcode(spec.table, spec.opcode, Some(i)) {
+                    assert!(
+                        is_function_type(spec.table, id),
+                        "{:?} {:#04X}:{i:#04X} maps to {id:#04X}, not a libmdr FunctionType",
+                        spec.table,
+                        spec.opcode
+                    );
+                }
+            }
+        }
+        // The lists themselves: spot checks against ProtocolV2.hpp.
+        assert!(is_function_type(Table::T1, 0x1B));
+        assert!(!is_function_type(Table::T1, 0x1C));
+        assert!(!is_function_type(Table::T1, 0x31));
+        assert!(!is_function_type(Table::T1, 0x60));
+        assert!(!is_function_type(Table::T1, 0xB4));
+        assert!(is_function_type(Table::T2, 0x6F));
+        assert!(!is_function_type(Table::T2, 0x65));
+        assert!(!is_function_type(Table::T2, 0x25));
+        assert!(!is_function_type(Table::T2, 0x10));
     }
 }

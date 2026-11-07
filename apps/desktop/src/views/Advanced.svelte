@@ -14,6 +14,7 @@
     hexGroups,
     isSetOpcode,
     parseHex,
+    probeEstimate,
     probeRow,
     type CapabilityRow,
     type FrameEntry,
@@ -113,6 +114,15 @@
   const probeState = $derived(probe?.state ?? "Idle");
   const canRun = $derived(canRunProbe(st.connected, probeConfirm, probeState));
   const probeRows = $derived((probe?.results ?? []).map(probeRow));
+  const estimate = $derived(probe ? probeEstimate(probe.total, probe.reply_ms, probe.gap_ms) : null);
+  let copied = $state(false);
+
+  function copyPath(path: string) {
+    navigator.clipboard
+      .writeText(path)
+      .then(() => (copied = true))
+      .catch((e) => (probeError = errText(e)));
+  }
 
   function runProbe() {
     if (!canRun) return;
@@ -130,7 +140,10 @@
     let alive = true;
     const offFrames = onFrames(takeFrames);
     const offRecording = onRecording((e) => (recording = e.path));
-    const offProbe = onProbe((e) => (probe = e));
+    const offProbe = onProbe((e) => {
+      if (e.file !== probe?.file) copied = false;
+      probe = e;
+    });
     // Watch only once listening, and never after the screen has gone.
     offFrames
       .then(() => (alive ? watchFrames(true) : null))
@@ -221,6 +234,9 @@
             <button class="btn fill" onclick={stopProbe}>Stop</button>
           </div>
         {:else}
+          {#if estimate}
+            <p class="note">{estimate}</p>
+          {/if}
           <input
             class="field confirm"
             aria-label="Confirm probe"
@@ -253,7 +269,11 @@
           </div>
         {/if}
         {#if probe?.state === "Done" && probe.file}
-          <p class="note path">{probe.file}</p>
+          {@const file = probe.file}
+          <p class="note path">{file}</p>
+          <div class="btnrow">
+            <button class="btn" onclick={() => copyPath(file)}>{copied ? "Copied" : "Copy path"}</button>
+          </div>
         {/if}
       </div>
     </div>

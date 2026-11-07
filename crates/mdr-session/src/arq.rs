@@ -19,6 +19,8 @@ struct Outgoing {
 #[derive(Debug)]
 struct InFlight {
     bytes: Vec<u8>,
+    table: Table,
+    payload: Vec<u8>,
     seq: u8,
     group: Group,
     timer: ReplyTimer,
@@ -89,11 +91,13 @@ impl Arq {
                 let frame = Frame {
                     frame_type: frame_type(request.table),
                     seq: self.next_seq,
-                    payload: request.bytes,
+                    payload: request.bytes.clone(),
                 };
                 let bytes = encode(&frame);
                 self.in_flight = Some(InFlight {
                     bytes: bytes.clone(),
+                    table: request.table,
+                    payload: request.bytes,
                     seq: self.next_seq,
                     group: request.group,
                     timer,
@@ -103,6 +107,21 @@ impl Arq {
                 Some(bytes)
             }
         }
+    }
+
+    /// The data frame handed out and not yet ACKed: table, payload, group.
+    pub fn in_flight(&self) -> Option<(Table, &[u8], Group)> {
+        let f = self.in_flight.as_ref()?;
+        Some((f.table, &f.payload, f.group))
+    }
+
+    /// Drops the first queued (not yet handed out) `Group::Raw` request
+    /// with exactly this payload; true if one was dropped.
+    pub fn cancel_queued_raw(&mut self, table: Table, payload: &[u8]) -> bool {
+        let found = self.queue.iter().position(|o| {
+            o.request.group == Group::Raw && o.request.table == table && o.request.bytes == payload
+        });
+        found.and_then(|i| self.queue.remove(i)).is_some()
     }
 
     /// Handles an ACK from the device. Returns what it settled, if it matched the frame in flight.

@@ -116,6 +116,9 @@ export interface ProbeEvent {
   results: ProbeResult[];
   /** The results file, once written. */
   file: string | null;
+  /** The reply wait and the gap, in ms. */
+  reply_ms: number;
+  gap_ms: number;
 }
 
 /** The word the probe asks for before it runs. */
@@ -143,3 +146,10 @@ export function probeRow(r: ProbeResult) {
 /** Run is offered only while connected, with RUN typed exactly, and not already running. */
 export const canRunProbe = (connected: boolean, confirm: string, state: ProbeState) =>
   connected && confirm === PROBE_CONFIRMATION && state !== "Running";
+
+/** "441 requests, up to about 13 minutes": every request silent, rounded up; null when there is nothing to send. */
+export function probeEstimate(total: number, replyMs: number, gapMs: number): string | null {
+  if (total <= 0) return null;
+  const minutes = Math.max(1, Math.ceil((total * (replyMs + gapMs)) / 60_000));
+  return `${total} request${total === 1 ? "" : "s"}, up to about ${minutes} minute${minutes === 1 ? "" : "s"}`;
+}

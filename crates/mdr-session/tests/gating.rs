@@ -127,6 +127,51 @@ fn every_device_data_frame_surfaces_as_a_payload() {
 }
 
 #[test]
+fn in_flight_shows_the_request_on_the_wire() {
+    let mut s = connected_session();
+    assert_eq!(s.in_flight(), None);
+    s.request(raw(&[0x22, 0x00])).unwrap();
+    s.request(raw(&[0xF6, 0x04])).unwrap();
+    // Queued, not yet handed out.
+    assert_eq!(s.in_flight(), None);
+    let req = drain(&mut s, 500).pop().unwrap();
+    assert_eq!(
+        s.in_flight(),
+        Some((Table::T1, &[0x22, 0x00][..], Group::Raw))
+    );
+    s.handle_input(
+        &frame(mdr_frame::FrameType::Ack, 1 - seq_of(&req), &[]),
+        510,
+    );
+    assert_eq!(s.in_flight(), None);
+    drain(&mut s, 520);
+    assert_eq!(
+        s.in_flight(),
+        Some((Table::T1, &[0xF6, 0x04][..], Group::Raw))
+    );
+}
+
+#[test]
+fn cancel_queued_raw_drops_only_a_queued_raw_request() {
+    let mut s = connected_session();
+    s.request(raw(&[0x22, 0x00])).unwrap();
+    s.request(raw(&[0xF6, 0x04])).unwrap();
+    s.request(request::battery_get()).unwrap();
+    let first = drain(&mut s, 500);
+    assert_eq!(first.len(), 1);
+    // In flight: not cancelled. Queued raw: cancelled. Tracked GET with the same bytes: kept.
+    assert!(!s.cancel_queued_raw(Table::T1, &[0x22, 0x00]));
+    assert!(s.cancel_queued_raw(Table::T1, &[0xF6, 0x04]));
+    assert!(!s.cancel_queued_raw(Table::T1, &[0xF6, 0x04]));
+    s.handle_input(
+        &frame(mdr_frame::FrameType::Ack, 1 - seq_of(&first[0]), &[]),
+        510,
+    );
+    let next = drain(&mut s, 520);
+    assert_eq!(decode_payload(&next[0]), request::battery_get().bytes);
+}
+
+#[test]
 fn phase2_setters_are_gated() {
     let mut s = connected_session_with_caps(&[0x20]);
     assert_eq!(

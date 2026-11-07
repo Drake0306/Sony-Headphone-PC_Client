@@ -378,3 +378,106 @@ fn probe_start_while_connecting_does_nothing() {
     assert!(!sent.iter().any(|p| p == &[0x02, 0x00]), "{sent:02X?}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// A user GET whose ACK the fake holds back, so the probe's first request
+/// waits in the ARQ queue behind it.
+fn backlogged_fake() -> FakeDevice {
+    let mut fake = FakeDevice::ult_wear();
+    fake.answer(
+        FrameType::Command2,
+        &[0x32, 0x02],
+        &[0x33, 0x02, 0x00, 0x01],
+    );
+    fake.delay_ack(&[0xA6, 0x20], Duration::from_millis(400));
+    fake
+}
+
+fn user_get() -> BrokerCmd {
+    BrokerCmd::Raw {
+        table: Table::T1,
+        bytes: vec![0xA6, 0x20],
+        confirmed_set: false,
+    }
+}
+
+fn t2_32_02() -> Vec<ProbePoint> {
+    points_for(&[(Table::T2, 0x32)])
+        .into_iter()
+        .filter(|p| p.inquired == Some(0x02))
+        .collect()
+}
+
+#[test]
+fn reply_wait_starts_when_the_request_is_on_the_wire() {
+    let dir = temp_dir("backlog");
+    // The wait (100 ms) is shorter than the backlog (400 ms).
+    let rig = Rig::start(
+        backlogged_fake(),
+        ProbeRunner::with_timing(100, 5).with_points(t2_32_02()),
+        &dir,
+    );
+    rig.tx.send(user_get()).unwrap();
+    rig.tx.send(BrokerCmd::ProbeStart).unwrap();
+    let done = rig
+        .probe_until(|e| e.state == ProbeState::Done)
+        .pop()
+        .unwrap();
+    assert_eq!(done.results.len(), 1);
+    let r = &done.results[0];
+    assert_eq!(
+        r.reply.as_deref(),
+        Some(&[0x33, 0x02, 0x00, 0x01][..]),
+        "{r:?}"
+    );
+    assert!(r.proven);
+    rig.stop();
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn probe_stop_recalls_a_get_still_queued() {
+    let dir = temp_dir("recall");
+    let rig = Rig::start(
+        backlogged_fake(),
+        ProbeRunner::with_timing(100, 5).with_points(t2_32_02()),
+        &dir,
+    );
+    rig.tx.send(user_get()).unwrap();
+    rig.tx.send(BrokerCmd::ProbeStart).unwrap();
+    // The probe GET is queued behind the held user GET when Stop arrives.
+    std::thread::sleep(Duration::from_millis(100));
+    rig.tx.send(BrokerCmd::ProbeStop).unwrap();
+    let done = rig
+        .probe_until(|e| e.state == ProbeState::Done)
+        .pop()
+        .unwrap();
+    assert!(done.results.is_empty(), "{:?}", done.results);
+    std::thread::sleep(Duration::from_millis(700));
+    let log = rig.stop();
+    let sent: Vec<_> = log
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(t, p)| (*t, p.clone()))
+        .collect();
+    assert!(
+        sent.iter().any(|(_, p)| p == &[0xA6, 0x20]),
+        "the user GET went out"
+    );
+    assert!(
+        !sent
+            .iter()
+            .any(|(t, p)| *t == FrameType::Command2 && p == &[0x32, 0x02]),
+        "the recalled probe GET was sent"
+    );
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn idle_event_carries_the_size_and_timing() {
+    let runner = ProbeRunner::new();
+    let e = runner.event(None);
+    assert_eq!(e.state, ProbeState::Idle);
+    assert_eq!(e.total, probe_points(GET_CATALOGUE).len());
+    assert_eq!((e.reply_ms, e.gap_ms), (1500, 150));
+}

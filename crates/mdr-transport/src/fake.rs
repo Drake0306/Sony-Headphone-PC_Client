@@ -138,6 +138,10 @@ pub struct FakeDevice {
     drop_after: Option<usize>,
     /// Extra scripted replies: (type, request prefix, reply).
     extra: Vec<(FrameType, Vec<u8>, Vec<u8>)>,
+    /// Requests whose ACK is held back: (request prefix, delay).
+    ack_delays: Vec<(Vec<u8>, Duration)>,
+    /// ACKs held back until their time.
+    held_acks: Vec<(Instant, Vec<u8>)>,
     log: ReceivedLog,
 }
 
@@ -156,6 +160,8 @@ impl FakeDevice {
             received: 0,
             drop_after: None,
             extra: Vec::new(),
+            ack_delays: Vec::new(),
+            held_acks: Vec::new(),
             log: ReceivedLog::default(),
         }
     }
@@ -176,6 +182,12 @@ impl FakeDevice {
     pub fn answer(&mut self, frame_type: FrameType, request: &[u8], reply: &[u8]) {
         self.extra
             .push((frame_type, request.to_vec(), reply.to_vec()));
+    }
+
+    /// Holds back the ACK for requests starting with `request` by `delay`
+    /// (a slow device keeps the host's one frame in flight that long).
+    pub fn delay_ack(&mut self, request: &[u8], delay: Duration) {
+        self.ack_delays.push((request.to_vec(), delay));
     }
 
     /// The shared log of data frames received from here on.
@@ -200,7 +212,15 @@ impl FakeDevice {
                 }
             }
             FrameType::Command1 | FrameType::Command2 => {
-                self.acks.push_back(encode(&ack_for(frame.seq)));
+                let ack = encode(&ack_for(frame.seq));
+                match self
+                    .ack_delays
+                    .iter()
+                    .find(|(req, _)| frame.payload.starts_with(req))
+                {
+                    Some((_, delay)) => self.held_acks.push((Instant::now() + *delay, ack)),
+                    None => self.acks.push_back(ack),
+                }
                 if let Ok(mut log) = self.log.lock() {
                     log.push((frame.frame_type, frame.payload.clone()));
                 }
@@ -235,6 +255,12 @@ impl FakeDevice {
 
     /// Next frame to send: ACKs first, then a data frame once the previous one is ACKed.
     fn next_outgoing(&mut self) -> Option<Vec<u8>> {
+        let now = Instant::now();
+        let (due, held): (Vec<_>, Vec<_>) = std::mem::take(&mut self.held_acks)
+            .into_iter()
+            .partition(|(at, _)| *at <= now);
+        self.held_acks = held;
+        self.acks.extend(due.into_iter().map(|(_, ack)| ack));
         if let Some(ack) = self.acks.pop_front() {
             return Some(ack);
         }

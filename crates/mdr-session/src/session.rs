@@ -323,6 +323,19 @@ impl Session {
         vec![Event::Disconnected]
     }
 
+    /// The request whose frame is on the wire and not yet ACKed: table,
+    /// payload, group. `None` while the next request is still queued.
+    pub fn in_flight(&self) -> Option<(Table, &[u8], Group)> {
+        self.arq.in_flight()
+    }
+
+    /// Drops a queued `Group::Raw` request with exactly this payload before
+    /// it reaches the wire (one already sent cannot be recalled); true if
+    /// one was dropped.
+    pub fn cancel_queued_raw(&mut self, table: Table, payload: &[u8]) -> bool {
+        self.arq.cancel_queued_raw(table, payload)
+    }
+
     /// Allows requests for a function the device works with but does not declare.
     pub fn mark_proven(&mut self, table: Table, function: u8) {
         if !self.state.proven.contains(&(table, function)) {

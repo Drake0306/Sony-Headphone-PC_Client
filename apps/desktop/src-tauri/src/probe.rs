@@ -3,8 +3,12 @@
 //!
 //! One request in flight; a reply is a frame on the same table whose first
 //! byte is the opcode + 1 and, when the request carried an inquired type,
-//! whose second byte repeats it. No reply within `reply_ms` (1.5 s) counts
-//! as silent; the next request waits `gap_ms` (150 ms). Every payload is
+//! whose second byte repeats it. No reply within `reply_ms` (1.5 s) of the
+//! request reaching the wire counts as silent (the session's ARQ may hold it
+//! behind other traffic first; a request that never leaves the queue within
+//! `QUEUE_LIMIT_FACTOR` × `reply_ms` is recalled and counted silent). The
+//! next request waits `gap_ms` (150 ms). Stop recalls a request still
+//! queued; one already on the wire cannot be recalled. Every payload is
 //! re-checked with `mdr_proto::probe::may_send` (a libmdr GET, not
 //! deny-listed) right before it is handed to `Session::request`, which
 //! applies the deny-list again.
@@ -27,6 +31,19 @@ use crate::settings::{raw_allowed, AppSettings};
 pub const REPLY_MS: u64 = 1500;
 /// The pause between one request's end and the next request.
 pub const GAP_MS: u64 = 150;
+/// A request still queued (not on the wire) after this many reply waits is
+/// recalled and counted silent.
+const QUEUE_LIMIT_FACTOR: u64 = 10;
+
+/// The request in flight.
+#[derive(Debug, Clone, Copy)]
+struct Current {
+    point: ProbePoint,
+    /// When it was handed to the session (queued in its ARQ).
+    queued_at: u64,
+    /// When its frame was first seen on the wire; the reply wait starts here.
+    on_wire_at: Option<u64>,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum ProbeState {
@@ -63,6 +80,9 @@ pub struct ProbeEvent {
     pub results: Vec<ProbeResult>,
     /// The results file, once written.
     pub file: Option<String>,
+    /// The reply wait and the gap, for the "up to about N minutes" estimate.
+    pub reply_ms: u64,
+    pub gap_ms: u64,
 }
 
 /// The probe may run only with the Advanced panel enabled and the
@@ -92,8 +112,7 @@ pub struct ProbeRunner {
     gap_ms: u64,
     points: Vec<ProbePoint>,
     queue: VecDeque<ProbePoint>,
-    /// The request in flight and when it was handed to the session.
-    current: Option<(ProbePoint, u64)>,
+    current: Option<Current>,
     /// The next request goes out no earlier than this.
     next_at: u64,
     results: Vec<ProbeResult>,
@@ -126,13 +145,27 @@ impl ProbeRunner {
             state: ProbeState::Idle,
             total: 0,
         }
+        .counted()
+    }
+
+    /// Sets `total` to the number of requests a run would send.
+    fn counted(mut self) -> ProbeRunner {
+        self.total = self.sendable().count();
+        self
+    }
+
+    fn sendable(&self) -> impl Iterator<Item = ProbePoint> + '_ {
+        self.points
+            .iter()
+            .copied()
+            .filter(|p| may_send(p.table, &p.bytes()))
     }
 
     /// Probes `points` instead of the catalogue (tests). Points `may_send`
     /// refuses are dropped here and again before sending.
     pub fn with_points(mut self, points: Vec<ProbePoint>) -> ProbeRunner {
         self.points = points;
-        self
+        self.counted()
     }
 
     pub fn state(&self) -> ProbeState {
@@ -145,12 +178,7 @@ impl ProbeRunner {
 
     /// Starts over with the full list.
     pub fn start(&mut self, now_ms: u64) {
-        self.queue = self
-            .points
-            .iter()
-            .copied()
-            .filter(|p| may_send(p.table, &p.bytes()))
-            .collect();
+        self.queue = self.sendable().collect();
         self.total = self.queue.len();
         self.current = None;
         self.next_at = now_ms;
@@ -158,11 +186,27 @@ impl ProbeRunner {
         self.state = ProbeState::Running;
     }
 
-    /// Ends the run, keeping the results so far.
-    pub fn stop(&mut self) {
+    /// Ends the run, keeping the results so far. A request still queued in
+    /// the session is recalled; one already on the wire cannot be.
+    pub fn stop(&mut self, session: Option<&mut Session>) {
+        if let (Some(c), Some(session)) = (self.current, session) {
+            session.cancel_queued_raw(c.point.table, &c.point.bytes());
+        }
         self.queue.clear();
         self.current = None;
         self.state = ProbeState::Done;
+    }
+
+    /// Notes when the request in flight reaches the wire; call after each
+    /// batch of writes, before reading the device.
+    pub fn on_wire(&mut self, session: &Session, now_ms: u64) {
+        let Some(c) = self.current.as_mut().filter(|c| c.on_wire_at.is_none()) else {
+            return;
+        };
+        let bytes = c.point.bytes();
+        if session.in_flight() == Some((c.point.table, &bytes[..], Group::Raw)) {
+            c.on_wire_at = Some(now_ms);
+        }
     }
 
     /// Records the reply if `bytes` answers the request in flight.
@@ -173,7 +217,7 @@ impl ProbeRunner {
         state: &DeviceState,
         now_ms: u64,
     ) -> bool {
-        let Some((point, _)) = self.current else {
+        let Some(Current { point, .. }) = self.current else {
             return false;
         };
         let answers = point.table == table
@@ -191,11 +235,18 @@ impl ProbeRunner {
         if !self.is_running() {
             return Step::Waiting;
         }
-        if let Some((point, sent_at)) = self.current {
-            if now_ms < sent_at + self.reply_ms {
+        if let Some(c) = self.current {
+            let deadline = match c.on_wire_at {
+                Some(t) => t + self.reply_ms,
+                None => c.queued_at + QUEUE_LIMIT_FACTOR * self.reply_ms,
+            };
+            if now_ms < deadline {
                 return Step::Waiting;
             }
-            self.record(point, None, session.state());
+            if c.on_wire_at.is_none() {
+                session.cancel_queued_raw(c.point.table, &c.point.bytes());
+            }
+            self.record(c.point, None, session.state());
             self.next_at = now_ms + self.gap_ms;
             return self.finish_if_empty(Step::Progress);
         }
@@ -219,11 +270,15 @@ impl ProbeRunner {
             group: Group::Raw,
         }) {
             Ok(()) => {
-                self.current = Some((point, now_ms));
+                self.current = Some(Current {
+                    point,
+                    queued_at: now_ms,
+                    on_wire_at: None,
+                });
                 Step::Waiting
             }
             Err(SessionError::NotConnected) => {
-                self.stop();
+                self.stop(Some(session));
                 Step::Finished
             }
             Err(_) => {
@@ -285,6 +340,8 @@ impl ProbeRunner {
             total: self.total,
             results: self.results.clone(),
             file,
+            reply_ms: self.reply_ms,
+            gap_ms: self.gap_ms,
         }
     }
 }
@@ -310,6 +367,11 @@ impl<'a> ProbeHost<'a> {
             emit,
             file: None,
         }
+    }
+
+    /// Notes when the probe's request reaches the wire (after the writes).
+    pub fn on_wire(&mut self, session: &Session, now_ms: u64) {
+        self.runner.on_wire(session, now_ms);
     }
 
     /// Re-publishes the current state (for a window that just opened).
@@ -373,7 +435,8 @@ impl<'a> ProbeHost<'a> {
         if !self.runner.is_running() {
             return false;
         }
-        self.runner.stop();
+        let mut session = session;
+        self.runner.stop(session.as_deref_mut());
         self.finish(session, address, record_dir)
     }
 

@@ -318,6 +318,10 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
                 return Err(link_lost(&mut session, &emit, e));
             }
         }
+        // The probe's reply wait starts once its request is on the wire.
+        if let Some(host) = probe.as_deref_mut() {
+            host.on_wire(&session, clock());
+        }
 
         match transport.recv_timeout(RECV_TIMEOUT) {
             Ok(Some(bytes)) => {

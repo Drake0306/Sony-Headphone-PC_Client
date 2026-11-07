@@ -185,6 +185,33 @@ describe("Advanced", () => {
       expect(calls("probe_start")).toHaveLength(1);
     });
 
+    it("shows the size and worst-case time before a run", async () => {
+      const r = render(Advanced, { st: connected() });
+      await waitFor(() => expect(backend.handlers.probe).toBeDefined());
+      probeEvent({ state: "Idle", done: 0, total: 441, results: [], file: null, reply_ms: 1500, gap_ms: 150 });
+      await waitFor(() => expect(r.getByText("441 requests, up to about 13 minutes")).toBeInTheDocument());
+    });
+
+    it("copies the results file path", async () => {
+      const writeText = vi.fn(async () => {});
+      Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+      const r = render(Advanced, { st: connected() });
+      await waitFor(() => expect(backend.handlers.probe).toBeDefined());
+      probeEvent({
+        state: "Done",
+        done: 0,
+        total: 1,
+        results: [],
+        file: "/captures/local/probe-2.json",
+        reply_ms: 1500,
+        gap_ms: 150,
+      });
+      await waitFor(() => expect(r.getByText("/captures/local/probe-2.json")).toBeInTheDocument());
+      await fireEvent.click(r.getByText("Copy path", { selector: "button" }));
+      expect(writeText).toHaveBeenCalledWith("/captures/local/probe-2.json");
+      await waitFor(() => expect(r.getByText("Copied", { selector: "button" })).toBeInTheDocument());
+    });
+
     it("shows progress, Stop, then the results and the file", async () => {
       const r = render(Advanced, { st: connected() });
       await waitFor(() => expect(backend.handlers.probe).toBeDefined());

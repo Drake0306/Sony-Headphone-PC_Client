@@ -17,9 +17,9 @@
   import {
     codecLabel,
     isPending,
-    PRESET_OFF,
+    PRESET_LOCK_NOTES,
+    presetLock,
     presetName,
-    SHAPEABLE_PRESETS,
     type DeviceState,
     type UltLevel,
   } from "../lib/state";
@@ -35,9 +35,6 @@
     { label: "ULT 2", value: "Ult2", orange: true },
   ];
   const ULT_ARG: Record<UltLevel, 0 | 1 | 2> = { Off: 0, Ult1: 1, Ult2: 2 };
-  const FIXED_NOTE =
-    "Sony applies this preset inside the headphones and does not report its band values. Choose Manual, Custom 1 or Custom 2 to shape your own.";
-  const OFF_NOTE = "Equalizer off.";
   const CONNECTION = [
     { label: "Sound quality", value: 0 },
     { label: "Stable connection", value: 1 },
@@ -55,13 +52,10 @@
   const presets = $derived((st.eq_capability?.presets ?? []).map(([id]) => ({ label: presetName(id), value: id })));
   const eqOff = $derived(st.eq_ult.status === "Unavailable" || st.eq_ult.value === null);
   const eqBusy = $derived(isPending(bands.status));
-  /** A Sony preset applied inside the headphones: its bands are not reported, so not editable. */
-  const fixedPreset = $derived(
-    preset.shown !== null && !SHAPEABLE_PRESETS.includes(preset.shown) && preset.shown !== PRESET_OFF,
-  );
-  const offPreset = $derived(preset.shown === PRESET_OFF);
+  /** A fixed Sony preset (bands applied inside, not reported) or Off: the faders are read-only. */
+  const lock = $derived(presetLock(preset.shown));
   /** Band writes (faders, Reset) only go to Manual, Custom 1 and Custom 2. */
-  const bandsLocked = $derived(fixedPreset || offPreset);
+  const bandsLocked = $derived(lock !== null);
   const codec = $derived(codecLabel(st.codec.value));
   const dsee = $derived(st.dsee.value);
 
@@ -77,7 +71,7 @@
     <div>
       <div class="block">
         <div class="eqhead">
-          <h4>Equalizer{preset.shown === null ? "" : ` · ${presetName(preset.shown)}`} · drag a handle</h4>
+          <h4>Equalizer{preset.shown === null ? "" : ` · ${presetName(preset.shown)}`}{bandsLocked ? "" : " · drag a handle"}</h4>
           {#if onadvanced}
             <button class="btn" onclick={onadvanced}>Advanced</button>
           {/if}
@@ -92,10 +86,8 @@
             oncommit={(next) => bands.request(next, () => setEqBands(next))}
           />
         </div>
-        {#if fixedPreset}
-          <p class="note">{FIXED_NOTE}</p>
-        {:else if offPreset}
-          <p class="note">{OFF_NOTE}</p>
+        {#if lock}
+          <p class="note">{PRESET_LOCK_NOTES[lock]}</p>
         {/if}
       </div>
       <div class="block">

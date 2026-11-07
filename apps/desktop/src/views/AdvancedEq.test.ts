@@ -420,4 +420,45 @@ describe("Advanced equalizer", () => {
     // Nothing scrolls.
     expect(advSrc).not.toMatch(/overflow(-y)?\s*:\s*(auto|scroll)/);
   });
+
+  const FIXED_NOTE =
+    "Sony applies this preset inside the headphones and does not report its band values. Choose Manual, Custom 1 or Custom 2 to shape your own.";
+
+  it("fixed_or_off_preset_hides_device_values", async () => {
+    const r = render(AdvancedEq, { st: connected("Confirmed", [16, 12, 10, 7, 3, 20], BRIGHT), onback: () => {} });
+    await r.findByRole("slider", { name: "31 Hz" });
+    expect(nowTexts(r.container)).toEqual(Array(6).fill("--"));
+    const note = r.getByText(FIXED_NOTE);
+    expect(note.closest(".bottom")).not.toBeNull();
+    await r.rerender({ st: connected("Confirmed", [16, 12, 10, 7, 3, 20], 0x00), onback: () => {} });
+    expect(nowTexts(r.container)).toEqual(Array(6).fill("--"));
+    expect(r.getByText("Equalizer off.")).toBeTruthy();
+    expect(r.queryByText(FIXED_NOTE)).toBeNull();
+    await r.rerender({ st: connected("Confirmed", [16, 12, 10, 7, 3, 20], MANUAL), onback: () => {} });
+    expect(nowTexts(r.container)).toEqual(["+6", "+2", "0", "−3", "−7", "+10"]);
+    expect(r.queryByText(FIXED_NOTE)).toBeNull();
+    expect(r.queryByText("Equalizer off.")).toBeNull();
+    r.unmount();
+  });
+
+  it("send_unavailable_when_target_unlisted", async () => {
+    const st = connected("Confirmed", undefined, BRIGHT);
+    const listed = (ids: number[]) => ({
+      ...st,
+      eq_capability: { ...st.eq_capability!, presets: ids.map((id): [number, string] => [id, ""]) },
+    });
+    const r = render(AdvancedEq, { st: listed([BRIGHT, MANUAL]), onback: () => {} });
+    await r.findByRole("slider", { name: "31 Hz" });
+    expect(r.getByText("the headphones do not list Custom 1")).toBeTruthy();
+    const send = r.getByRole("button", { name: "Send best fit to headphones" });
+    expect(send.getAttribute("aria-disabled")).toBe("true");
+    await fireEvent.click(send);
+    expect(r.queryByRole("dialog")).toBeNull();
+    await r.rerender({ st: listed([BRIGHT, MANUAL, CUSTOM_1]), onback: () => {} });
+    expect(r.queryByText(/do not list/)).toBeNull();
+    expect(send.getAttribute("aria-disabled")).toBe("false");
+    await new Promise((done) => setTimeout(done, 10));
+    expect(deviceWrites()).toHaveLength(0);
+    r.unmount();
+  });
 });

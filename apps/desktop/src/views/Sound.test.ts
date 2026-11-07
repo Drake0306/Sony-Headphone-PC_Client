@@ -112,4 +112,16 @@ describe("Sound equalizer", () => {
       unmount();
     }
   });
+
+  it("header_drops_drag_hint_when_locked", () => {
+    const head = (preset: number) => {
+      const r = render(Sound, { st: withEq(preset) });
+      const text = r.container.querySelector(".eqhead h4")!.textContent;
+      r.unmount();
+      return text;
+    };
+    expect(head(0x10)).toBe("Equalizer · Bright");
+    expect(head(0x00)).toBe("Equalizer · Off");
+    expect(head(0xa0)).toBe("Equalizer · Manual · drag a handle");
+  });
 });

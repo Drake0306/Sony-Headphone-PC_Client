@@ -108,6 +108,20 @@ export function targetPreset(current: number | null): TargetPreset {
   };
 }
 
+/**
+ * Why a fit cannot go into `target`, or null: the headphones list their
+ * presets and the target is not among them. An unknown or empty list is
+ * allowed. Same text as `eq_curve::check_listed`.
+ */
+export function targetProblem(
+  target: TargetPreset,
+  cap: { presets: readonly (readonly [number, string])[] } | null | undefined,
+): string | null {
+  const ids = cap?.presets.map(([id]) => id) ?? [];
+  if (ids.length === 0 || ids.includes(target.id)) return null;
+  return `the headphones do not list ${presetName(target.id)}`;
+}
+
 export interface CurveSaver {
   /** Saves `bands`; resolves once it (or a later curve that replaced it) is saved. */
   save(bands: number[]): Promise<void>;

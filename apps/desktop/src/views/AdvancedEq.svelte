@@ -32,12 +32,13 @@
     resetCurve,
     shapeProblem,
     targetPreset,
+    targetProblem,
     toRaw,
     visibleBands,
     type TargetPreset,
   } from "../lib/eqCurve";
   import { getBestFitPreview, getEqCurve, sendBestFit, setEqCurve } from "../lib/ipc";
-  import { isPending, type DeviceState } from "../lib/state";
+  import { isPending, PRESET_LOCK_NOTES, presetLock, type DeviceState } from "../lib/state";
 
   let { st, onback }: { st: DeviceState; onback: () => void } = $props();
 
@@ -70,13 +71,19 @@
   const busy = $derived(isPending(eq.status));
   /** Best fit writes six values of 21 steps; other headphones cannot take it. */
   const shape = $derived(shapeProblem(st.eq_capability));
+  /** Where Send would write, and why it cannot (the headphones do not list that preset). */
+  const target = $derived(targetPreset(st.eq_ult.value?.preset ?? null));
+  const unlisted = $derived(targetProblem(target, st.eq_capability));
+  /** A fixed Sony preset or Off: the headphones do not report its bands. */
+  const lock = $derived(st.connected ? presetLock(st.eq_ult.value?.preset ?? null) : null);
   const sendOff = $derived(
     !st.connected ||
       st.eq_ult.status === "Unavailable" ||
       st.eq_ult.value === null ||
       curve === null ||
       busy ||
-      shape !== null,
+      shape !== null ||
+      unlisted !== null,
   );
   const same = (a: readonly number[] | null | undefined, b: readonly number[] | null) =>
     !!a && !!b && a.length === b.length && a.every((v, i) => v === b[i]);
@@ -86,8 +93,10 @@
   );
   const levelText = (v: number | null | undefined) => faderText(v, 0);
   const resetOff = $derived(curve === null || busy);
-  /** The headphones' six levels now, from state; null while disconnected or unknown. */
-  const onDevice = $derived(st.connected && st.eq_ult.value ? st.eq_ult.value.bands.map(fromRaw) : null);
+  /** The headphones' six levels now, from state; null while disconnected, unknown, or on a fixed preset or Off. */
+  const onDevice = $derived(
+    st.connected && st.eq_ult.value && lock === null ? st.eq_ult.value.bands.map(fromRaw) : null,
+  );
 
   onMount(() => {
     getEqCurve()
@@ -160,7 +169,7 @@
   function ask() {
     if (sendOff || curve === null) return;
     const bands = [...curve];
-    asking = { bands, fit: bestFitPreview(bands), target: targetPreset(st.eq_ult.value?.preset ?? null) };
+    asking = { bands, fit: bestFitPreview(bands), target };
   }
 
   function send() {
@@ -227,24 +236,28 @@
   </div>
 
   <div class="bottom">
-    <!-- One column per device value: label, the headphones now, the best fit. -->
-    <div class="fit">
-      <div class="r">
-        <span class="lab hold">What the headphones will hold</span>
-        {#each DEVICE_BAND_LABELS as label (label)}<span class="lab dev">{label}</span>{/each}
+    <div class="values">
+      <!-- One column per device value: label, the headphones now, the best fit. -->
+      <div class="fit">
+        <div class="r">
+          <span class="lab hold">What the headphones will hold</span>
+          {#each DEVICE_BAND_LABELS as label (label)}<span class="lab dev">{label}</span>{/each}
+        </div>
+        <div class="r now">
+          <span class="lab">On the headphones now</span>
+          {#each DEVICE_BAND_LABELS as label, k (label)}<span class="dot">{levelText(onDevice?.[k])}</span>{/each}
+        </div>
+        <div class="r best">
+          <span class="lab">Best fit</span>
+          {#each DEVICE_BAND_LABELS as label, k (label)}<span class="dot">{levelText(fit?.[k])}</span>{/each}
+        </div>
       </div>
-      <div class="r now">
-        <span class="lab">On the headphones now</span>
-        {#each DEVICE_BAND_LABELS as label, k (label)}<span class="dot">{levelText(onDevice?.[k])}</span>{/each}
-      </div>
-      <div class="r best">
-        <span class="lab">Best fit</span>
-        {#each DEVICE_BAND_LABELS as label, k (label)}<span class="dot">{levelText(fit?.[k])}</span>{/each}
-      </div>
+      {#if lock}<p class="note">{PRESET_LOCK_NOTES[lock]}</p>{/if}
     </div>
     <div class="act">
       <p class="note live">{NOTE}</p>
       {#if shape}<p class="note err">{shape}</p>{/if}
+      {#if unlisted}<p class="note err">{unlisted}</p>{/if}
       {#if problem}<p class="note err">{problem}</p>{/if}
       <div class="send">
         {#if sendNote}<span class="lab" class:live={eq.refused !== null}>{sendNote}</span>{/if}
@@ -356,6 +369,19 @@
     gap: 24px;
     align-items: flex-end;
     justify-content: space-between;
+  }
+
+  /* The mini table, and under it the fixed-preset or Off note. */
+  .values {
+    flex: none;
+    max-width: 500px;
+  }
+
+  .values .note {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 14px;
   }
 
   /* Seven columns: row label, then one per device value (labels may wrap to two lines). */

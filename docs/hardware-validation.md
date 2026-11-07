@@ -126,6 +126,7 @@ Run with the real headphones connected.
 - [ ] From Bright, open Advanced and press Send best fit to headphones. The dialog names "Custom 1 (the headphones will switch to it)". Press Cancel (and once Escape): nothing goes out. Press Send best fit again and confirm: exactly one `58 03 A1 <ULT> 06 …` goes out and the NTFY `59 03 A1 …` carries the fitted bands with the ULT byte unchanged; the Sound screen now shows Custom 1 with those six values.
 - [ ] In Advanced, press Reset: the four faders and the best fit read 0, the curve survives a restart as all zeros, and nothing goes out in the frame log.
 - [ ] At the default 880×560 window, the Advanced view does not scroll, the four faders are tall (about 300 px of travel) with clear space between them, and the bottom row (values, note, Reset, Send) is on one line.
+- [ ] On the Sound screen with Bright selected at 880×560, the fixed-preset note fits under the faders with no clipping and nothing scrolls. In Advanced on Bright, "On the headphones now" reads "--" and the same note sits under the values.
 - [ ] "On the headphones now" in the Advanced view matches the fit, and the Sound screen faders show the same six values.
 - [ ] Back on the Sound screen, the fader knobs snap to the 21 segments and the +10, 0 and −10 labels are not clipped in the real window.
 - [ ] Restart Hairline; the Advanced curve is still there (`eq_curve.json` in the config directory).

@@ -3,7 +3,8 @@
   with an ink border over a veiled window. A title, a body, optional
   label/value details (values in Doto), then Cancel and the confirm button.
   Focus starts on Cancel and stays inside the panel (Tab wraps); Escape or a
-  click on the backdrop cancels. The owner unmounts it from either callback.
+  click on the backdrop cancels. The owner unmounts it from either callback;
+  focus then returns to what had it before the dialog opened.
 -->
 <script lang="ts">
   import { onMount } from "svelte";
@@ -23,7 +24,13 @@
   let cancel: HTMLButtonElement;
   const id = `confirm-${Math.random().toString(36).slice(2)}`;
 
-  onMount(() => cancel.focus());
+  onMount(() => {
+    const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    cancel.focus();
+    return () => {
+      if (before?.isConnected) before.focus();
+    };
+  });
 
   function key(e: KeyboardEvent) {
     if (e.key === "Escape") {

@@ -8,6 +8,7 @@ import {
   PAGE_COUNT,
   resetCurve,
   targetPreset,
+  targetProblem,
   toRaw,
   visibleBands,
 } from "./eqCurve";
@@ -110,5 +111,15 @@ describe("eqCurve helpers", () => {
   it("reset_curve_is_ten_zeros", () => {
     expect(resetCurve()).toEqual(Array(10).fill(0));
     expect(resetCurve()).not.toBe(resetCurve());
+  });
+
+  it("target_problem_when_unlisted", () => {
+    const cap = (ids: number[]) => ({ presets: ids.map((id): [number, string] => [id, ""]) });
+    expect(targetProblem(targetPreset(0x10), cap([0x10, 0xa0]))).toBe("the headphones do not list Custom 1");
+    expect(targetProblem(targetPreset(0xa2), cap([0xa0, 0xa1]))).toBe("the headphones do not list Custom 2");
+    expect(targetProblem(targetPreset(0xa0), cap([0xa0]))).toBeNull();
+    // Unknown or empty preset list: allowed.
+    expect(targetProblem(targetPreset(0x10), cap([]))).toBeNull();
+    expect(targetProblem(targetPreset(0x10), null)).toBeNull();
   });
 });

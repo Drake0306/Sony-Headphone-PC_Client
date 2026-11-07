@@ -166,6 +166,28 @@ fn rejects_out_of_range() {
 }
 
 #[test]
+fn send_best_fit_needs_the_target_listed() {
+    let curve = [0; 10];
+    let mut listed = cap(6, 21);
+    listed.presets = vec![
+        (0x00, String::new()),
+        (BRIGHT, String::new()),
+        (MANUAL, String::new()),
+    ];
+    assert!(prepare_send(Some(&listed), &curve, MANUAL).is_ok());
+    assert_eq!(
+        prepare_send(Some(&listed), &curve, CUSTOM_1).map(|_| ()),
+        Err("the headphones do not list Custom 1".to_string())
+    );
+    assert_eq!(
+        prepare_send(Some(&listed), &curve, CUSTOM_2).map(|_| ()),
+        Err("the headphones do not list Custom 2".to_string())
+    );
+    // An empty list means the presets are not known yet: allowed.
+    assert!(prepare_send(Some(&cap(6, 21)), &curve, CUSTOM_1).is_ok());
+}
+
+#[test]
 fn send_best_fit_writes_preset_and_bands_in_one_frame() {
     let (tx, rx) = channel();
     let (etx, erx) = channel();

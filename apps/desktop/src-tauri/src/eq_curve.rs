@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use mdr_proto::eq::{best_fit, to_raw, DEVICE_BANDS, LEVEL_MAX, LEVEL_MIN};
-use mdr_proto::EqUltCapability;
+use mdr_proto::{preset_name, EqUltCapability};
 use mdr_session::DeviceState;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
@@ -104,6 +104,17 @@ pub fn check_target_preset(preset: u8) -> Result<u8, String> {
     }
 }
 
+/// Refuses `preset` when the headphones list their presets and it is not
+/// among them. An unknown capability or an empty list is allowed.
+pub fn check_listed(cap: Option<&EqUltCapability>, preset: u8) -> Result<(), String> {
+    match cap {
+        Some(c) if !c.presets.is_empty() && !c.presets.iter().any(|(id, _)| *id == preset) => Err(
+            format!("the headphones do not list {}", preset_name(preset)),
+        ),
+        _ => Ok(()),
+    }
+}
+
 /// The six fitted levels (−10..=10) for `curve` and the broker command that
 /// writes them, on the device's raw 0..=20 scale, into `preset` in one frame.
 pub fn fit_command(curve: &EqCurve, preset: u8) -> ([i8; 6], BrokerCmd) {
@@ -127,7 +138,8 @@ pub fn check_shape(cap: Option<&EqUltCapability>) -> Result<(), String> {
     }
 }
 
-/// Checks the device's EQ shape, the target preset and the ten bands, then
+/// Checks the device's EQ shape, the target preset (one of the three, and
+/// listed by the headphones when they list presets) and the ten bands, then
 /// gives the curve to save, the six fitted levels and the command that writes
 /// them into `preset`.
 pub fn prepare_send(
@@ -137,6 +149,7 @@ pub fn prepare_send(
 ) -> Result<(EqCurve, [i8; 6], BrokerCmd), String> {
     check_shape(cap)?;
     let preset = check_target_preset(preset)?;
+    check_listed(cap, preset)?;
     let curve = EqCurve {
         bands: check_curve(bands)?,
     };
@@ -191,7 +204,8 @@ pub fn best_fit_preview(state: State<'_, Mutex<EqCurve>>) -> [i8; 6] {
 /// six EQ values in one frame that also selects `preset` (Manual, Custom 1 or
 /// Custom 2; the ULT level is kept) and returns the six fitted levels.
 /// Refused when the headphones report an EQ that is not six bands of 21
-/// steps, or when `preset` is not one of those three.
+/// steps, when `preset` is not one of those three, or when the headphones
+/// list their presets without it.
 #[tauri::command]
 pub fn send_best_fit(
     app: AppHandle,

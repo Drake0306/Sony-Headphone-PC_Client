@@ -148,6 +148,30 @@ fn check_bands(bands: &[u8]) -> Result<(), String> {
     Ok(())
 }
 
+/// Writes a pasted Sound share code: `bands` (raw) and `ult` into `preset`
+/// (Manual, Custom 1 or Custom 2) in one EQ frame. The UI calls it only after
+/// the confirmation dialog.
+#[tauri::command]
+pub fn set_eq_preset_bands(
+    broker: State<'_, Broker>,
+    device: State<'_, Mutex<DeviceState>>,
+    preset: u8,
+    ult: u8,
+    bands: Vec<u8>,
+) -> Result<(), String> {
+    let cap = device
+        .lock()
+        .map_err(|_| "the device state is unavailable".to_string())?
+        .eq_capability
+        .clone();
+    broker.send(crate::eq_curve::prepare_preset_bands(
+        cap.as_ref(),
+        preset,
+        ult,
+        &bands,
+    )?)
+}
+
 #[tauri::command]
 pub fn set_volume(broker: State<'_, Broker>, volume: u8) -> Result<(), String> {
     broker.send(BrokerCmd::SetVolume(check_volume(volume)?))

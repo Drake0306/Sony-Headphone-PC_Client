@@ -5,15 +5,21 @@
   status (`eq_ult`). On a fixed Sony preset the headphones apply the curve
   inside and report centre values, so the faders show those values read-only
   with a note; on Off they are disabled. Only Manual, Custom 1 and Custom 2
-  take band writes.
+  take band writes. Share shows the device's bands, ULT and preset slot as a
+  code and QR (Manual, Custom 1 or Custom 2 only); Paste a code decodes one
+  and applies it (Sound codes only after a confirmation; Advanced codes are
+  saved in the app and open the Advanced equalizer).
 -->
 <script lang="ts">
   import Boxes from "../lib/controls/Boxes.svelte";
   import Faders from "../lib/controls/Faders.svelte";
+  import PasteCode from "../lib/controls/PasteCode.svelte";
+  import ShareCode from "../lib/controls/ShareCode.svelte";
   import Row from "../lib/controls/Row.svelte";
   import Toggle from "../lib/controls/Toggle.svelte";
   import { control } from "../lib/control.svelte";
   import { setConnectionMode, setDseeAutoOff, setEqBands, setEqPreset, setUlt } from "../lib/ipc";
+  import { encodeSound, presetSlot } from "../lib/presetCode";
   import {
     codecLabel,
     isPending,
@@ -58,6 +64,19 @@
   const bandsLocked = $derived(lock !== null);
   const codec = $derived(codecLabel(st.codec.value));
   const dsee = $derived(st.dsee.value);
+
+  /** The code for the device's current bands, ULT and slot; null when it cannot be shared. */
+  const shareable = $derived.by(() => {
+    const eq = st.eq_ult.value;
+    if (!st.connected || eq === null || eqBusy || presetSlot(eq.preset) === 3) return null;
+    try {
+      return encodeSound({ bands: eq.bands, ult: ULT_ARG[eq.ult], slot: presetSlot(eq.preset) });
+    } catch {
+      return null;
+    }
+  });
+  let sharing = $state<string | null>(null);
+  let pasting = $state(false);
 
   function reset() {
     if (eqOff || eqBusy || bandsLocked) return;
@@ -114,6 +133,14 @@
             tabindex={eqOff || eqBusy || bandsLocked ? -1 : 0}
             onclick={reset}>Reset</button
           >
+          <button
+            class="btn"
+            class:unavailable={shareable === null}
+            aria-disabled={shareable === null}
+            tabindex={shareable === null ? -1 : 0}
+            onclick={() => (sharing = shareable)}>Share</button
+          >
+          <button class="btn" onclick={() => (pasting = true)}>Paste a code</button>
         </div>
       </div>
     </div>
@@ -166,6 +193,13 @@
     </div>
   </div>
 </div>
+
+{#if sharing}
+  <ShareCode title="Share this preset" code={sharing} onclose={() => (sharing = null)} />
+{/if}
+{#if pasting}
+  <PasteCode {st} onclose={() => (pasting = false)} onsaved={() => onadvanced?.()} />
+{/if}
 
 <style>
   .sound {

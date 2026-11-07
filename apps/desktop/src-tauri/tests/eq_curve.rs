@@ -7,7 +7,8 @@ use std::time::{Duration, Instant};
 
 use hairline_lib::broker::{run_broker, BrokerCmd};
 use hairline_lib::eq_curve::{
-    check_curve, check_shape, check_target_preset, fit_command, load, prepare_send, save, EqCurve,
+    check_curve, check_shape, check_target_preset, fit_command, load, prepare_preset_bands,
+    prepare_send, save, EqCurve,
 };
 use mdr_frame::FrameType;
 use mdr_proto::eq::{best_fit, to_raw};
@@ -251,5 +252,104 @@ fn send_best_fit_writes_preset_and_bands_in_one_frame() {
     let sets = eq_sets(&log.lock().unwrap());
     // Exactly one frame for the send, and no separate preset write.
     assert_eq!(sets[before..].to_vec(), vec![want], "{sets:02X?}");
+    tx.send(BrokerCmd::Disconnect).unwrap();
+}
+
+fn listed(cap_bands: u8, steps: u8, presets: &[u8]) -> EqUltCapability {
+    let mut c = cap(cap_bands, steps);
+    c.presets = presets.iter().map(|&id| (id, String::new())).collect();
+    c
+}
+
+#[test]
+fn preset_code_checks_preset_ult_and_bands() {
+    let six = [6, 0, 20, 10, 13, 16];
+    for preset in [MANUAL, CUSTOM_1, CUSTOM_2] {
+        assert_eq!(
+            prepare_preset_bands(None, preset, 1, &six),
+            Ok(BrokerCmd::SetEqPresetUltBands(
+                preset,
+                UltLevel::Ult1,
+                six.to_vec()
+            ))
+        );
+    }
+    let only = "a preset code can only be written into Manual, Custom 1 or Custom 2".to_string();
+    for preset in [0x00, BRIGHT, 0x17, 0xA3] {
+        assert_eq!(
+            prepare_preset_bands(None, preset, 0, &six),
+            Err(only.clone())
+        );
+    }
+    assert_eq!(
+        prepare_preset_bands(Some(&listed(6, 21, &[0x00, MANUAL])), CUSTOM_2, 0, &six),
+        Err("the headphones do not list Custom 2".to_string())
+    );
+    assert!(
+        prepare_preset_bands(Some(&listed(6, 21, &[MANUAL, CUSTOM_2])), CUSTOM_2, 0, &six).is_ok()
+    );
+    assert_eq!(
+        prepare_preset_bands(None, MANUAL, 3, &six),
+        Err("unknown ULT level 3".to_string())
+    );
+    assert_eq!(
+        prepare_preset_bands(None, MANUAL, 0, &six[..5]),
+        Err("expected 6 bands, got 5".to_string())
+    );
+    assert_eq!(
+        prepare_preset_bands(None, MANUAL, 0, &[0, 0, 0, 0, 0, 21]),
+        Err("band level 21 is outside 0..=20".to_string())
+    );
+    // The headphones' own shape wins over the defaults.
+    assert_eq!(
+        prepare_preset_bands(Some(&cap(5, 11)), MANUAL, 0, &six),
+        Err("expected 5 bands, got 6".to_string())
+    );
+    assert_eq!(
+        prepare_preset_bands(Some(&cap(6, 11)), MANUAL, 0, &six),
+        Err("band level 20 is outside 0..=10".to_string())
+    );
+    assert!(prepare_preset_bands(Some(&cap(6, 11)), MANUAL, 0, &[0, 1, 2, 3, 4, 10]).is_ok());
+}
+
+#[test]
+fn preset_code_writes_preset_ult_and_bands_in_one_frame() {
+    let (tx, rx) = channel();
+    let (etx, erx) = channel();
+    let fake = FakeDevice::ult_wear();
+    let log = fake.received_log();
+    std::thread::spawn(move || {
+        run_broker(
+            Box::new(fake),
+            rx,
+            |s| etx.send(s.clone()).unwrap(),
+            monotonic_ms,
+        )
+    });
+    let ready = wait_for(&erx, |s| {
+        s.connected && s.eq_capability.is_some() && matches!(s.eq_ult.status, Status::Confirmed)
+    });
+    let bands = vec![6, 0, 20, 10, 13, 16];
+    let cmd = prepare_preset_bands(ready.eq_capability.as_ref(), CUSTOM_2, 1, &bands).unwrap();
+    let eq_sets = |log: &[(FrameType, Vec<u8>)]| -> Vec<Vec<u8>> {
+        log.iter()
+            .filter(|(t, p)| *t == FrameType::Command1 && p.first() == Some(&0x58))
+            .map(|(_, p)| p.clone())
+            .collect()
+    };
+    let before = eq_sets(&log.lock().unwrap()).len();
+    tx.send(cmd).unwrap();
+    let st = wait_for(&erx, |s| {
+        s.eq_ult.value.as_ref().map(|e| e.bands.clone()) == Some(bands.clone())
+            && matches!(s.eq_ult.status, Status::Confirmed)
+    });
+    let eq = st.eq_ult.value.unwrap();
+    assert_eq!((eq.preset, eq.ult), (CUSTOM_2, UltLevel::Ult1));
+    let sets = eq_sets(&log.lock().unwrap());
+    assert_eq!(
+        sets[before..].to_vec(),
+        vec![vec![0x58, 0x03, 0xA2, 0x01, 0x06, 6, 0, 20, 10, 13, 16]],
+        "{sets:02X?}"
+    );
     tx.send(BrokerCmd::Disconnect).unwrap();
 }

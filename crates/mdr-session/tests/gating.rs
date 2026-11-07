@@ -243,6 +243,10 @@ fn eq_setters_without_the_eq_capability_are_unavailable() {
     assert_eq!(s.set_eq_preset_ult(0x10, mdr_proto::UltLevel::Off), refused);
     assert_eq!(s.set_eq_bands(vec![10; 6]), refused);
     assert_eq!(s.set_eq_preset_bands(0xA1, vec![10; 6]), refused);
+    assert_eq!(
+        s.set_eq_preset_ult_bands(0xA1, mdr_proto::UltLevel::Ult1, vec![10; 6]),
+        refused
+    );
     assert!(matches!(s.state().eq_ult.status, Status::Unavailable));
     assert!(drain(&mut s, 10_000).is_empty());
 }
@@ -278,6 +282,25 @@ fn preset_and_bands_go_in_one_request() {
     assert_eq!(
         decode_payload(&out[0]),
         [0x58, 0x03, 0xA1, 0x01, 0x06, 15, 11, 8, 11, 13, 16]
+    );
+}
+
+#[test]
+fn preset_ult_and_bands_go_in_one_request() {
+    let mut s = connected_session();
+    assert!(drain(&mut s, 10_000).is_empty());
+    assert_eq!(
+        s.set_eq_preset_ult_bands(0xA2, mdr_proto::UltLevel::Ult2, vec![1, 2, 3]),
+        Err(SessionError::InvalidValue)
+    );
+    assert!(drain(&mut s, 10_001).is_empty());
+    s.set_eq_preset_ult_bands(0xA2, mdr_proto::UltLevel::Ult2, vec![6, 0, 20, 10, 13, 16])
+        .unwrap();
+    let out = drain(&mut s, 10_002);
+    assert_eq!(out.len(), 1);
+    assert_eq!(
+        decode_payload(&out[0]),
+        [0x58, 0x03, 0xA2, 0x02, 0x06, 6, 0, 20, 10, 13, 16]
     );
 }
 

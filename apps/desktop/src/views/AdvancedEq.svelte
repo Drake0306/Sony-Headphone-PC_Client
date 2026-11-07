@@ -11,13 +11,17 @@
   one EQ write of that preset and the fitted bands, ULT kept, with the EQ
   group's status (`eq_ult`): pending, then "Sent" once the device reports the
   fitted bands, or the refusal. Takes the whole content area, sized so nothing
-  scrolls at 880×560; "‹ Sound" goes back.
+  scrolls at 880×560; "‹ Sound" goes back. Share shows the curve as a code
+  and QR; Paste a code takes one (an Advanced code replaces and saves the
+  curve; a Sound code goes to the headphones only after its confirmation).
 -->
 <script lang="ts">
   import { onMount } from "svelte";
   import Fader, { faderText } from "../lib/controls/Fader.svelte";
   import Confirm from "../lib/controls/Confirm.svelte";
   import FaderScale from "../lib/controls/FaderScale.svelte";
+  import PasteCode from "../lib/controls/PasteCode.svelte";
+  import ShareCode from "../lib/controls/ShareCode.svelte";
   import { control } from "../lib/control.svelte";
   import {
     ADVANCED_BAND_LABELS,
@@ -38,6 +42,7 @@
     type TargetPreset,
   } from "../lib/eqCurve";
   import { getBestFitPreview, getEqCurve, sendBestFit, setEqCurve } from "../lib/ipc";
+  import { encodeAdvanced } from "../lib/presetCode";
   import { isPending, PRESET_LOCK_NOTES, presetLock, type DeviceState } from "../lib/state";
 
   let { st, onback }: { st: DeviceState; onback: () => void } = $props();
@@ -161,6 +166,34 @@
     persist();
   }
 
+  let sharing = $state<string | null>(null);
+  let pasting = $state(false);
+
+  function share() {
+    if (curve !== null) sharing = encodeAdvanced(curve);
+  }
+
+  /** A pasted curve: drawn at once, then saved (and its fit shown) as an edit would be. */
+  function adopt(bands: number[]): Promise<void> {
+    curve = [...bands];
+    sentRaw = null;
+    edits++;
+    fit = bestFitPreview(curve);
+    const mine = edits;
+    return saver.save(curve).then(() => {
+      problem = null;
+      getBestFitPreview().then(
+        (stored) => {
+          if (mine === edits && Array.isArray(stored)) fit = stored;
+        },
+        (e) => {
+          problem = "Saved; preview unavailable";
+          console.error(e);
+        },
+      );
+    });
+  }
+
   function go(step: number) {
     page = Math.min(PAGE_COUNT - 1, Math.max(0, page + step));
   }
@@ -259,6 +292,17 @@
       {#if shape}<p class="note err">{shape}</p>{/if}
       {#if unlisted}<p class="note err">{unlisted}</p>{/if}
       {#if problem}<p class="note err">{problem}</p>{/if}
+      <!-- Its own row: beside Send the column (≈310 px at 880 wide) would overflow. -->
+      <div class="codes">
+        <button
+          class="btn"
+          class:unavailable={curve === null}
+          aria-disabled={curve === null}
+          tabindex={curve === null ? -1 : 0}
+          onclick={share}>Share</button
+        >
+        <button class="btn" onclick={() => (pasting = true)}>Paste a code</button>
+      </div>
       <div class="send">
         {#if sendNote}<span class="lab" class:live={eq.refused !== null}>{sendNote}</span>{/if}
         <button
@@ -268,6 +312,7 @@
           tabindex={resetOff ? -1 : 0}
           onclick={reset}>Reset</button
         >
+
         <button
           class="btn fill"
           class:unavailable={sendOff}
@@ -291,10 +336,17 @@
   />
 {/if}
 
+{#if sharing}
+  <ShareCode title="Share this curve" code={sharing} onclose={() => (sharing = null)} />
+{/if}
+{#if pasting}
+  <PasteCode {st} savecurve={adopt} onclose={() => (pasting = false)} />
+{/if}
+
 <style>
   /* Height at 880×560 (no scroll): 20 + top ≈26 + 8 + faders (the rest,
-     ≈385) + 8 + strip 17 + 8 + bottom ≈60–73 + 16. Each rail takes the
-     faders' height less the 58 px foot and 8 px gap: ≈320. */
+     ≈360) + 8 + strip 17 + 8 + bottom ≈86–99 + 16. Each rail takes the
+     faders' height less the 58 px foot and 8 px gap: ≈295. */
   .adv {
     display: flex;
     flex-direction: column;
@@ -450,6 +502,7 @@
     color: var(--muted);
   }
 
+  .codes,
   .send {
     display: flex;
     gap: 6px;

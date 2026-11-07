@@ -30,6 +30,18 @@ export const setEqPreset = (preset: number) => invoke<void>("set_eq_preset", { p
 /** Six band levels, each 0..=20 (10 is flat). */
 export const setEqBands = (bands: number[]) => invoke<void>("set_eq_bands", { bands });
 
+/** The Advanced equalizer's ten-band curve, levels −10..=10 (31 Hz .. 16 kHz). */
+export const getEqCurve = () => invoke<{ bands: number[] }>("get_eq_curve");
+
+/** Saves the ten-band curve in the app (never sent to the headphones); rejects when invalid. */
+export const setEqCurve = (bands: number[]) => invoke<void>("set_eq_curve", { bands });
+
+/** The six device levels (−10..=10, wire order) fitted to the saved curve. */
+export const getBestFitPreview = () => invoke<number[]>("best_fit_preview");
+
+/** Sends the saved curve's best fit through the Sound screen's band write; returns the six levels. */
+export const sendBestFit = () => invoke<number[]>("send_best_fit");
+
 /** Volume 0..=30. */
 export const setVolume = (volume: number) => invoke<void>("set_volume", { volume });
 

@@ -5,13 +5,13 @@
   The bottom spacer matches Fader's foot so the marks line up with the rails.
 -->
 <script lang="ts">
-  import { faderText } from "./Fader.svelte";
+  import { faderText, faderVars, type FaderSize } from "./Fader.svelte";
 
-  let { max = 20 }: { max?: number } = $props();
+  let { max = 20, size = "md" }: { max?: number; size?: FaderSize } = $props();
   const centre = $derived(max / 2);
 </script>
 
-<div class="fader-scale" aria-hidden="true">
+<div class="fader-scale" aria-hidden="true" style={faderVars(size)}>
   <div class="ends">
     <b class="lab">{faderText(max, centre)}</b>
     <b class="lab">{faderText(centre, centre)}</b>
@@ -25,7 +25,7 @@
     display: flex;
     flex: none;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--fader-gap);
     height: 100%;
   }
 
@@ -41,13 +41,13 @@
   }
 
   .ends b {
-    height: 10px;
+    height: var(--fader-knob);
     font-weight: 400;
-    line-height: 10px;
+    line-height: var(--fader-knob);
   }
 
   .foot {
     flex: none;
-    height: 48px;
+    height: var(--fader-foot);
   }
 </style>

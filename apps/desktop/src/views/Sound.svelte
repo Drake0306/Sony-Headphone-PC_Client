@@ -13,7 +13,8 @@
   import { setConnectionMode, setDseeAutoOff, setEqBands, setEqPreset, setUlt } from "../lib/ipc";
   import { codecLabel, isPending, presetName, type DeviceState, type UltLevel } from "../lib/state";
 
-  let { st }: { st: DeviceState } = $props();
+  // `onadvanced` opens the Advanced equalizer (Main swaps it in for this screen).
+  let { st, onadvanced }: { st: DeviceState; onadvanced?: () => void } = $props();
 
   // Index 0 is Clear Bass (docs/hardware-validation.md).
   const LABELS = ["Clear Bass", "400 Hz", "1 kHz", "2.5 kHz", "6.3 kHz", "16 kHz"];
@@ -54,7 +55,12 @@
   <div class="two sound">
     <div>
       <div class="block">
-        <h4>Equalizer{preset.shown === null ? "" : ` · ${presetName(preset.shown)}`} · drag a handle</h4>
+        <div class="eqhead">
+          <h4>Equalizer{preset.shown === null ? "" : ` · ${presetName(preset.shown)}`} · drag a handle</h4>
+          {#if onadvanced}
+            <button class="btn" onclick={onadvanced}>Advanced</button>
+          {/if}
+        </div>
         <div class="eq">
           <Faders
             bands={bands.shown}
@@ -145,6 +151,22 @@
 <style>
   .sound {
     grid-template-columns: 1.35fr 1fr;
+  }
+
+  .eqhead {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .eqhead h4 {
+    margin: 0;
+  }
+
+  .eqhead .btn {
+    padding: 2px 8px;
   }
 
   .eq {

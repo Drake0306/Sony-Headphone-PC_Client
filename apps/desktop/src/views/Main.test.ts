@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, waitFor } from "@testing-library/svelte";
 
 const backend = vi.hoisted(() => ({ showAdvanced: false }));
 
@@ -43,6 +43,44 @@ describe("Main nav", () => {
     backend.showAdvanced = true;
     const r = render(Main);
     await waitFor(() => expect(navLabels(r.container).at(-1)).toBe("Advanced"));
+    r.unmount();
+  });
+});
+
+describe("Advanced equalizer from Sound", () => {
+  beforeEach(() => {
+    location.hash = "#sound";
+  });
+
+  it("back returns to Sound", async () => {
+    backend.showAdvanced = false;
+    const r = render(Main);
+    const open = await r.findByRole("button", { name: "Advanced" });
+    await fireEvent.click(open);
+    expect(r.getByText("Advanced equalizer")).toBeTruthy();
+    // The view takes the whole content area: no nav, and no hash of its own.
+    expect(r.container.querySelector("nav")).toBeNull();
+    expect(r.container.querySelector(".eq")).toBeNull();
+    expect(location.hash).toBe("#sound");
+
+    await fireEvent.click(r.getByRole("button", { name: "‹ Sound" }));
+    expect(r.queryByText("Advanced equalizer")).toBeNull();
+    expect(r.container.querySelector(".eq")).not.toBeNull();
+    expect(navLabels(r.container)).toContain("Sound");
+    r.unmount();
+  });
+
+  it("a tab change closes it", async () => {
+    const r = render(Main);
+    await fireEvent.click(await r.findByRole("button", { name: "Advanced" }));
+    expect(r.getByText("Advanced equalizer")).toBeTruthy();
+    location.hash = "#noise";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    await waitFor(() => expect(r.queryByText("Advanced equalizer")).toBeNull());
+    location.hash = "#sound";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    await waitFor(() => expect(r.container.querySelector(".eq")).not.toBeNull());
+    expect(r.queryByText("Advanced equalizer")).toBeNull();
     r.unmount();
   });
 });

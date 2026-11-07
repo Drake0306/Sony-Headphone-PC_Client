@@ -15,6 +15,24 @@
     const db = v - centre;
     return db > 0 ? `+${db}` : db < 0 ? `−${-db}` : "0";
   }
+
+  /**
+   * Fader dimensions in px, defined once: the knob height also drives the
+   * pointer maths, and FaderScale uses the knob and foot so its marks line up.
+   * "md" is the Sound screen, "lg" the Advanced equalizer's big faders.
+   */
+  export const FADER_SIZES = {
+    md: { knob: 10, knobWidth: 24, track: 6, seg: 16, zero: 28, rail: 44, gap: 6, foot: 48, value: 18 },
+    lg: { knob: 14, knobWidth: 44, track: 8, seg: 26, zero: 48, rail: 88, gap: 10, foot: 64, value: 28 },
+  } as const;
+  export type FaderSize = keyof typeof FADER_SIZES;
+
+  /** The sizes as CSS custom properties (`--fader-knob: 10px`, ...). */
+  export function faderVars(size: FaderSize): string {
+    return Object.entries(FADER_SIZES[size])
+      .map(([k, v]) => `--fader-${k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}: ${v}px`)
+      .join("; ");
+  }
 </script>
 
 <script lang="ts">
@@ -32,13 +50,15 @@
     oncommit: (v: number) => void;
     /** Top raw value (steps − 1); the centre is max / 2. */
     max?: number;
+    /** "md" (Sound screen) or "lg" (Advanced equalizer); the height follows the parent. */
+    size?: FaderSize;
   }
 
-  let { value, label, status, disabled = false, onchange, oncommit, max = 20 }: Props = $props();
+  let { value, label, status, disabled = false, onchange, oncommit, max = 20, size = "md" }: Props = $props();
 
   const KEY_COMMIT_MS = 150;
   /** Knob height in px; the knob's centre travels the rail minus this. */
-  const KNOB = 10;
+  const KNOB = $derived(FADER_SIZES[size].knob);
   const BIG_STEP = 5;
 
   const centre = $derived(max / 2);
@@ -131,7 +151,7 @@
   }
 </script>
 
-<div class="fader" class:inert>
+<div class="fader" class:inert style={faderVars(size)}>
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="rail"
@@ -157,6 +177,7 @@
       <i
         class="knob"
         role="slider"
+        aria-orientation="vertical"
         tabindex={inert ? -1 : 0}
         aria-label={label}
         aria-valuemin={0}
@@ -181,7 +202,7 @@
     flex: 1;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: var(--fader-gap);
     min-width: 0;
     height: 100%;
   }
@@ -190,7 +211,7 @@
     position: relative;
     flex: 1;
     width: 100%;
-    max-width: 44px;
+    max-width: var(--fader-rail);
     cursor: ns-resize;
     touch-action: none;
   }
@@ -201,18 +222,18 @@
 
   .track {
     position: absolute;
-    top: 5px;
-    bottom: 5px;
-    left: calc(50% - 3px);
-    width: 6px;
+    top: calc(var(--fader-knob) / 2);
+    bottom: calc(var(--fader-knob) / 2);
+    left: calc(50% - var(--fader-track) / 2);
+    width: var(--fader-track);
     background: var(--hair);
   }
 
   /* One tick per step, centred on the step; zero is longer and darker. */
   .seg {
     position: absolute;
-    left: calc(50% - 8px);
-    width: 16px;
+    left: calc(50% - var(--fader-seg) / 2);
+    width: var(--fader-seg);
     height: 1px;
     transform: translateY(50%);
     background: var(--hair);
@@ -220,15 +241,15 @@
   }
 
   .seg.zero {
-    left: calc(50% - 14px);
-    width: 28px;
+    left: calc(50% - var(--fader-zero) / 2);
+    width: var(--fader-zero);
     background: var(--muted);
   }
 
   .fill {
     position: absolute;
-    left: calc(50% - 3px);
-    width: 6px;
+    left: calc(50% - var(--fader-track) / 2);
+    width: var(--fader-track);
     background: var(--ink);
     pointer-events: none;
     transition:
@@ -238,9 +259,9 @@
 
   .knob {
     position: absolute;
-    left: calc(50% - 12px);
-    width: 24px;
-    height: 10px;
+    left: calc(50% - var(--fader-knob-width) / 2);
+    width: var(--fader-knob-width);
+    height: var(--fader-knob);
     background: var(--ult);
     transition: bottom 120ms ease-out;
   }
@@ -266,12 +287,12 @@
     flex-direction: column;
     align-items: center;
     gap: 2px;
-    height: 48px;
+    height: var(--fader-foot);
   }
 
   .val {
-    font-size: 18px;
-    line-height: 20px;
+    font-size: var(--fader-value);
+    line-height: calc(var(--fader-value) + 2px);
     color: var(--ink);
     white-space: nowrap;
   }

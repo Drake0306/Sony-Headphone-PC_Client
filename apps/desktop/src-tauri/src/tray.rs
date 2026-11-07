@@ -10,9 +10,17 @@ use crate::popover;
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let quit = MenuItem::with_id(app, "quit", "Quit Hairline", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&quit])?;
-    TrayIconBuilder::with_id("main")
+    // macOS tints the monochrome template icon for the menu bar. Windows has
+    // no template icons, and the black glyph vanishes on a dark taskbar, so it
+    // gets the full-colour app icon (a dark tile, readable on light and dark).
+    #[cfg(not(target_os = "windows"))]
+    let builder = TrayIconBuilder::with_id("main")
         .icon(Image::from_bytes(include_bytes!("../icons/tray.png"))?)
-        .icon_as_template(true)
+        .icon_as_template(true);
+    #[cfg(target_os = "windows")]
+    let builder = TrayIconBuilder::with_id("main")
+        .icon(Image::from_bytes(include_bytes!("../icons/32x32.png"))?);
+    builder
         .tooltip("Hairline")
         .menu(&menu)
         .show_menu_on_left_click(false)

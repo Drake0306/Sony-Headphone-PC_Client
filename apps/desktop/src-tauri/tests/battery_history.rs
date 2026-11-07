@@ -297,6 +297,9 @@ fn the_estimate_is_re_emitted_and_goes_blank_when_stale() {
     let wall = Arc::new(AtomicU64::new(W));
     let skew = Arc::new(AtomicU64::new(0));
     let (tx, brx, handle) = spawn_with_battery(dir.clone(), Arc::clone(&wall), Arc::clone(&skew));
+    // The first event comes from the write; the re-emit timer is armed on the
+    // broker clock read before it, so skewing the clock only after this
+    // receive makes the next pass due.
     let first = next_estimate(&brx);
     assert_eq!(first.samples, 11);
     assert!(first.minutes_left.is_some(), "{first:?}");

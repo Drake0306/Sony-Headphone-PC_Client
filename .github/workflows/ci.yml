@@ -40,8 +40,7 @@ jobs:
         run: cargo build -p mdr-transport
 
   windows-crates:
-    # Protocol crates and the Windows transport only; the Tauri app is not
-    # built on Windows yet.
+    # Protocol crates and the Windows transport; the app is in windows-app.
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,3 +52,32 @@ jobs:
         run: cargo test -p mdr-frame -p mdr-proto -p mdr-session -p mdr-transport
       - name: Clippy
         run: cargo clippy -p mdr-transport --all-targets -- -D warnings
+
+  windows-app:
+    # The whole Tauri app on Windows: the frontend build first, because the
+    # app's build script embeds ../dist.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: apps/desktop
+      - name: Build frontend
+        run: pnpm build
+        working-directory: apps/desktop
+      - name: Test
+        run: cargo test -p hairline
+      - name: Clippy
+        run: cargo clippy -p hairline --all-targets -- -D warnings

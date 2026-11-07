@@ -125,3 +125,20 @@ Run with the real headphones connected.
 - [ ] "On the headphones now" in the Advanced view matches the fit, and the Sound screen faders show the same six values.
 - [ ] Back on the Sound screen, the fader knobs snap to the 21 segments and the +10, 0 and −10 labels are not clipped in the real window.
 - [ ] Restart Hairline; the Advanced curve is still there (`eq_curve.json` in the config directory).
+
+## 10. Windows app (Phase 7a, to do with a Windows machine)
+
+The app builds and its tests pass on Windows CI; it has not been started on a Windows machine or run against the headphones on Windows. Nothing below is verified. Do section 7 (the transport) first.
+
+- [ ] `HAIRLINE_FAKE=1`: the app starts, the tray icon appears in the notification area, and a left click opens the popover centred above the icon with the `FAKE` label.
+- [ ] The tray icon is visible on both light and dark taskbars.
+- [ ] The popover has no title bar, stays on top, and does not appear in the taskbar.
+- [ ] With the taskbar on the left, right or top, the popover opens by the icon and fully on screen.
+- [ ] Clicking outside hides the popover (set_focus takes the foreground, so focus loss arrives). Clicking the tray icon while it is open hides it and does not reopen it at once; the next click opens it.
+- [ ] Right click on the tray icon shows Quit, and Quit ends the app.
+- [ ] The popover footer opens the main window; it appears in the taskbar like an ordinary window, and closing it leaves the tray icon running.
+- [ ] With the headphones paired and connected, the popover shows battery, noise control and ULT, and a change from the popover takes effect on the headphones.
+- [ ] Devices: the Link list shows no host entry and no "playing" (the Windows audio module does not exist yet).
+- [ ] Scenes: an "App in front" trigger with an executable name (for example `Zoom` for `Zoom.exe`) applies when that app is in front. A "Microphone in use" trigger never fires on Windows yet.
+- [ ] Launch at login: turning it on in Settings starts Hairline after signing in again.
+- [ ] Record the Windows version and the headphones' firmware with the results.

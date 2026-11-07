@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Advanced equalizer research</title>
+<style>
+  :root { --paper:#efede6; --ink:#161614; --hair:#cfccc2; --muted:#6f726d; --ult:#ff6600; --box:#f8f7f3; --pink:#ff4fa3; }
+  @media (prefers-color-scheme: dark) { :root { --paper:#161614; --ink:#efede6; --hair:#3a3a36; --muted:#9a9c97; --box:#1f1f1c; } }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--paper); color:var(--ink); font:15px/1.5 "Instrument Sans", system-ui, sans-serif; font-variant-numeric:tabular-nums; }
+  main { max-width:820px; margin:0 auto; padding:48px max(16px, env(safe-area-inset-left)) 64px max(16px, env(safe-area-inset-right)); }
+  h1 { font-size:28px; font-weight:600; letter-spacing:-0.01em; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 32px; }
+  h2 { font:400 11px/1 "DM Mono", ui-monospace, monospace; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:36px 0 12px; padding-top:12px; border-top:1px solid var(--hair); }
+  h3 { font-size:16px; font-weight:600; margin:18px 0 6px; }
+  p { margin:0 0 12px; max-width:70ch; }
+  ul { margin:0 0 12px; padding-left:18px; max-width:70ch; }
+  li { margin:0 0 6px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; margin:0 0 12px; }
+  td, th { text-align:left; padding:7px 8px 7px 0; border-bottom:1px solid var(--hair); vertical-align:top; }
+  th { font:400 11px/1 "DM Mono", ui-monospace, monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  code { font:13px "DM Mono", ui-monospace, monospace; background:var(--box); padding:1px 4px; }
+  .verdict { border:1px solid var(--ink); padding:14px 16px; margin:0 0 16px; max-width:none; }
+  .verdict b { font-weight:600; }
+  .chip { display:inline-block; padding:1px 6px; border:1px solid var(--hair); font:10px/1.6 "DM Mono", ui-monospace, monospace; letter-spacing:.04em; text-transform:uppercase; margin-right:4px; }
+  .chip.u { border-color:var(--ult); color:var(--ult); }
+  .live { color:var(--ult); font-weight:600; }
+  .num { font-family:"DM Mono", ui-monospace, monospace; }
+
+  /* Mock of the full-area Advanced EQ view */
+  .mock { border:1px solid var(--hair); background:var(--paper); padding:24px 28px; margin:12px 0 8px; }
+  .mock .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; }
+  .mock .back { border:1px solid var(--ink); background:var(--box); font:10px/1 "DM Mono", ui-monospace, monospace; letter-spacing:.06em; text-transform:uppercase; padding:6px 10px; }
+  .mock .title { font-size:18px; font-weight:600; }
+  .mock .lab { font:10px "DM Mono", ui-monospace, monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .faders { display:grid; grid-template-columns:repeat(4, 1fr); gap:28px; height:260px; align-items:end; }
+  .fader { display:flex; flex-direction:column; align-items:center; height:100%; }
+  .fader .track { position:relative; flex:1; width:14px; background:var(--hair); }
+  .fader .fill { position:absolute; left:0; right:0; bottom:50%; background:var(--ink); }
+  .fader .fill.neg { bottom:auto; top:50%; }
+  .fader .zero { position:absolute; left:-8px; right:-8px; top:50%; height:1px; background:var(--muted); }
+  .fader .knob { position:absolute; left:-9px; width:32px; height:10px; background:var(--ult); }
+  .fader .val { font:900 26px "Doto", "DM Mono", monospace; margin-top:8px; }
+  .fader .hz { font:10px "DM Mono", ui-monospace, monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-top:2px; }
+  .strip { display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:center; margin-top:22px; }
+  .strip .arrow { border:1px solid var(--ink); background:var(--box); width:34px; height:28px; font:14px "DM Mono", monospace; display:grid; place-items:center; }
+  .strip .bands { display:grid; grid-template-columns:repeat(10, 1fr); gap:3px; }
+  .strip .bands span { height:6px; background:var(--hair); }
+  .strip .bands span.on { background:var(--ult); }
+  .strip .bands span.on.pink { background:var(--pink); }
+  .notebar { display:flex; justify-content:space-between; align-items:center; margin-top:16px; font-size:12px; color:var(--muted); }
+  .notebar .warn { color:var(--ult); font-weight:600; }
+  .swatches { display:flex; gap:14px; align-items:center; font-size:12px; color:var(--muted); margin:6px 0 0; }
+  .sw { width:22px; height:22px; border:1px solid var(--hair); display:inline-block; vertical-align:middle; margin-right:6px; }
+  .pipe td:first-child { white-space:nowrap; font-family:"DM Mono", ui-monospace, monospace; font-size:12px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Advanced equalizer</h1>
+  <p class="sub">Can Hairline give the ULT WEAR a many-band equalizer, and would it save to the headphones? Research note, 8 November 2026.</p>
+
+  <div class="verdict">
+    <p><b>Short answer.</b> The headphones can only store six numbers: Clear Bass and five fixed bands at 400 Hz, 1 kHz, 2.5 kHz, 6.3 kHz and 16 kHz, each in 21 steps. There is no command on this model that accepts more bands, so a 10-band or 31-band curve <b>cannot be saved to the headphones</b>. It can run in the app, as a system-wide equalizer on the Mac, but only after installing a signed audio driver with your password. That is a real project, not a screen.</p>
+    <p style="margin:0"><b>Recommendation.</b> Build the full-area Advanced view you described, with two honest outputs: a "Send best fit to headphones" button that squashes the curve onto the six device bands and saves it, and an "App EQ" switch that applies the full curve on this Mac only, with the label you asked for. Ship the view and best-fit first (small); make the in-app audio engine its own phase (large).</p>
+  </div>
+
+  <h2>What the headphones can hold</h2>
+  <p>This comes from the unit itself, not from a review. On connect Hairline asks for the EQ capability and the headphones answer <code>51 03 06 15 0A 0C</code>: six bands, 21 steps each, an extra step for ULT 2, twelve preset ids. Band 0 is Clear Bass, the other five sit at fixed centres. The write command <code>58 03</code> carries exactly those six values plus the preset id and the ULT level, and nothing else. Two of the preset ids are user slots, which is where a custom curve lives on the device.</p>
+  <table>
+    <tr><th>Fact</th><th>Source</th></tr>
+    <tr><td>6 bands, 21 steps (−10 to +10), fixed centres 400 Hz to 16 kHz plus Clear Bass</td><td>Capability reply recorded in <code>docs/hardware-validation.md</code>; Sony's app shows the same five sliders plus Clear Bass</td></tr>
+    <tr><td>Clear Bass lifts everything under about 400 Hz by one amount; no finer low end</td><td>hifi.de review of the ULT WEAR</td></tr>
+    <tr><td>Sony's newer WH-1000XM6 has a 10-band EQ, 31 Hz to 16 kHz, ±6 dB</td><td>Reviews of the XM6 and Sound Connect. It is a different firmware with a different EQ capability; nothing in it reaches our unit</td></tr>
+    <tr><td>No protocol path exists for more bands on this firmware</td><td>The libmdr protocol tables we build on and our own capability scan: the EQ write is one fixed-size payload per inquired type, and this unit declares only type 03</td></tr>
+  </table>
+  <p>So the honest UI rule is simple: anything with more than six controls is an <b>app</b> setting. The Advanced view must say so, in the view, not in a tooltip.</p>
+
+  <h2>Three ways to use a bigger curve</h2>
+  <h3>A. Best fit to the device <span class="chip">saves to headphones</span></h3>
+  <p>Take the many-band curve, evaluate it at the six device centres, round to the 21 steps, and write it with the normal EQ command. The headphones then carry it to your phone and everywhere else. It is lossy: a narrow 3 kHz dip becomes a shallow dip at 2.5 kHz. The view shows the fitted six values beside the full curve so the loss is visible. This costs a day of work and adds no new wire commands.</p>
+
+  <h3>B. In-app EQ on this Mac <span class="chip u">app only</span></h3>
+  <p>To equalize what you hear, the app has to sit between the Mac's audio and the Bluetooth link. macOS gives no way to do that from a normal app; every system equalizer (eqMac, SoundSource, BlackHole-based setups) installs a <b>virtual audio device</b>, an Audio Server plug-in in <code>/Library/Audio/Plug-Ins/HAL</code>. The app makes that device the system output, reads the audio back from it, runs the filters, and plays the result to the headphones. What it takes:</p>
+  <ul>
+    <li><b>A driver bundle</b> written against Apple's Audio Server Plug-in API (Apple ships a null-driver sample; eqMac's open-source driver started from it). It runs in user space, not the kernel, so it is stable, but it is still a separate binary.</li>
+    <li><b>Developer ID signing.</b> Community projects report that macOS 15 and later silently skip ad-hoc signed drivers, so this needs the paid Apple Developer Program and a proper signature, plus notarization if we distribute it.</li>
+    <li><b>Admin install.</b> Copying into the HAL folder and restarting <code>coreaudiod</code> needs your password once. eqMac asks for it on first launch for this reason.</li>
+    <li><b>Routing logic.</b> Switch the default output to the virtual device while the headphones are connected, hand audio back when they disconnect or the app quits, keep volume keys working, and never leave the Mac silent if the app crashes. This is where such apps earn their bug reports.</li>
+    <li><b>The filters themselves</b> are the easy part: a chain of biquads or Apple's own EQ audio unit, any number of bands, a few milliseconds of buffer on top of the normal Bluetooth delay.</li>
+  </ul>
+  <p>Effects: only audio from this Mac is equalized. Your phone hears the headphones' own six bands. Videos gain a little lip-sync offset from the buffer. CPU and battery cost is negligible.</p>
+  <table>
+    <tr><th>Platform</th><th>What the in-app EQ needs</th><th>Risk</th></tr>
+    <tr><td>macOS</td><td>Signed Audio Server plug-in, admin install, routing manager in the app</td><td>Signing requirement and output switching; both known and solved by eqMac</td></tr>
+    <tr><td>Windows</td><td>An Audio Processing Object registered per endpoint, as Equalizer APO does; admin install; driver signing</td><td>Bluetooth endpoints reset and drop the APO on reconnect; needs re-attach logic</td></tr>
+    <tr><td>Linux</td><td>PipeWire filter-chain node, no driver</td><td>Lowest; the Hairline process just publishes a filter graph</td></tr>
+  </table>
+
+  <h3>C. Both, side by side <span class="chip">recommended</span></h3>
+  <p>The Advanced view holds one curve. Two actions sit under it: <b>Send best fit to headphones</b> (option A, always available) and <b>App EQ on this Mac</b> (option B, a switch that is greyed out with a note until the engine phase ships). The label you asked for reads, in the view: <span class="live">These bands run in Hairline only. The headphones keep their six-band curve; use "Send best fit" to put the closest match on them.</span></p>
+
+  <h2>Is it worth it?</h2>
+  <p>Option A is worth it on its own: a big, comfortable editor for the six values you already have, plus a many-band curve to design from, saving to the headphones. Small, safe, no driver.</p>
+  <p>Option B is the thing people actually pay for in SoundSource and eqMac, so yes, it is useful, but only for listening from the Mac, and it adds a driver, a signing cost, a password prompt and a new class of audio bugs to a project that has had none so far. My advice is to decide on it after the view exists and you have used the best-fit path for a week. If you still want it, it gets its own phase with the driver as its first task, and it should be an opt-in install inside Settings, never part of the normal launch.</p>
+
+  <h2>The view, as you described it</h2>
+  <p>An "Advanced" button beside the equalizer on the Sound screen. It takes over the whole viewable area of the window (not full screen), with a back button at the top left. Four big faders are visible at a time, the same fader as today but taller. Under them a band strip shows all bands with the visible four marked; left and right buttons step through four at a time, since dragging a strip reads badly with a mouse. The default set is ten bands from 31 Hz to 16 kHz, like Sony's newest headphones; a 31-band third-octave set can be a choice in the same view later.</p>
+
+  <div class="mock" aria-label="Mock-up of the Advanced equalizer view">
+    <div class="top">
+      <span class="back">‹ Sound</span>
+      <span class="title">Advanced equalizer</span>
+      <span class="lab">Bands 1–4 of 10</span>
+    </div>
+    <div class="faders">
+      <div class="fader"><div class="track"><div class="zero"></div><div class="fill" style="height:30%"></div><div class="knob" style="bottom:calc(80% - 5px)"></div></div><div class="val">+6</div><div class="hz">31 Hz</div></div>
+      <div class="fader"><div class="track"><div class="zero"></div><div class="fill" style="height:15%"></div><div class="knob" style="bottom:calc(65% - 5px)"></div></div><div class="val">+3</div><div class="hz">62 Hz</div></div>
+      <div class="fader"><div class="track"><div class="zero"></div><div class="knob" style="bottom:calc(50% - 5px)"></div></div><div class="val">0</div><div class="hz">125 Hz</div></div>
+      <div class="fader"><div class="track"><div class="zero"></div><div class="fill neg" style="height:10%"></div><div class="knob" style="bottom:calc(40% - 5px)"></div></div><div class="val">−2</div><div class="hz">250 Hz</div></div>
+    </div>
+    <div class="strip">
+      <span class="arrow">‹</span>
+      <div class="bands"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <span class="arrow">›</span>
+    </div>
+    <div class="notebar">
+      <span class="warn">These bands run in Hairline only. The headphones keep their six-band curve.</span>
+      <span><span class="back">Send best fit to headphones</span></span>
+    </div>
+  </div>
+  <p class="swatches"><span><span class="sw" style="background:var(--ult)"></span>ULT orange, Hairline's accent</span><span><span class="sw" style="background:var(--pink)"></span>Pink, as you asked</span></p>
+  <p>On the pink strip: Hairline uses exactly one accent, the orange that means "live" everywhere else. A pink strip would be a second accent with no other job in the app. I can do it either way; if you want pink, I'd make it a theme accent choice in Settings so the whole app agrees, rather than one pink control. Your call.</p>
+
+  <h2>Pipeline</h2>
+  <table class="pipe">
+    <tr><th>Phase</th><th>Scope</th><th>State</th></tr>
+    <tr><td>4</td><td>Advanced panel, opcode probe, battery history, socket + CLI</td><td>in progress on <code>phase4-beyond-sony</code>; Tasks 1–3 of 6 done</td></tr>
+    <tr><td>5</td><td>Advanced equalizer view: full-area editor, 10 bands, paging strip, best fit saved to the headphones, app-only label, curve stored in the app</td><td>next; about two days of work; no driver, no new wire commands</td></tr>
+    <tr><td>6</td><td>App EQ engine on macOS: signed Audio Server plug-in, routing manager, filter chain, opt-in install in Settings</td><td>decide after using Phase 5; needs the Apple Developer Program</td></tr>
+    <tr><td>7</td><td>Windows tray app and hardware check; Windows APO for the app EQ if Phase 6 happened</td><td>needs a Windows machine</td></tr>
+    <tr><td>8</td><td>Linux: bluer transport, tray, PipeWire filter-chain EQ</td><td>last, per your platform order</td></tr>
+  </table>
+
+  <h2>Sources</h2>
+  <ul>
+    <li>Our own capture: <code>docs/hardware-validation.md</code> §2, EQ capability <code>51 03 06 15 0A 0C</code> and the read-modify-write check in §4.</li>
+    <li>eqMac open-source repository and its driver notes (Apple null-driver origin, user-space, password on first launch): github.com/bitgapp/eqMac.</li>
+    <li>Apple, "Creating an Audio Server Driver Plug-in" (install to <code>/Library/Audio/Plug-Ins/HAL</code>).</li>
+    <li>Community HAL plug-in projects on the macOS 15 signing requirement (ad-hoc signatures skipped, Developer ID needed): proxy-audio-device, MacAudio, AudioHub.</li>
+    <li>Equalizer APO project page and user guides on per-endpoint install, admin rights and Bluetooth reconnect behaviour.</li>
+    <li>Reviews of the Sony WH-1000XM6 10-band EQ; hifi.de and Android Central reviews of the ULT WEAR's five-band EQ and Clear Bass.</li>
+  </ul>
+</main>
+</body>
+</html>

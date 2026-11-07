@@ -48,6 +48,15 @@ describe("SceneEditor", () => {
     expect(getByText(note)).toHaveClass("note");
   });
 
+  it("scene_editor_offers_the_device_presets_and_the_saved_one", async () => {
+    const draft = { ...newScene(), actions: { ...newScene().actions, eq_preset: 0xa1 } };
+    const r = render(SceneEditor, { draft, devicePresets: [0x00, 0x16], onSave: () => {}, onDelete: () => {} });
+    expect(r.getByText("Off")).toBeInTheDocument();
+    expect(r.getByText("Bass Boost")).toBeInTheDocument();
+    expect(r.getByText("Custom 1")).toBeInTheDocument();
+    expect(r.queryByText("Bright")).toBeNull();
+  });
+
   it("scene_editor_escape_and_blur_stop_recording", async () => {
     const { getByText, queryByLabelText } = setup();
     await fireEvent.click(getByText("Record"));

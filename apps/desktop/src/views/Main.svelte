@@ -84,7 +84,7 @@
     {:else if tab === "devices"}
       <Devices {st} />
     {:else if tab === "scenes"}
-      <Scenes />
+      <Scenes {st} />
     {:else if tab === "settings"}
       <Settings {st} />
     {:else}

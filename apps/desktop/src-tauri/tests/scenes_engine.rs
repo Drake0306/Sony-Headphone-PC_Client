@@ -347,6 +347,36 @@ fn set_scenes_clears_a_deleted_active_scene() {
     assert_eq!(engine.tick(&on), None);
 }
 
+#[test]
+fn editing_the_active_scene_reapplies() {
+    let mut engine = Engine::new(vec![
+        nc_ambient_scene("walk", Trigger::Manual),
+        nc_ambient_scene("other", Trigger::Manual),
+    ]);
+    assert!(engine.apply_manual("walk").is_some());
+    let mut edited = engine.scenes().to_vec();
+    edited[0].actions.volume = Some(9);
+    assert_eq!(
+        engine.set_scenes(edited.clone()),
+        Some(edited[0].actions.clone())
+    );
+    assert_eq!(engine.active(), Some("walk"));
+    // Editing a scene that is not active sends nothing.
+    edited[1].actions.volume = Some(3);
+    assert_eq!(engine.set_scenes(edited), None);
+}
+
+#[test]
+fn saving_unchanged_active_scene_sends_nothing() {
+    let mut engine = Engine::new(vec![nc_ambient_scene("walk", Trigger::Manual)]);
+    assert!(engine.apply_manual("walk").is_some());
+    let mut same = engine.scenes().to_vec();
+    same[0].name = "Walking".into();
+    same[0].hotkey = Some("Alt+Super+1".into());
+    assert_eq!(engine.set_scenes(same), None);
+    assert_eq!(engine.active(), Some("walk"));
+}
+
 // ---- The broker loop with a scene host and scripted sensors ----
 
 mod broker_level {
@@ -549,6 +579,38 @@ mod broker_level {
         std::thread::sleep(Duration::from_millis(300));
         assert!(b.scenes.try_recv().is_err(), "exactly one more emission");
         assert_eq!(b.sent_len(), before, "EmitScenes sent frames");
+        b.stop();
+    }
+
+    #[test]
+    fn editing_the_active_scene_sends_the_new_actions() {
+        let walk = scene(
+            "walk",
+            Trigger::Manual,
+            Actions {
+                volume: Some(9),
+                ..Actions::default()
+            },
+        );
+        let b = run(vec![walk.clone()]);
+        b.wait_state(|s| s.connected);
+        b.cmds.send(BrokerCmd::ApplyScene("walk".into())).unwrap();
+        assert_eq!(b.next_scenes().as_deref(), Some("walk"));
+        b.wait_state(|s| s.volume.value == Some(9) && s.volume.status == Status::Confirmed);
+
+        let mut edited = walk;
+        edited.actions.volume = Some(4);
+        b.cmds
+            .send(BrokerCmd::SetScenes(vec![edited.clone()]))
+            .unwrap();
+        assert_eq!(b.next_scenes().as_deref(), Some("walk"));
+        b.wait_state(|s| s.volume.value == Some(4) && s.volume.status == Status::Confirmed);
+        assert_eq!(b.sent_with(VOLUME_SET), 2);
+
+        b.cmds.send(BrokerCmd::SetScenes(vec![edited])).unwrap();
+        assert_eq!(b.next_scenes().as_deref(), Some("walk"));
+        std::thread::sleep(Duration::from_millis(300));
+        assert_eq!(b.sent_with(VOLUME_SET), 2, "unchanged save sent frames");
         b.stop();
     }
 }

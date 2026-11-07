@@ -16,6 +16,10 @@
     validateScene,
     type Scene,
   } from "../lib/scenes";
+  import type { DeviceState } from "../lib/state";
+
+  /** The device state, for the EQ presets the headphones report. */
+  let { st = null }: { st?: DeviceState | null } = $props();
 
   let draft = $state<Scene | null>(null);
   // Bumped on every open, so the editor starts a fresh working copy.
@@ -139,6 +143,7 @@
           <SceneEditor
             {draft}
             {isNew}
+            devicePresets={st?.eq_capability?.presets.map(([id]) => id) ?? null}
             busy={saving}
             {error}
             hotkeyError={isNew ? null : hotkeyError($scenes, draft.id)}

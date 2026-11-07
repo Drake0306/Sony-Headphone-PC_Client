@@ -86,6 +86,6 @@ Run with `HAIRLINE_FRAME_LOG=1` and check each result in the log under `captures
 - [ ] TimeRange: set a range that includes now and one that does not; the scene applies only inside it.
 - [ ] FrontmostApp: use a real app name (try different capitalisation); the scene applies when that app is in front.
 - [ ] Hotkey: record one on a scene and press it. Press `⌥⌘N` and confirm the window opens.
-- [ ] Hotkey conflict: record one that another app or the OS already uses. It shows as refused with the reason, in the editor and in Settings.
-- [ ] Keep: a scene with a Keep field leaves that setting untouched (frame log shows no SET for it).
+- [ ] Hotkey conflict: record one that another app already uses and record what macOS does when another app holds the same combination (refused with the reason in the editor and in Settings, or taken silently).
+- [ ] Keep: a scene with a Keep field leaves that setting untouched: no SET changes it (the value inside a combined NC or EQ request is unchanged).
 

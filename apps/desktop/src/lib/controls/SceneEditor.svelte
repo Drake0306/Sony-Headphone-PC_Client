@@ -11,7 +11,7 @@
   import {
     accelerator,
     AMBIENT_MAX,
-    EQ_PRESETS,
+    eqPresetChoices,
     hotkeyChips,
     isModifierPress,
     triggerSentence,
@@ -27,6 +27,8 @@
     draft: Scene;
     /** Not in the saved list yet. */
     isNew?: boolean;
+    /** Preset ids the headphones report; null or empty uses the known list. */
+    devicePresets?: number[] | null;
     /** A save or delete is in flight. */
     busy?: boolean;
     error?: string | null;
@@ -39,6 +41,7 @@
   let {
     draft: initial,
     isNew = false,
+    devicePresets = null,
     busy = false,
     error = null,
     hotkeyError = null,
@@ -70,10 +73,10 @@
     { label: "2", value: 2, orange: true },
     { label: "Keep", value: KEEP },
   ];
-  const EQ: { label: string; value: number | Keep }[] = [
-    ...EQ_PRESETS.map((id) => ({ label: presetName(id), value: id })),
+  const EQ: { label: string; value: number | Keep }[] = $derived([
+    ...eqPresetChoices(devicePresets, initial.actions.eq_preset).map((id) => ({ label: presetName(id), value: id })),
     { label: "Keep", value: KEEP },
-  ];
+  ]);
   // Ticks start at 1, so volume 0 has its own box.
   const VOLUME_BOXES: { label: string; value: 0 | Keep }[] = [
     { label: "0", value: 0 },

@@ -4,6 +4,8 @@ import {
   actionChips,
   hotkeyChips,
   hotkeyError,
+  eqPresetChoices,
+  EQ_PRESETS,
   hotkeyList,
   lacksModifier,
   WINDOW_ERROR_KEY,
@@ -160,6 +162,21 @@ describe("validateScene", () => {
     expect(validateScenes([scene("a"), scene("b")])).toBeNull();
     expect(validateScenes([scene("a"), scene("a", { name: "X" })])).toBe('scene "X": id "a" is used twice');
     expect(validateScenes([scene("a"), scene("b", { name: "" })])).toBe('scene "": name is empty');
+  });
+});
+
+describe("eqPresetChoices", () => {
+  it("eq_preset_choices_prefer_the_device_list", () => {
+    expect(eqPresetChoices([0x00, 0x10, 0x16], null)).toEqual([0x00, 0x10, 0x16]);
+    expect(eqPresetChoices([0x00, 0x10, 0x16], 0x10)).toEqual([0x00, 0x10, 0x16]);
+    // An id the backend does not accept is left out.
+    expect(eqPresetChoices([0x00, 0x42], null)).toEqual([0x00]);
+  });
+
+  it("eq_preset_choices_fall_back_and_keep_the_saved_value", () => {
+    expect(eqPresetChoices(null, null)).toEqual(EQ_PRESETS);
+    expect(eqPresetChoices([], 0x11)).toEqual(EQ_PRESETS);
+    expect(eqPresetChoices([0x00, 0x10], 0xa1)).toEqual([0x00, 0x10, 0xa1]);
   });
 });
 

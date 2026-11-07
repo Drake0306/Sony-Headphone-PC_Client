@@ -57,6 +57,17 @@ export interface ScenesView {
 /** Preset ids the backend accepts (commands.rs `EQ_PRESETS`). */
 export const EQ_PRESETS = [0x00, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0xa0, 0xa1, 0xa2];
 export const VOLUME_MAX = 30;
+
+/**
+ * The editor's EQ preset boxes: the presets the device reports (those the
+ * backend accepts) or `EQ_PRESETS` when it reports none, plus the scene's
+ * saved preset when the list lacks it.
+ */
+export function eqPresetChoices(device: number[] | null | undefined, saved: number | null): number[] {
+  const known = (device ?? []).filter((id) => EQ_PRESETS.includes(id));
+  const list = known.length > 0 ? known : EQ_PRESETS.slice();
+  return saved !== null && !list.includes(saved) ? [...list, saved] : list;
+}
 export const AMBIENT_MAX = 20;
 
 // Counts "scenes" events, so a `get_scenes` reply older than an event is dropped.

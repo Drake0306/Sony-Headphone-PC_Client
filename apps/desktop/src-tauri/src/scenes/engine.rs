@@ -39,7 +39,9 @@ impl Engine {
 
     /// Replaces the list. A deleted active scene is cleared without a revert;
     /// a deleted evaluated scene is forgotten so the next tick re-evaluates.
-    pub fn set_scenes(&mut self, scenes: Vec<Scene>) {
+    /// Returns the active scene's actions when they were edited, so the
+    /// change reaches the headphones; `None` when they are unchanged.
+    pub fn set_scenes(&mut self, scenes: Vec<Scene>) -> Option<Actions> {
         let known = |id: &Option<String>| {
             id.as_ref()
                 .is_some_and(|id| scenes.iter().any(|s| &s.id == id))
@@ -50,7 +52,10 @@ impl Engine {
         if !known(&self.evaluated) {
             self.evaluated = None;
         }
+        let before = self.active.as_deref().and_then(|id| self.actions_of(id));
         self.scenes = scenes;
+        let after = self.active.as_deref().and_then(|id| self.actions_of(id));
+        after.filter(|a| Some(a) != before.as_ref())
     }
 
     /// Re-evaluates the triggers. Returns the new scene's actions only when

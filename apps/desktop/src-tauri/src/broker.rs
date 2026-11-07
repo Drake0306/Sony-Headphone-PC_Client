@@ -96,9 +96,10 @@ pub struct SceneHost<'a> {
 }
 
 impl SceneHost<'_> {
-    /// Handles `ApplyScene`, `SetScenes` and `EmitScenes` (other commands are
-    /// ignored), emits `"scenes"`, and
-    /// returns the actions to send now (none while disconnected).
+    /// Handles `ApplyScene`, `SetScenes` (an edited active scene is
+    /// re-applied) and `EmitScenes` (other commands are ignored), emits
+    /// `"scenes"`, and returns the actions to send now (none while
+    /// disconnected).
     fn command(&mut self, cmd: &BrokerCmd, connected: bool) -> Option<Actions> {
         let actions = match cmd {
             BrokerCmd::ApplyScene(id) => {
@@ -108,10 +109,7 @@ impl SceneHost<'_> {
                 }
                 actions
             }
-            BrokerCmd::SetScenes(scenes) => {
-                self.engine.set_scenes(scenes.clone());
-                None
-            }
+            BrokerCmd::SetScenes(scenes) => self.engine.set_scenes(scenes.clone()),
             BrokerCmd::EmitScenes => None,
             _ => return None,
         };

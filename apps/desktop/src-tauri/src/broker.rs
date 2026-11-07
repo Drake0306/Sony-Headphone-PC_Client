@@ -576,6 +576,9 @@ pub fn spawn_broker(
                 engine: Engine::new(scenes),
                 sense: Box::new(desktop_inputs),
                 emit: Box::new(|engine: &Engine| {
+                    if let Ok(mut active) = app.state::<crate::socket::ActiveScene>().0.lock() {
+                        *active = engine.active().map(str::to_string);
+                    }
                     let _ = app.emit(
                         "scenes",
                         ScenesEvent {

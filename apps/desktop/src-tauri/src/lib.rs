@@ -3,7 +3,7 @@
 mod audio_macos;
 pub mod battery_history;
 pub mod broker;
-mod commands;
+pub mod commands;
 pub mod device_record;
 pub mod dock;
 pub mod frame_log;
@@ -14,6 +14,7 @@ pub mod probe;
 pub mod scenes;
 mod sensors_macos;
 pub mod settings;
+pub mod socket;
 mod tray;
 
 use std::sync::Mutex;
@@ -44,6 +45,7 @@ pub fn run() {
         .manage(commands::Runtime { fake })
         .manage(hotkeys::HotkeyErrors::default())
         .manage(recorder.clone())
+        .manage(socket::ActiveScene::default())
         .invoke_handler(tauri::generate_handler![
             commands::runtime_info,
             commands::get_state,
@@ -111,11 +113,18 @@ pub fn run() {
                 recorder.clone(),
             );
             app.manage(commands::Broker(tx));
+            socket::spawn(app.handle().clone());
             Ok(())
         })
         .build(tauri::generate_context!())
         .expect("error while building Hairline")
         .run(|app, event| {
+            if matches!(
+                event,
+                tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. }
+            ) {
+                socket::cleanup(app);
+            }
             // Clicking the Dock icon reopens the main window.
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { .. } = event {

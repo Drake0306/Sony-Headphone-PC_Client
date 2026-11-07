@@ -3,9 +3,10 @@
 use std::sync::mpsc::Sender;
 use std::sync::Mutex;
 
-use mdr_proto::{NcAsmState, NcMode, UltLevel};
+use mdr_proto::{preset_name, NcAsmState, NcMode, UltLevel};
 use mdr_session::DeviceState;
 use serde::Serialize;
+use serde_json::Value;
 use tauri::{AppHandle, Emitter, State};
 
 use crate::battery_history::{self, BatteryEstimate};
@@ -23,7 +24,7 @@ use crate::settings;
 pub struct Broker(pub Sender<BrokerCmd>);
 
 impl Broker {
-    fn send(&self, cmd: BrokerCmd) -> Result<(), String> {
+    pub(crate) fn send(&self, cmd: BrokerCmd) -> Result<(), String> {
         self.0
             .send(cmd)
             .map_err(|_| "the broker has stopped".to_string())
@@ -63,31 +64,42 @@ pub fn set_nc(
     level: u8,
     voice_focus: bool,
 ) -> Result<(), String> {
-    let mode = match mode.as_str() {
-        "off" => NcMode::Off,
-        "nc" => NcMode::NoiseCancelling,
-        "ambient" => NcMode::Ambient,
-        other => return Err(format!("unknown noise mode {other:?}")),
-    };
-    if !(1..=20).contains(&level) {
-        return Err(format!("ambient level {level} is outside 1..=20"));
-    }
     broker.send(BrokerCmd::SetNc(NcAsmState {
-        mode,
-        level,
+        mode: nc_mode(&mode)?,
+        level: check_level(level)?,
         voice_focus,
     }))
 }
 
+fn nc_mode(mode: &str) -> Result<NcMode, String> {
+    match mode {
+        "off" => Ok(NcMode::Off),
+        "nc" => Ok(NcMode::NoiseCancelling),
+        "ambient" => Ok(NcMode::Ambient),
+        other => Err(format!("unknown noise mode {other:?}")),
+    }
+}
+
+fn check_level(level: u8) -> Result<u8, String> {
+    if (1..=20).contains(&level) {
+        Ok(level)
+    } else {
+        Err(format!("ambient level {level} is outside 1..=20"))
+    }
+}
+
 #[tauri::command]
 pub fn set_ult(broker: State<'_, Broker>, level: u8) -> Result<(), String> {
-    let ult = match level {
-        0 => UltLevel::Off,
-        1 => UltLevel::Ult1,
-        2 => UltLevel::Ult2,
-        other => return Err(format!("unknown ULT level {other}")),
-    };
-    broker.send(BrokerCmd::SetUlt(ult))
+    broker.send(BrokerCmd::SetUlt(ult_level(level)?))
+}
+
+fn ult_level(level: u8) -> Result<UltLevel, String> {
+    match level {
+        0 => Ok(UltLevel::Off),
+        1 => Ok(UltLevel::Ult1),
+        2 => Ok(UltLevel::Ult2),
+        other => Err(format!("unknown ULT level {other}")),
+    }
 }
 
 #[tauri::command]
@@ -109,10 +121,15 @@ const VOICE_ASSISTANTS: [u8; 5] = [0x30, 0x31, 0x32, 0x34, 0xFF];
 
 #[tauri::command]
 pub fn set_eq_preset(broker: State<'_, Broker>, preset: u8) -> Result<(), String> {
-    if !EQ_PRESETS.contains(&preset) {
-        return Err(format!("unknown EQ preset {preset:#04X}"));
+    broker.send(BrokerCmd::SetEqPreset(check_eq_preset(preset)?))
+}
+
+fn check_eq_preset(preset: u8) -> Result<u8, String> {
+    if EQ_PRESETS.contains(&preset) {
+        Ok(preset)
+    } else {
+        Err(format!("unknown EQ preset {preset:#04X}"))
     }
-    broker.send(BrokerCmd::SetEqPreset(preset))
 }
 
 #[tauri::command]
@@ -133,10 +150,139 @@ fn check_bands(bands: &[u8]) -> Result<(), String> {
 
 #[tauri::command]
 pub fn set_volume(broker: State<'_, Broker>, volume: u8) -> Result<(), String> {
-    if volume > VOLUME_MAX {
-        return Err(format!("volume {volume} is outside 0..={VOLUME_MAX}"));
+    broker.send(BrokerCmd::SetVolume(check_volume(volume)?))
+}
+
+fn check_volume(volume: u8) -> Result<u8, String> {
+    if volume <= VOLUME_MAX {
+        Ok(volume)
+    } else {
+        Err(format!("volume {volume} is outside 0..={VOLUME_MAX}"))
     }
-    broker.send(BrokerCmd::SetVolume(volume))
+}
+
+/// Controls the local socket may set (`control_command`).
+pub const SOCKET_CONTROLS: [&str; 7] = [
+    "nc",
+    "ambient_level",
+    "voice_focus",
+    "ult",
+    "volume",
+    "eq_preset",
+    "dsee_auto_off",
+];
+
+/// One control from the local socket, validated with the same checks as the
+/// `set_*` commands. `value` is the control's value; for `nc` it is the mode
+/// (`"nc"`, `"ambient"`, `"off"`) or `{"mode", "level"?, "voice"?}`. The
+/// noise switch, ambient level and voice focus share one SET, so the rest of
+/// the NC/ASM state comes from `current`, as the window does (`noise.ts`).
+pub fn control_command(
+    control: &str,
+    value: &Value,
+    current: &DeviceState,
+) -> Result<BrokerCmd, String> {
+    let nc = current.nc.value;
+    let cur_level = nc.map_or(1, |n| n.level.clamp(1, 20));
+    let cur_voice = nc.is_some_and(|n| n.voice_focus);
+    match control {
+        "nc" => {
+            let (mode, level, voice) = match value {
+                Value::String(mode) => (mode.as_str(), None, None),
+                Value::Object(o) => (
+                    o.get("mode")
+                        .and_then(Value::as_str)
+                        .ok_or("nc needs a mode: nc, ambient or off")?,
+                    o.get("level").filter(|v| !v.is_null()),
+                    o.get("voice").filter(|v| !v.is_null()),
+                ),
+                _ => return Err("nc needs a mode: nc, ambient or off".into()),
+            };
+            let mode = nc_mode(mode)?;
+            let level = match level {
+                Some(v) => check_level(number(v, "ambient level", "1..=20")?)?,
+                None => cur_level,
+            };
+            // Voice focus belongs to Ambient; other modes keep what is set.
+            let voice_focus = match voice {
+                Some(v) if mode == NcMode::Ambient => boolean(v, "voice")?,
+                Some(v) => boolean(v, "voice").map(|_| cur_voice)?,
+                None => cur_voice,
+            };
+            Ok(BrokerCmd::SetNc(NcAsmState {
+                mode,
+                level,
+                voice_focus,
+            }))
+        }
+        "ambient_level" => Ok(BrokerCmd::SetNc(NcAsmState {
+            mode: NcMode::Ambient,
+            level: check_level(number(value, "ambient level", "1..=20")?)?,
+            voice_focus: cur_voice,
+        })),
+        "voice_focus" => {
+            let on = boolean(value, "voice focus")?;
+            if nc.map(|n| n.mode) != Some(NcMode::Ambient) {
+                return Err("voice focus needs Ambient".into());
+            }
+            Ok(BrokerCmd::SetNc(NcAsmState {
+                mode: NcMode::Ambient,
+                level: cur_level,
+                voice_focus: on,
+            }))
+        }
+        "ult" => Ok(BrokerCmd::SetUlt(ult_level(number(
+            value,
+            "ULT level",
+            "0..=2",
+        )?)?)),
+        "volume" => Ok(BrokerCmd::SetVolume(check_volume(number(
+            value, "volume", "0..=30",
+        )?)?)),
+        "eq_preset" => Ok(BrokerCmd::SetEqPreset(check_eq_preset(eq_preset(value)?)?)),
+        "dsee_auto_off" => Ok(BrokerCmd::SetDseeAutoOff(boolean(value, "dsee_auto_off")?)),
+        other => Err(format!(
+            "unknown control {other:?} (one of {})",
+            SOCKET_CONTROLS.join(", ")
+        )),
+    }
+}
+
+/// A whole number that fits a byte; anything else names the range.
+fn number(value: &Value, what: &str, range: &str) -> Result<u8, String> {
+    match value.as_u64().or_else(|| value.as_i64().map(|_| u64::MAX)) {
+        Some(n) => u8::try_from(n).map_err(|_| format!("{what} {value} is outside {range}")),
+        None => Err(format!("{what} needs a number in {range}")),
+    }
+}
+
+fn boolean(value: &Value, what: &str) -> Result<bool, String> {
+    value
+        .as_bool()
+        .ok_or_else(|| format!("{what} needs true or false"))
+}
+
+/// An EQ preset by id (a number, or hex like `"16"` / `"0x16"`) or by name
+/// (`"Bass Boost"`, any case).
+fn eq_preset(value: &Value) -> Result<u8, String> {
+    if let Some(n) = value.as_u64() {
+        return u8::try_from(n).map_err(|_| format!("unknown EQ preset {value}"));
+    }
+    let text = value
+        .as_str()
+        .ok_or("eq_preset needs a preset name or hex id")?
+        .trim();
+    if let Some(&id) = EQ_PRESETS
+        .iter()
+        .find(|&&id| preset_name(id).eq_ignore_ascii_case(text))
+    {
+        return Ok(id);
+    }
+    let hex = text
+        .strip_prefix("0x")
+        .or_else(|| text.strip_prefix("0X"))
+        .unwrap_or(text);
+    u8::from_str_radix(hex, 16).map_err(|_| format!("unknown EQ preset {text:?}"))
 }
 
 #[tauri::command]
@@ -360,7 +506,99 @@ pub fn clear_battery_history(app: AppHandle, broker: State<'_, Broker>) -> Resul
 
 #[cfg(test)]
 mod tests {
-    use super::check_bands;
+    use super::{check_bands, control_command, BrokerCmd};
+    use mdr_proto::{NcAsmState, NcMode};
+    use mdr_session::{DeviceState, Status, Tracked};
+    use serde_json::json;
+
+    fn with_nc(mode: NcMode, level: u8, voice_focus: bool) -> DeviceState {
+        DeviceState {
+            nc: Tracked {
+                value: Some(NcAsmState {
+                    mode,
+                    level,
+                    voice_focus,
+                }),
+                status: Status::Confirmed,
+            },
+            ..DeviceState::default()
+        }
+    }
+
+    fn nc(mode: NcMode, level: u8, voice_focus: bool) -> Result<BrokerCmd, String> {
+        Ok(BrokerCmd::SetNc(NcAsmState {
+            mode,
+            level,
+            voice_focus,
+        }))
+    }
+
+    #[test]
+    fn control_command_fills_nc_from_the_current_state() {
+        let cur = with_nc(NcMode::Ambient, 9, true);
+        assert_eq!(
+            control_command("nc", &json!("nc"), &cur),
+            nc(NcMode::NoiseCancelling, 9, true)
+        );
+        // Voice is only taken for Ambient.
+        assert_eq!(
+            control_command("nc", &json!({"mode": "off", "voice": false}), &cur),
+            nc(NcMode::Off, 9, true)
+        );
+        assert_eq!(
+            control_command("ambient_level", &json!(3), &with_nc(NcMode::Off, 9, false)),
+            nc(NcMode::Ambient, 3, false)
+        );
+        assert_eq!(
+            control_command("voice_focus", &json!(false), &cur),
+            nc(NcMode::Ambient, 9, false)
+        );
+        assert_eq!(
+            control_command("voice_focus", &json!(true), &DeviceState::default()),
+            Err("voice focus needs Ambient".into())
+        );
+        assert_eq!(
+            control_command("nc", &json!({"mode": "ambient", "level": 21}), &cur),
+            Err("ambient level 21 is outside 1..=20".into())
+        );
+        assert_eq!(
+            control_command("nc", &json!("loud"), &cur),
+            Err("unknown noise mode \"loud\"".into())
+        );
+    }
+
+    #[test]
+    fn control_command_checks_values_like_the_set_commands() {
+        let cur = DeviceState::default();
+        assert_eq!(
+            control_command("volume", &json!(-1), &cur),
+            Err("volume -1 is outside 0..=30".into())
+        );
+        assert_eq!(
+            control_command("volume", &json!("loud"), &cur),
+            Err("volume needs a number in 0..=30".into())
+        );
+        assert_eq!(
+            control_command("ult", &json!(3), &cur),
+            Err("unknown ULT level 3".into())
+        );
+        for preset in [json!("16"), json!("0x16"), json!(22), json!("BASS BOOST")] {
+            assert_eq!(
+                control_command("eq_preset", &preset, &cur),
+                Ok(BrokerCmd::SetEqPreset(0x16)),
+                "{preset}"
+            );
+        }
+        assert_eq!(
+            control_command("eq_preset", &json!("99"), &cur),
+            Err("unknown EQ preset 0x99".into())
+        );
+        assert_eq!(
+            control_command("dsee_auto_off", &json!(true), &cur),
+            Ok(BrokerCmd::SetDseeAutoOff(true))
+        );
+        assert!(control_command("auto_power_off", &json!(0), &cur).is_err());
+    }
 
     #[test]
     fn bands_need_six_levels_within_range() {

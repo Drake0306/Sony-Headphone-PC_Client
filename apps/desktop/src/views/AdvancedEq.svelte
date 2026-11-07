@@ -3,16 +3,20 @@
   app, edited four big faders at a time. Under the faders a strip of ten
   segments marks the visible four; ‹ and › step a page (1–4, 5–8, 7–10). Every
   settled edit saves the whole curve (`set_eq_curve`, never the headphones)
-  and refreshes the six fitted device values shown beside "Send best fit to
-  headphones"; during a drag they follow the local mirror of the fit. Only the
-  Send button writes to the headphones, through the Sound screen's band write
-  and the EQ group's status (`eq_ult`): pending, then "Sent" once the device
-  reports the fitted bands, or the refusal. Takes the whole content area;
-  "‹ Sound" goes back.
+  and refreshes the six fitted device values in the mini table beside the
+  actions; during a drag they follow the local mirror of the fit. Reset sets
+  the ten bands to 0 the same way. Only Send writes to the headphones, and
+  only after a confirmation that names the target preset (Manual, Custom 1 or
+  Custom 2 as they are; any other preset goes to Custom 1) and the six values:
+  one EQ write of that preset and the fitted bands, ULT kept, with the EQ
+  group's status (`eq_ult`): pending, then "Sent" once the device reports the
+  fitted bands, or the refusal. Takes the whole content area, sized so nothing
+  scrolls at 880×560; "‹ Sound" goes back.
 -->
 <script lang="ts">
   import { onMount } from "svelte";
   import Fader, { faderText } from "../lib/controls/Fader.svelte";
+  import Confirm from "../lib/controls/Confirm.svelte";
   import FaderScale from "../lib/controls/FaderScale.svelte";
   import { control } from "../lib/control.svelte";
   import {
@@ -25,9 +29,12 @@
     LEVEL_MAX,
     LEVEL_MIN,
     PAGE_COUNT,
+    resetCurve,
     shapeProblem,
+    targetPreset,
     toRaw,
     visibleBands,
+    type TargetPreset,
   } from "../lib/eqCurve";
   import { getBestFitPreview, getEqCurve, sendBestFit, setEqCurve } from "../lib/ipc";
   import { isPending, type DeviceState } from "../lib/state";
@@ -38,6 +45,9 @@
     "These bands run in Hairline only. The headphones keep their six-band curve; use Send best fit to put the closest match on them.";
   /** Top raw fader value; the curve's levels run LEVEL_MIN..LEVEL_MAX around its centre. */
   const SPAN = LEVEL_MAX - LEVEL_MIN;
+  const CONFIRM_TITLE = "Send best fit to the headphones?";
+  const confirmBody = (target: string) =>
+    `The headphones hold six bands (${DEVICE_BAND_LABELS.join(", ")}), not ten. Hairline fits your ten bands onto those six and writes them into ${target}.`;
   const ALL = Array.from({ length: BAND_COUNT }, (_, i) => i);
 
   /** Levels −10..=10; null until the stored curve has been read. */
@@ -50,6 +60,8 @@
   let sentRaw = $state<number[] | null>(null);
   /** Orders the store's fit answers so an older one never replaces a newer edit. */
   let edits = 0;
+  /** The send waiting for the confirmation: the curve drawn when it opened and where it goes. */
+  let asking = $state<{ bands: number[]; fit: number[]; target: TargetPreset } | null>(null);
 
   const saver = curveSaver(setEqCurve);
   const eq = control<number[]>(() => ({ value: st.eq_ult.value?.bands ?? null, status: st.eq_ult.status }));
@@ -73,6 +85,7 @@
     eq.refused?.reason ?? (sent ? "Sent" : busy && sentRaw !== null ? "Sending" : null),
   );
   const levelText = (v: number | null | undefined) => faderText(v, 0);
+  const resetOff = $derived(curve === null || busy);
   /** The headphones' six levels now, from state; null while disconnected or unknown. */
   const onDevice = $derived(st.connected && st.eq_ult.value ? st.eq_ult.value.bands.map(fromRaw) : null);
 
@@ -102,6 +115,11 @@
 
   function commit(i: number, raw: number) {
     change(i, raw);
+    persist();
+  }
+
+  /** Saves the drawn curve, then shows the store's fit for it. */
+  function persist() {
     if (curve === null) return;
     const mine = edits;
     saver.save(curve).then(
@@ -124,21 +142,40 @@
     );
   }
 
+  /** All ten bands back to 0, saved in the app; nothing goes to the headphones. */
+  function reset() {
+    if (resetOff) return;
+    curve = resetCurve();
+    sentRaw = null;
+    edits++;
+    fit = bestFitPreview(curve);
+    persist();
+  }
+
   function go(step: number) {
     page = Math.min(PAGE_COUNT - 1, Math.max(0, page + step));
   }
 
-  function send() {
+  /** Opens the confirmation; nothing is sent until it is confirmed. */
+  function ask() {
     if (sendOff || curve === null) return;
-    // The drawn curve goes with the request (saved, fitted and sent by the
-    // command), so the fit sent is the fit shown even if a key step has not
-    // settled. The saver gets it too, so a save still queued cannot end on an
-    // older curve. The faders stay inert while the send is pending.
     const bands = [...curve];
-    sentRaw = bestFitPreview(bands).map(toRaw);
+    asking = { bands, fit: bestFitPreview(bands), target: targetPreset(st.eq_ult.value?.preset ?? null) };
+  }
+
+  function send() {
+    const req = asking;
+    asking = null;
+    if (req === null || sendOff) return;
+    // The curve drawn when the confirmation opened goes with the request
+    // (saved, fitted and sent by the command), so the fit sent is the fit
+    // shown. The saver gets it too, so a save still queued cannot end on an
+    // older curve. The faders stay inert while the send is pending.
+    const { bands, fit: shown, target } = req;
+    sentRaw = shown.map(toRaw);
     saver.save(bands).catch((e) => console.error(e));
     eq.request(sentRaw, async () => {
-      const levels = await sendBestFit(bands);
+      const levels = await sendBestFit(bands, target.id);
       if (Array.isArray(levels)) sentRaw = levels.map(toRaw);
       return levels;
     });
@@ -190,23 +227,20 @@
   </div>
 
   <div class="bottom">
-    <div>
-      <!-- One column per device value: label, the headphones now, the best fit. -->
-      <div class="fit">
-        <div class="r">
-          <span></span>
-          {#each DEVICE_BAND_LABELS as label (label)}<span class="lab dev">{label}</span>{/each}
-        </div>
-        <div class="r now">
-          <span class="lab">On the headphones now</span>
-          {#each DEVICE_BAND_LABELS as label, k (label)}<span class="dot">{levelText(onDevice?.[k])}</span>{/each}
-        </div>
-        <div class="r best">
-          <span class="lab">Best fit</span>
-          {#each DEVICE_BAND_LABELS as label, k (label)}<span class="dot">{levelText(fit?.[k])}</span>{/each}
-        </div>
+    <!-- One column per device value: label, the headphones now, the best fit. -->
+    <div class="fit">
+      <div class="r">
+        <span class="lab hold">What the headphones will hold</span>
+        {#each DEVICE_BAND_LABELS as label (label)}<span class="lab dev">{label}</span>{/each}
       </div>
-      <p class="hold">What the headphones will hold</p>
+      <div class="r now">
+        <span class="lab">On the headphones now</span>
+        {#each DEVICE_BAND_LABELS as label, k (label)}<span class="dot">{levelText(onDevice?.[k])}</span>{/each}
+      </div>
+      <div class="r best">
+        <span class="lab">Best fit</span>
+        {#each DEVICE_BAND_LABELS as label, k (label)}<span class="dot">{levelText(fit?.[k])}</span>{/each}
+      </div>
     </div>
     <div class="act">
       <p class="note live">{NOTE}</p>
@@ -215,22 +249,44 @@
       <div class="send">
         {#if sendNote}<span class="lab" class:live={eq.refused !== null}>{sendNote}</span>{/if}
         <button
+          class="btn"
+          class:unavailable={resetOff}
+          aria-disabled={resetOff}
+          tabindex={resetOff ? -1 : 0}
+          onclick={reset}>Reset</button
+        >
+        <button
           class="btn fill"
           class:unavailable={sendOff}
           aria-disabled={sendOff}
           tabindex={sendOff ? -1 : 0}
-          onclick={send}>Send best fit to headphones</button
+          onclick={ask}>Send best fit to headphones</button
         >
       </div>
     </div>
   </div>
 </div>
 
+{#if asking}
+  <Confirm
+    title={CONFIRM_TITLE}
+    body={confirmBody(asking.target.label)}
+    details={DEVICE_BAND_LABELS.map((label, k) => ({ label, value: levelText(asking?.fit[k]) }))}
+    confirmLabel="Send"
+    onconfirm={send}
+    oncancel={() => (asking = null)}
+  />
+{/if}
+
 <style>
+  /* Height at 880×560 (no scroll): 20 + top ≈26 + 8 + faders (the rest,
+     ≈385) + 8 + strip 17 + 8 + bottom ≈60–73 + 16. Each rail takes the
+     faders' height less the 58 px foot and 8 px gap: ≈320. */
   .adv {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 8px;
+    padding: 20px 32px 16px;
   }
 
   .top {
@@ -247,12 +303,13 @@
     margin-left: auto;
   }
 
+  /* The faders take every free pixel; each rail fills its column. */
   .faders {
     display: flex;
     flex: 1;
-    gap: 24px;
+    gap: 32px;
     align-items: stretch;
-    min-height: 0;
+    min-height: 300px;
   }
 
   .faders.pending {
@@ -265,13 +322,14 @@
 
   .strip {
     display: flex;
+    flex: none;
     gap: 10px;
     align-items: center;
   }
 
   .strip .arrow {
-    padding: 3px 10px;
-    font-size: 12px;
+    padding: 2px 10px;
+    font-size: 11px;
     line-height: 1;
   }
 
@@ -291,25 +349,42 @@
     background: var(--ult);
   }
 
-  /* Values and the Send block side by side; the Send block wraps under when narrow. */
+  /* One compact row: the mini table on the left, the note and buttons on the right. */
   .bottom {
     display: flex;
-    flex-wrap: wrap;
-    gap: 16px 28px;
+    flex: none;
+    gap: 24px;
     align-items: flex-end;
     justify-content: space-between;
   }
 
+  /* Seven columns: row label, then one per device value (labels may wrap to two lines). */
   .fit {
     display: grid;
-    grid-template-columns: auto repeat(6, auto);
-    gap: 4px 14px;
-    align-items: baseline;
-    justify-content: start;
+    flex: none;
+    grid-template-columns: auto repeat(6, minmax(36px, auto));
+    gap: 3px 10px;
+    align-items: end;
+    font-family: "DM Mono", monospace;
+    font-size: 11px;
+    line-height: 14px;
   }
 
   .fit .r {
     display: contents;
+  }
+
+  .fit .lab {
+    line-height: 13px;
+  }
+
+  .fit .now .lab,
+  .fit .best .lab {
+    white-space: nowrap;
+  }
+
+  .fit .hold {
+    max-width: 150px;
   }
 
   .fit .dev {
@@ -318,8 +393,8 @@
   }
 
   .fit .dot {
-    font-size: 16px;
-    line-height: 18px;
+    font-family: inherit;
+    font-weight: 500;
     text-align: center;
   }
 
@@ -327,24 +402,20 @@
     color: var(--muted);
   }
 
-  .hold {
-    margin: 6px 0 0;
-    color: var(--muted);
-    font-size: 11px;
-  }
-
   .act {
     display: flex;
+    flex: 1;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
     align-items: flex-end;
-    margin-left: auto;
-    max-width: 360px;
+    min-width: 0;
+    max-width: 420px;
   }
 
   .act .note {
     margin: 0;
-    font-size: 12px;
+    font-size: 11px;
+    line-height: 14px;
     text-align: right;
   }
 
@@ -355,7 +426,7 @@
 
   .send {
     display: flex;
-    gap: 10px;
+    gap: 6px;
     align-items: center;
   }
 </style>

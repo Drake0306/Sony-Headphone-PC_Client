@@ -1,7 +1,8 @@
 //! The Advanced equalizer's ten-band curve: `eq_curve.json` in the settings
 //! directory, and sending its best fit to the headphones' six EQ values.
-//! The curve itself never goes to the device; only the fit does, through the
-//! same `SetEqBands` path as the Sound screen's faders.
+//! The curve itself never goes to the device; only the fit does, in one EQ
+//! write that also selects the target preset (Manual, Custom 1 or Custom 2)
+//! and keeps the ULT level.
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -91,12 +92,24 @@ pub fn save(dir: &Path, curve: &EqCurve) -> io::Result<()> {
     std::fs::rename(&tmp, path_in(dir))
 }
 
+/// The presets best fit may be written into: Manual, Custom 1, Custom 2.
+pub const FIT_TARGETS: [u8; 3] = [0xA0, 0xA1, 0xA2];
+
+/// `preset` if best fit may be written into it (Manual, Custom 1 or Custom 2).
+pub fn check_target_preset(preset: u8) -> Result<u8, String> {
+    if FIT_TARGETS.contains(&preset) {
+        Ok(preset)
+    } else {
+        Err("best fit can only be written into Manual, Custom 1 or Custom 2".to_string())
+    }
+}
+
 /// The six fitted levels (−10..=10) for `curve` and the broker command that
-/// writes them, on the device's raw 0..=20 scale, through `SetEqBands`.
-pub fn fit_command(curve: &EqCurve) -> ([i8; 6], BrokerCmd) {
+/// writes them, on the device's raw 0..=20 scale, into `preset` in one frame.
+pub fn fit_command(curve: &EqCurve, preset: u8) -> ([i8; 6], BrokerCmd) {
     let fitted = best_fit(&curve.bands);
     let raw = fitted.iter().map(|&v| to_raw(v)).collect();
-    (fitted, BrokerCmd::SetEqBands(raw))
+    (fitted, BrokerCmd::SetEqPresetBands(preset, raw))
 }
 
 /// Best fit writes six values of 21 steps; refuses a headphone that reports
@@ -114,17 +127,20 @@ pub fn check_shape(cap: Option<&EqUltCapability>) -> Result<(), String> {
     }
 }
 
-/// Checks the device's EQ shape and the ten bands, then gives the curve to
-/// save, the six fitted levels and the command that writes them.
+/// Checks the device's EQ shape, the target preset and the ten bands, then
+/// gives the curve to save, the six fitted levels and the command that writes
+/// them into `preset`.
 pub fn prepare_send(
     cap: Option<&EqUltCapability>,
     bands: &[i8],
+    preset: u8,
 ) -> Result<(EqCurve, [i8; 6], BrokerCmd), String> {
     check_shape(cap)?;
+    let preset = check_target_preset(preset)?;
     let curve = EqCurve {
         bands: check_curve(bands)?,
     };
-    let (fitted, cmd) = fit_command(&curve);
+    let (fitted, cmd) = fit_command(&curve, preset);
     Ok((curve, fitted, cmd))
 }
 
@@ -172,8 +188,10 @@ pub fn best_fit_preview(state: State<'_, Mutex<EqCurve>>) -> [i8; 6] {
 }
 
 /// Saves the ten `bands` given, then writes their best fit to the headphones'
-/// six EQ values (preset and ULT are kept) and returns the six fitted levels.
-/// Refused when the headphones report an EQ that is not six bands of 21 steps.
+/// six EQ values in one frame that also selects `preset` (Manual, Custom 1 or
+/// Custom 2; the ULT level is kept) and returns the six fitted levels.
+/// Refused when the headphones report an EQ that is not six bands of 21
+/// steps, or when `preset` is not one of those three.
 #[tauri::command]
 pub fn send_best_fit(
     app: AppHandle,
@@ -181,13 +199,14 @@ pub fn send_best_fit(
     state: State<'_, Mutex<EqCurve>>,
     device: State<'_, Mutex<DeviceState>>,
     bands: Vec<i8>,
+    preset: u8,
 ) -> Result<[i8; 6], String> {
     let cap = device
         .lock()
         .map_err(|_| "the device state is unavailable".to_string())?
         .eq_capability
         .clone();
-    let (curve, fitted, cmd) = prepare_send(cap.as_ref(), &bands)?;
+    let (curve, fitted, cmd) = prepare_send(cap.as_ref(), &bands, preset)?;
     store(&app, &state, curve)?;
     broker.send(cmd)?;
     Ok(fitted)

@@ -2,7 +2,10 @@
   Sound: the full equalizer faders and the preset grid on the left; ULT, the
   codec box with the connection-quality switch, and DSEE on the right. Every
   value comes from DeviceState; faders, presets and ULT share the EQ group's
-  status (`eq_ult`).
+  status (`eq_ult`). On a fixed Sony preset the headphones apply the curve
+  inside and report centre values, so the faders show those values read-only
+  with a note; on Off they are disabled. Only Manual, Custom 1 and Custom 2
+  take band writes.
 -->
 <script lang="ts">
   import Boxes from "../lib/controls/Boxes.svelte";
@@ -11,7 +14,15 @@
   import Toggle from "../lib/controls/Toggle.svelte";
   import { control } from "../lib/control.svelte";
   import { setConnectionMode, setDseeAutoOff, setEqBands, setEqPreset, setUlt } from "../lib/ipc";
-  import { codecLabel, isPending, presetName, type DeviceState, type UltLevel } from "../lib/state";
+  import {
+    codecLabel,
+    isPending,
+    PRESET_OFF,
+    presetName,
+    SHAPEABLE_PRESETS,
+    type DeviceState,
+    type UltLevel,
+  } from "../lib/state";
 
   // `onadvanced` opens the Advanced equalizer (Main swaps it in for this screen).
   let { st, onadvanced }: { st: DeviceState; onadvanced?: () => void } = $props();
@@ -24,6 +35,9 @@
     { label: "ULT 2", value: "Ult2", orange: true },
   ];
   const ULT_ARG: Record<UltLevel, 0 | 1 | 2> = { Off: 0, Ult1: 1, Ult2: 2 };
+  const FIXED_NOTE =
+    "Sony applies this preset inside the headphones and does not report its band values. Choose Manual, Custom 1 or Custom 2 to shape your own.";
+  const OFF_NOTE = "Equalizer off.";
   const CONNECTION = [
     { label: "Sound quality", value: 0 },
     { label: "Stable connection", value: 1 },
@@ -41,11 +55,18 @@
   const presets = $derived((st.eq_capability?.presets ?? []).map(([id]) => ({ label: presetName(id), value: id })));
   const eqOff = $derived(st.eq_ult.status === "Unavailable" || st.eq_ult.value === null);
   const eqBusy = $derived(isPending(bands.status));
+  /** A Sony preset applied inside the headphones: its bands are not reported, so not editable. */
+  const fixedPreset = $derived(
+    preset.shown !== null && !SHAPEABLE_PRESETS.includes(preset.shown) && preset.shown !== PRESET_OFF,
+  );
+  const offPreset = $derived(preset.shown === PRESET_OFF);
+  /** Band writes (faders, Reset) only go to Manual, Custom 1 and Custom 2. */
+  const bandsLocked = $derived(fixedPreset || offPreset);
   const codec = $derived(codecLabel(st.codec.value));
   const dsee = $derived(st.dsee.value);
 
   function reset() {
-    if (eqOff || eqBusy) return;
+    if (eqOff || eqBusy || bandsLocked) return;
     const flat = Array.from({ length: bandCount }, () => max / 2);
     bands.request(flat, () => setEqBands(flat));
   }
@@ -66,10 +87,16 @@
             bands={bands.shown}
             labels={LABELS}
             status={bands.status}
+            disabled={bandsLocked}
             {max}
             oncommit={(next) => bands.request(next, () => setEqBands(next))}
           />
         </div>
+        {#if fixedPreset}
+          <p class="note">{FIXED_NOTE}</p>
+        {:else if offPreset}
+          <p class="note">{OFF_NOTE}</p>
+        {/if}
       </div>
       <div class="block">
         <h4>Presets</h4>
@@ -90,9 +117,9 @@
           <button class="btn unavailable" aria-disabled="true" tabindex="-1" title="Phase 4">Save as Custom 1</button>
           <button
             class="btn"
-            class:unavailable={eqOff || eqBusy}
-            aria-disabled={eqOff || eqBusy}
-            tabindex={eqOff || eqBusy ? -1 : 0}
+            class:unavailable={eqOff || eqBusy || bandsLocked}
+            aria-disabled={eqOff || eqBusy || bandsLocked}
+            tabindex={eqOff || eqBusy || bandsLocked ? -1 : 0}
             onclick={reset}>Reset</button
           >
         </div>

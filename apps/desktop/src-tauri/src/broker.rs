@@ -49,6 +49,8 @@ pub enum BrokerCmd {
     SetMultipoint(bool),
     SetEqPreset(u8),
     SetEqBands(Vec<u8>),
+    /// A preset and its bands in one EQ write (Advanced equalizer's best fit).
+    SetEqPresetBands(u8, Vec<u8>),
     SetVolume(u8),
     SetDseeAutoOff(bool),
     SetConnectionMode(u8),
@@ -559,6 +561,7 @@ fn apply(session: &mut Session, cmd: BrokerCmd) -> Result<(), SessionError> {
         BrokerCmd::SetMultipoint(on) => session.set_multipoint(on),
         BrokerCmd::SetEqPreset(preset) => session.set_eq_preset(preset),
         BrokerCmd::SetEqBands(bands) => session.set_eq_bands(bands),
+        BrokerCmd::SetEqPresetBands(preset, bands) => session.set_eq_preset_bands(preset, bands),
         BrokerCmd::SetVolume(v) => session.set_volume(v),
         BrokerCmd::SetDseeAutoOff(auto) => session.set_dsee_auto_off(auto),
         BrokerCmd::SetConnectionMode(v) => session.set_connection_mode(v),

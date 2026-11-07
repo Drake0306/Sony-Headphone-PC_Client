@@ -199,6 +199,14 @@ export function codecLabel(codec: Codec | null): string {
 export const modelNumber = (model: string | null): string => (model === "ULT WEAR" ? "WH-ULT900N" : (model ?? ""));
 
 /** EQ preset names by id (mdr-proto `preset_name`); the device sends empty names. */
+/** EQ preset ids Hairline acts on by name: Off, and the three the user shapes. */
+export const PRESET_OFF = 0x00;
+export const PRESET_MANUAL = 0xa0;
+export const PRESET_CUSTOM_1 = 0xa1;
+export const PRESET_CUSTOM_2 = 0xa2;
+/** Presets whose bands the user sets; every other preset but Off is applied inside the headphones. */
+export const SHAPEABLE_PRESETS: readonly number[] = [PRESET_MANUAL, PRESET_CUSTOM_1, PRESET_CUSTOM_2];
+
 export function presetName(id: number): string {
   const names: Record<number, string> = {
     0x00: "Off",

@@ -6,6 +6,8 @@ import {
   DEVICE_BAND_LABELS,
   fromRaw,
   PAGE_COUNT,
+  resetCurve,
+  targetPreset,
   toRaw,
   visibleBands,
 } from "./eqCurve";
@@ -93,5 +95,20 @@ describe("eqCurve helpers", () => {
     await c;
     await s.idle();
     expect(sent).toEqual([[1], [3]]);
+  });
+
+  it("target_preset_rule", () => {
+    // Manual, Custom 1 and Custom 2 take the fit themselves.
+    expect(targetPreset(0xa0)).toEqual({ id: 0xa0, label: "Manual", switches: false });
+    expect(targetPreset(0xa1)).toEqual({ id: 0xa1, label: "Custom 1", switches: false });
+    expect(targetPreset(0xa2)).toEqual({ id: 0xa2, label: "Custom 2", switches: false });
+    // Any other preset (a fixed Sony one, Off, unknown) goes to Custom 1.
+    const custom1 = { id: 0xa1, label: "Custom 1 (the headphones will switch to it)", switches: true };
+    for (const id of [0x00, 0x10, 0x13, 0x17, null]) expect(targetPreset(id)).toEqual(custom1);
+  });
+
+  it("reset_curve_is_ten_zeros", () => {
+    expect(resetCurve()).toEqual(Array(10).fill(0));
+    expect(resetCurve()).not.toBe(resetCurve());
   });
 });

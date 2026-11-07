@@ -8,6 +8,7 @@ use mdr_session::DeviceState;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
+use crate::battery_history::{self, BatteryEstimate};
 use crate::broker::{raw_command, BrokerCmd, RecordingEvent};
 use crate::device_record::{capability_rows, CapabilityRow};
 use crate::frame_log;
@@ -334,6 +335,26 @@ pub fn probe_start(
 #[tauri::command]
 pub fn probe_stop(broker: State<'_, Broker>) -> Result<(), String> {
     broker.send(BrokerCmd::ProbeStop)
+}
+
+/// The battery history's estimate now, for a window that has just opened
+/// (later ones arrive as `"battery"` events). Empty without a settings dir.
+#[tauri::command]
+pub fn battery_estimate(app: AppHandle) -> BatteryEstimate {
+    settings::dir(&app)
+        .map(|dir| {
+            battery_history::estimate(&battery_history::load(&dir), battery_history::unix_now())
+        })
+        .unwrap_or_default()
+}
+
+/// Deletes `battery.jsonl` and emits the empty estimate.
+#[tauri::command]
+pub fn clear_battery_history(app: AppHandle) -> Result<(), String> {
+    let dir = settings::dir(&app).map_err(|e| e.to_string())?;
+    battery_history::clear(&dir).map_err(|e| format!("battery history not cleared: {e}"))?;
+    let _ = app.emit("battery", BatteryEstimate::default());
+    Ok(())
 }
 
 #[cfg(test)]

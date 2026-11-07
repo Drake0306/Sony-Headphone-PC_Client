@@ -1,6 +1,7 @@
 //! Hairline desktop app: wires the broker, the tray, the popover and the commands.
 
 mod audio_macos;
+pub mod battery_history;
 pub mod broker;
 mod commands;
 pub mod device_record;
@@ -72,6 +73,8 @@ pub fn run() {
             commands::send_raw,
             commands::probe_start,
             commands::probe_stop,
+            commands::battery_estimate,
+            commands::clear_battery_history,
             settings::get_settings,
             settings::set_settings,
         ])

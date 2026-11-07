@@ -1,8 +1,9 @@
 // Typed wrappers around the Tauri commands and the app events ("state",
-// "settings", "scenes", "frames", "recording").
+// "settings", "scenes", "frames", "recording", "battery").
 
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { BatteryEstimate } from "./battery";
 import type { CapabilityRow, FrameEntry, ProbeEvent, RecordingEvent } from "./advanced";
 import type { Scene, ScenesEvent } from "./scenes";
 import type { AppSettings, DeviceState, RuntimeInfo } from "./state";
@@ -109,6 +110,15 @@ export const probeStop = () => invoke<null>("probe_stop");
 
 export const onProbe = (handler: (e: ProbeEvent) => void): Promise<UnlistenFn> =>
   listen<ProbeEvent>("probe", (event) => handler(event.payload));
+
+/** The battery history's time-left estimate now; later ones arrive as "battery" events. */
+export const batteryEstimate = () => invoke<BatteryEstimate>("battery_estimate");
+
+/** Deletes the battery history; a "battery" event with the empty estimate follows. */
+export const clearBatteryHistory = () => invoke<null>("clear_battery_history");
+
+export const onBattery = (handler: (e: BatteryEstimate) => void): Promise<UnlistenFn> =>
+  listen<BatteryEstimate>("battery", (event) => handler(event.payload));
 
 export const onRecording = (handler: (e: RecordingEvent) => void): Promise<UnlistenFn> =>
   listen<RecordingEvent>("recording", (event) => handler(event.payload));

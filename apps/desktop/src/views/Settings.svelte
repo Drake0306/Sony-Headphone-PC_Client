@@ -9,8 +9,10 @@
   import LinkList from "../lib/controls/LinkList.svelte";
   import Row from "../lib/controls/Row.svelte";
   import Toggle from "../lib/controls/Toggle.svelte";
+  import { battery, historyNote } from "../lib/battery";
   import { control } from "../lib/control.svelte";
   import {
+    clearBatteryHistory,
     setAutoPowerOff,
     setQuickAccess,
     setSettings,
@@ -46,7 +48,6 @@
   ];
   const PENDING: Status = { Pending: { since_ms: 0 } };
   const hex = (id: number) => `0x${id.toString(16).toUpperCase().padStart(2, "0")}`;
-  const noop = () => {};
   const mac = typeof navigator !== "undefined" && navigator.userAgent.includes("Mac");
   const hotkeys = $derived(hotkeyList($scenes.scenes, mac, $scenes.hotkey_errors));
 
@@ -208,8 +209,10 @@
             {/each}
           </div>
         </Row>
-        <Row label="Battery history" note="Phase 4">
-          <Toggle on={null} status="Unavailable" label="Battery history" onpick={noop} />
+        <Row label="Battery history" note={historyNote($battery)}>
+          {#if $battery.samples > 0}
+            <button class="btn" onclick={() => clearBatteryHistory().catch((e) => console.error(e))}>Clear</button>
+          {/if}
         </Row>
         <Row label="Appearance">
           <Boxes

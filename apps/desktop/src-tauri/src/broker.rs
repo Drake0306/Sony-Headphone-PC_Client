@@ -15,6 +15,7 @@ use mdr_transport::{connect, discover, is_ult_wear_name, Candidate, FakeDevice, 
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::audio_macos::current_output_device_name;
+use crate::battery_history::{self, BatteryHost};
 use crate::device_record;
 use crate::frame_log;
 use crate::frame_ring::{FrameEntry, FrameTap, Recorder};
@@ -227,7 +228,7 @@ pub fn run_broker<E: Fn(&DeviceState)>(
 
 /// What a connection runs with besides the transport; all optional.
 #[derive(Default)]
-pub struct BrokerContext<'a, 's, 'f, 'p> {
+pub struct BrokerContext<'a, 's, 'f, 'p, 'b> {
     /// The connected headphones as discovered: the Bluetooth name is matched
     /// against the default audio output (without it the model name is used),
     /// the address is shown in the UI and keys the device record.
@@ -240,6 +241,8 @@ pub struct BrokerContext<'a, 's, 'f, 'p> {
     pub record_dir: Option<&'a Path>,
     /// The opcode probe; handles `ProbeStart`/`ProbeStop`.
     pub probe: Option<&'a mut ProbeHost<'p>>,
+    /// The battery sampler; writes `battery.jsonl` and emits `"battery"`.
+    pub battery: Option<&'a mut BatteryHost<'b>>,
 }
 
 /// As `run_broker`, with the device, scenes, frame tap and device records
@@ -250,7 +253,7 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
     cmds: impl Borrow<Receiver<BrokerCmd>>,
     emit: E,
     mut clock: impl FnMut() -> u64,
-    ctx: BrokerContext<'_, '_, '_, '_>,
+    ctx: BrokerContext<'_, '_, '_, '_, '_>,
 ) -> io::Result<()> {
     let BrokerContext {
         device,
@@ -258,6 +261,7 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
         mut frames,
         record_dir,
         mut probe,
+        mut battery,
     } = ctx;
     let address = device.map(|d| d.address.as_str());
     // Ends a running probe with its partial results (Stop or a lost link).
@@ -278,6 +282,9 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
     }
     if let Some(tap) = frames.as_deref_mut() {
         tap.new_link();
+    }
+    if let Some(host) = battery.as_deref_mut() {
+        host.new_link();
     }
     session.start();
     let mut devices_checked_at: Option<u64> = None;
@@ -438,6 +445,9 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
         }
         if changed {
             emit(session.state());
+            if let Some(host) = battery.as_deref_mut() {
+                host.observe(session.state());
+            }
         }
         if let Some(tap) = frames.as_deref_mut() {
             tap.flush();
@@ -584,6 +594,15 @@ pub fn spawn_broker(
                     let _ = app.emit("probe", event);
                 }),
             );
+            let mut battery = record_dir.clone().map(|dir| {
+                BatteryHost::new(
+                    dir,
+                    Box::new(battery_history::unix_now),
+                    Box::new(|estimate: &battery_history::BatteryEstimate| {
+                        let _ = app.emit("battery", estimate);
+                    }),
+                )
+            });
             let mut backoff = 0;
             loop {
                 let result = match open_transport(fake) {
@@ -600,6 +619,7 @@ pub fn spawn_broker(
                                 frames: Some(&mut tap),
                                 record_dir: record_dir.as_deref(),
                                 probe: Some(&mut probe),
+                                battery: battery.as_mut(),
                             },
                         )
                     }

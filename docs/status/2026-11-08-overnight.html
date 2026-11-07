@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overnight status, 8 November</title>
+<style>
+  :root { --paper:#efede6; --ink:#161614; --hair:#cfccc2; --muted:#6f726d; --ult:#ff6600; --box:#f8f7f3; }
+  @media (prefers-color-scheme: dark) { :root { --paper:#161614; --ink:#efede6; --hair:#3a3a36; --muted:#9a9c97; --box:#1f1f1c; } }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--paper); color:var(--ink); font:15px/1.5 "Instrument Sans", system-ui, sans-serif; font-variant-numeric:tabular-nums; }
+  main { max-width:760px; margin:0 auto; padding:48px max(16px, env(safe-area-inset-left)) 64px max(16px, env(safe-area-inset-right)); }
+  h1 { font-size:28px; font-weight:600; letter-spacing:-0.01em; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 32px; }
+  h2 { font:400 11px/1 "DM Mono", ui-monospace, monospace; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:36px 0 12px; padding-top:12px; border-top:1px solid var(--hair); }
+  p { margin:0 0 12px; }
+  ul { margin:0 0 12px; padding-left:18px; }
+  li { margin:0 0 6px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; margin:0 0 12px; }
+  td, th { text-align:left; padding:7px 0; border-bottom:1px solid var(--hair); vertical-align:top; }
+  th { font:400 11px/1 "DM Mono", ui-monospace, monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  td:last-child, th:last-child { text-align:right; white-space:nowrap; }
+  .num { font-family:"DM Mono", ui-monospace, monospace; }
+  .live { color:var(--ult); font-weight:600; }
+  .chip { display:inline-block; padding:1px 6px; border:1px solid var(--hair); font:10px/1.6 "DM Mono", ui-monospace, monospace; letter-spacing:.04em; text-transform:uppercase; margin-right:4px; }
+  .chip.u { border-color:var(--ult); color:var(--ult); }
+  code { font:13px "DM Mono", ui-monospace, monospace; background:var(--box); padding:1px 4px; }
+  .todo li::marker { color:var(--ult); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Overnight status</h1>
+  <p class="sub">Hairline, Saturday 8 November 2026. Everything below is on <code>main</code> and pushed.</p>
+
+  <h2>Short version</h2>
+  <p>Phase 2 (the full window) is merged. The modes module you asked for, called <strong>Scenes</strong> in the app, is built, reviewed and merged on top of it. The Windows transport (Phase 3a) is merged too, built and unit-tested on a real Windows runner in CI. Nothing in the popover or the window is static any more: every value you see comes from the headphones or from your own saved scenes. The "LDAC" you saw was the fake device talking, not mock data in the UI. Your real unit reports AAC. A fake run now shows a <span class="chip u">FAKE</span> label so the two can never be confused again.</p>
+
+  <h2>What landed</h2>
+  <table>
+    <tr><th>Piece</th><th>State</th></tr>
+    <tr><td>Phase 2 window: Overview, Sound, Noise, Devices, Settings, Paper/Ink/System themes, launch at login, Dock icon on click</td><td>merged <span class="num">b767b4a</span></td></tr>
+    <tr><td>Final-review fixes: frontend tests in CI, Bluetooth row shows the real channel and address, "This Mac playing" uses the live CoreAudio check, DSEE row relabelled to what it is (DSEE Extreme auto/off, not a battery feature)</td><td>merged</td></tr>
+    <tr><td>Scenes core: model, <code>scenes.json</code> store, first-match evaluator</td><td>merged</td></tr>
+    <tr><td>Scenes engine on the broker thread, macOS sensors (frontmost app, microphone in use), apply on connect</td><td>merged</td></tr>
+    <tr><td>Scenes screen with editor, popover MODE row, live "Automatic" block on Noise</td><td>merged</td></tr>
+    <tr><td>Global hotkeys per scene, ⌥⌘N opens the window, refusals shown with the reason</td><td>merged</td></tr>
+    <tr><td>README "Modes" section and hardware checklist section 6</td><td>merged <span class="num">9810c39</span></td></tr>
+    <tr><td>Phase 3a: Windows RFCOMM transport over Winsock, compiled and unit-tested on a Windows CI runner. The Windows tray app itself is not started.</td><td>merged <span class="num">ac2fe14</span></td></tr>
+  </table>
+
+  <h2>Checks</h2>
+  <table>
+    <tr><th>Suite</th><th>Result</th></tr>
+    <tr><td>Rust workspace tests</td><td class="num">136 passed, 0 failed</td></tr>
+    <tr><td>Frontend tests (Vitest)</td><td class="num">82 passed, 0 failed</td></tr>
+    <tr><td>Clippy with warnings as errors, rustfmt, svelte-check, colour-literal grep</td><td>clean</td></tr>
+    <tr><td>GitHub CI on <code>main</code></td><td>green on the Phase 2 merge, the Scenes merge and the Windows transport merge</td></tr>
+    <tr><td>Windows CI job (new): protocol crates built and unit-tested on <code>windows-latest</code></td><td>green</td></tr>
+  </table>
+  <p>Reviews: every task had an independent review and a scoped re-review after fixes, then one whole-branch review per phase. The Scenes review caught two real bugs before merge: a lower-ranked scene could be applied on connect ahead of the right one, and the hotkey recorder only worked when reached by Tab because macOS WebKit does not focus a clicked button. Both are fixed and tested.</p>
+
+  <h2>How Scenes work</h2>
+  <p>A scene is a name, a trigger, and a set of actions. Triggers: by hand, headphones connect, a time range (wraps midnight), an app in front, or the microphone in use. Every two seconds the first enabled scene in list order that matches becomes active, and its actions are sent once. Each action is one of your existing controls: noise mode, ambient level and voice focus, ULT, an EQ preset, volume, DSEE. "Keep" leaves a setting alone. Nothing new goes to the headphones, so the deny-list and the confirmation flow are untouched.</p>
+  <p>Four scenes ship switched off so the screen is not empty: <span class="chip">At the desk</span> <span class="chip">On a call</span> <span class="chip">Late</span> <span class="chip">Walking</span>. Enable the ones you want and change them freely. Your headphones were not touched overnight; the device was disconnected the whole time and no setting was written.</p>
+
+  <h2>Needs your hands</h2>
+  <ul class="todo">
+    <li>Connect the headphones and run the app from <code>main</code>. The Scenes checklist is in <code>docs/hardware-validation.md</code>, section 6.</li>
+    <li>Apply a scene by hand from the Scenes screen and from the popover MODE row, then enable "At the desk" and reconnect to see the connect trigger fire.</li>
+    <li>Start a FaceTime or Zoom call with "On a call" enabled to test the microphone trigger.</li>
+    <li>Record a hotkey on a scene and press it. Press ⌥⌘N. Record the same hotkey on a second scene to see the refusal.</li>
+    <li>Phase 2 items still unverified on hardware: EQ preset write uses <code>58 03</code>, multipoint tail bytes, the meaning of the DSEE and connection-mode values, touch-panel and wear-pause enum values, Ink-theme popover corners, launch at login.</li>
+  </ul>
+
+  <h2>Left as is</h2>
+  <ul>
+    <li>The merged branches <code>phase2-main-window</code> and <code>phase3-windows-transport</code> still exist on GitHub, and <code>phase2-main-window</code> locally. Deleting branches was blocked for me, so that is yours to do. Everything in them is in <code>main</code>.</li>
+    <li>The approved design file still says "Turn DSEE off at low battery" on the Sound mockup; the app says "DSEE Extreme". I left the design reference untouched.</li>
+    <li>Phase 3 is only the transport. The Windows tray flyout and any hardware check need a Windows machine, so they wait for you. The transport has never talked to real headphones; the checklist for that is section 7 of the hardware file.</li>
+  </ul>
+</main>
+</body>
+</html>

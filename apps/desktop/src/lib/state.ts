@@ -198,6 +198,27 @@ export function codecLabel(codec: Codec | null): string {
 /** Marketing model number for the name the device reports. */
 export const modelNumber = (model: string | null): string => (model === "ULT WEAR" ? "WH-ULT900N" : (model ?? ""));
 
+/** EQ preset ids Hairline acts on by name: Off, and the three the user shapes. */
+export const PRESET_OFF = 0x00;
+export const PRESET_MANUAL = 0xa0;
+export const PRESET_CUSTOM_1 = 0xa1;
+export const PRESET_CUSTOM_2 = 0xa2;
+/** Presets whose bands the user sets; every other preset but Off is applied inside the headphones. */
+export const SHAPEABLE_PRESETS: readonly number[] = [PRESET_MANUAL, PRESET_CUSTOM_1, PRESET_CUSTOM_2];
+
+/** Why the bands cannot be shaped on this preset: a fixed Sony preset, Off, or neither (null). */
+export function presetLock(id: number | null): "fixed" | "off" | null {
+  if (id === null || SHAPEABLE_PRESETS.includes(id)) return null;
+  return id === PRESET_OFF ? "off" : "fixed";
+}
+
+/** The note shown under the bands for each lock (Sound and the Advanced equalizer). */
+export const PRESET_LOCK_NOTES: Record<"fixed" | "off", string> = {
+  fixed:
+    "Sony applies this preset inside the headphones and does not report its band values. Choose Manual, Custom 1 or Custom 2 to shape your own.",
+  off: "Equalizer off.",
+};
+
 /** EQ preset names by id (mdr-proto `preset_name`); the device sends empty names. */
 export function presetName(id: number): string {
   const names: Record<number, string> = {

@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use hairline_lib::broker::{run_broker, BrokerCmd};
 use hairline_lib::eq_curve::{
-    check_curve, check_shape, fit_command, load, prepare_send, save, EqCurve,
+    check_curve, check_shape, check_target_preset, fit_command, load, prepare_send, save, EqCurve,
 };
 use mdr_frame::FrameType;
 use mdr_proto::eq::{best_fit, to_raw};
@@ -113,12 +113,34 @@ fn send_best_fit_needs_six_bands_of_21_steps() {
         )
     );
     let curve = [8, 6, 4, 2, 0, -2, 0, 2, 4, 6];
-    assert!(prepare_send(Some(&cap(10, 21)), &curve).is_err());
-    assert!(prepare_send(None, &[0; 9]).is_err());
-    let (saved, fitted, cmd) = prepare_send(Some(&cap(6, 21)), &curve).unwrap();
+    assert!(prepare_send(Some(&cap(10, 21)), &curve, MANUAL).is_err());
+    assert!(prepare_send(None, &[0; 9], MANUAL).is_err());
+    let (saved, fitted, cmd) = prepare_send(Some(&cap(6, 21)), &curve, MANUAL).unwrap();
     assert_eq!(saved.bands, curve);
     assert_eq!(fitted, [5, 1, -2, 1, 3, 6]);
-    assert_eq!(cmd, BrokerCmd::SetEqBands(vec![15, 11, 8, 11, 13, 16]));
+    assert_eq!(
+        cmd,
+        BrokerCmd::SetEqPresetBands(MANUAL, vec![15, 11, 8, 11, 13, 16])
+    );
+}
+
+const MANUAL: u8 = 0xA0;
+const CUSTOM_1: u8 = 0xA1;
+const CUSTOM_2: u8 = 0xA2;
+const BRIGHT: u8 = 0x10;
+
+#[test]
+fn send_best_fit_only_targets_manual_or_custom() {
+    let curve = [0; 10];
+    for preset in [MANUAL, CUSTOM_1, CUSTOM_2] {
+        assert_eq!(check_target_preset(preset), Ok(preset));
+        assert!(prepare_send(None, &curve, preset).is_ok());
+    }
+    for preset in [0x00, BRIGHT, 0x16, 0x17, 0xA3, 0xFF] {
+        let err = "best fit can only be written into Manual, Custom 1 or Custom 2".to_string();
+        assert_eq!(check_target_preset(preset), Err(err.clone()));
+        assert_eq!(prepare_send(None, &curve, preset).map(|_| ()), Err(err));
+    }
 }
 
 #[test]
@@ -144,7 +166,29 @@ fn rejects_out_of_range() {
 }
 
 #[test]
-fn send_best_fit_uses_set_eq_bands() {
+fn send_best_fit_needs_the_target_listed() {
+    let curve = [0; 10];
+    let mut listed = cap(6, 21);
+    listed.presets = vec![
+        (0x00, String::new()),
+        (BRIGHT, String::new()),
+        (MANUAL, String::new()),
+    ];
+    assert!(prepare_send(Some(&listed), &curve, MANUAL).is_ok());
+    assert_eq!(
+        prepare_send(Some(&listed), &curve, CUSTOM_1).map(|_| ()),
+        Err("the headphones do not list Custom 1".to_string())
+    );
+    assert_eq!(
+        prepare_send(Some(&listed), &curve, CUSTOM_2).map(|_| ()),
+        Err("the headphones do not list Custom 2".to_string())
+    );
+    // An empty list means the presets are not known yet: allowed.
+    assert!(prepare_send(Some(&cap(6, 21)), &curve, CUSTOM_1).is_ok());
+}
+
+#[test]
+fn send_best_fit_writes_preset_and_bands_in_one_frame() {
     let (tx, rx) = channel();
     let (etx, erx) = channel();
     let fake = FakeDevice::ult_wear();
@@ -158,15 +202,15 @@ fn send_best_fit_uses_set_eq_bands() {
         )
     });
     wait_for(&erx, |s| s.connected);
-    // Move preset and ULT away from the fake's defaults so preserving them shows.
-    tx.send(BrokerCmd::SetEqPreset(0x16)).unwrap();
+    // A fixed preset (Bright) and ULT 2: the fit goes into Custom 1, ULT kept.
+    tx.send(BrokerCmd::SetEqPreset(BRIGHT)).unwrap();
     wait_for(&erx, |s| {
-        s.eq_ult.value.as_ref().map(|e| e.preset) == Some(0x16)
+        s.eq_ult.value.as_ref().map(|e| e.preset) == Some(BRIGHT)
             && matches!(s.eq_ult.status, Status::Confirmed)
     });
     tx.send(BrokerCmd::SetUlt(UltLevel::Ult2)).unwrap();
     let ready = wait_for(&erx, |s| {
-        s.eq_ult.value.as_ref().map(|e| (e.preset, e.ult)) == Some((0x16, UltLevel::Ult2))
+        s.eq_ult.value.as_ref().map(|e| (e.preset, e.ult)) == Some((BRIGHT, UltLevel::Ult2))
             && matches!(s.eq_ult.status, Status::Confirmed)
     });
 
@@ -177,30 +221,35 @@ fn send_best_fit_uses_set_eq_bands() {
         ready.eq_capability.as_ref().map(|c| (c.bands, c.steps)),
         Some((6, 21))
     );
-    let (_, sent_fit, sent_cmd) = prepare_send(ready.eq_capability.as_ref(), &curve.bands).unwrap();
-    let (fitted, cmd) = fit_command(&curve);
+    let (_, sent_fit, sent_cmd) =
+        prepare_send(ready.eq_capability.as_ref(), &curve.bands, CUSTOM_1).unwrap();
+    let (fitted, cmd) = fit_command(&curve, CUSTOM_1);
     assert_eq!((sent_fit, &sent_cmd), (fitted, &cmd));
     assert_eq!(fitted, best_fit(&curve.bands));
     assert_eq!(fitted, [5, 1, -2, 1, 3, 6]);
     let raw: Vec<u8> = fitted.iter().map(|&v| to_raw(v)).collect();
     assert_eq!(raw, [15, 11, 8, 11, 13, 16]);
-    assert_eq!(cmd, BrokerCmd::SetEqBands(raw.clone()));
+    assert_eq!(cmd, BrokerCmd::SetEqPresetBands(CUSTOM_1, raw.clone()));
+
+    let eq_sets = |log: &[(FrameType, Vec<u8>)]| -> Vec<Vec<u8>> {
+        log.iter()
+            .filter(|(t, p)| *t == FrameType::Command1 && p.first() == Some(&0x58))
+            .map(|(_, p)| p.clone())
+            .collect()
+    };
+    let before = eq_sets(&log.lock().unwrap()).len();
     tx.send(cmd).unwrap();
     let st = wait_for(&erx, |s| {
         s.eq_ult.value.as_ref().map(|e| e.bands.clone()) == Some(raw.clone())
             && matches!(s.eq_ult.status, Status::Confirmed)
     });
     let eq = st.eq_ult.value.unwrap();
-    assert_eq!((eq.preset, eq.ult), (0x16, UltLevel::Ult2));
+    assert_eq!((eq.preset, eq.ult), (CUSTOM_1, UltLevel::Ult2));
 
-    let mut want = vec![0x58, 0x03, 0x16, 0x02, 0x06];
+    let mut want = vec![0x58, 0x03, CUSTOM_1, 0x02, 0x06];
     want.extend_from_slice(&raw);
-    let frames = log.lock().unwrap().clone();
-    let sets: Vec<&Vec<u8>> = frames
-        .iter()
-        .filter(|(t, p)| *t == FrameType::Command1 && p.first() == Some(&0x58))
-        .map(|(_, p)| p)
-        .collect();
-    assert_eq!(sets.last(), Some(&&want), "{sets:02X?}");
+    let sets = eq_sets(&log.lock().unwrap());
+    // Exactly one frame for the send, and no separate preset write.
+    assert_eq!(sets[before..].to_vec(), vec![want], "{sets:02X?}");
     tx.send(BrokerCmd::Disconnect).unwrap();
 }

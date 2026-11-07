@@ -1,7 +1,10 @@
 // The Advanced equalizer's ten-band curve on the frontend: band names, paging
 // (four faders at a time), the best fit onto the device's six values (a mirror
 // of `mdr_proto::eq::best_fit`, so the fitted numbers follow a drag before the
-// app has saved anything) and a saver that writes one curve at a time.
+// app has saved anything), the preset a send writes into, and a saver that
+// writes one curve at a time.
+
+import { PRESET_CUSTOM_1, presetName, SHAPEABLE_PRESETS } from "./state";
 
 /** Centre frequencies of the ten bands, as `ADVANCED_BANDS_HZ` in mdr-proto. */
 export const ADVANCED_BANDS_HZ = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000] as const;
@@ -76,6 +79,47 @@ export function bestFitPreview(curve: readonly number[]): number[] {
     level(interpolate(4000, c[7], 8000, c[8], 6300)),
     level(c[9]),
   ];
+}
+
+/** The flat curve: all ten bands at 0. */
+export const resetCurve = (): number[] => Array.from({ length: BAND_COUNT }, () => 0);
+
+export interface TargetPreset {
+  id: number;
+  /** How the confirmation names it. */
+  label: string;
+  /** True when the headphones will change preset to take the fit. */
+  switches: boolean;
+}
+
+/**
+ * Where a best fit is written: the current preset when it is Manual, Custom 1
+ * or Custom 2; otherwise (a fixed Sony preset, Off, or unknown) Custom 1, and
+ * the headphones switch to it.
+ */
+export function targetPreset(current: number | null): TargetPreset {
+  if (current !== null && SHAPEABLE_PRESETS.includes(current)) {
+    return { id: current, label: presetName(current), switches: false };
+  }
+  return {
+    id: PRESET_CUSTOM_1,
+    label: `${presetName(PRESET_CUSTOM_1)} (the headphones will switch to it)`,
+    switches: true,
+  };
+}
+
+/**
+ * Why a fit cannot go into `target`, or null: the headphones list their
+ * presets and the target is not among them. An unknown or empty list is
+ * allowed. Same text as `eq_curve::check_listed`.
+ */
+export function targetProblem(
+  target: TargetPreset,
+  cap: { presets: readonly (readonly [number, string])[] } | null | undefined,
+): string | null {
+  const ids = cap?.presets.map(([id]) => id) ?? [];
+  if (ids.length === 0 || ids.includes(target.id)) return null;
+  return `the headphones do not list ${presetName(target.id)}`;
 }
 
 export interface CurveSaver {

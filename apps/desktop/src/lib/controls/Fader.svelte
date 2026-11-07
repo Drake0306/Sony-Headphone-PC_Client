@@ -24,7 +24,7 @@
    */
   export const FADER_SIZES = {
     md: { knob: 10, knobWidth: 24, track: 6, seg: 16, zero: 28, rail: 44, gap: 6, foot: 48, value: 18 },
-    lg: { knob: 14, knobWidth: 44, track: 8, seg: 26, zero: 48, rail: 88, gap: 10, foot: 64, value: 28 },
+    lg: { knob: 14, knobWidth: 44, track: 8, seg: 26, zero: 48, rail: 88, gap: 8, foot: 58, value: 28 },
   } as const;
   export type FaderSize = keyof typeof FADER_SIZES;
 

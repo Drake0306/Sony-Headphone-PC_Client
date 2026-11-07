@@ -221,6 +221,24 @@ impl Session {
     /// Changes only the band levels, keeping the device's current preset and ULT
     /// level. The band count must match the device's EQ capability (6 if unknown).
     pub fn set_eq_bands(&mut self, bands: Vec<u8>) -> Result<(), SessionError> {
+        self.check_band_count(&bands)?;
+        let mut eq = self.current_eq()?;
+        eq.bands = bands;
+        self.request(request::eq_ult_set(&eq))
+    }
+
+    /// Changes the EQ preset and the band levels in one request, keeping the
+    /// ULT level, so the bands land in that preset without a separate preset
+    /// write. The band count must match the device's EQ capability (6 if unknown).
+    pub fn set_eq_preset_bands(&mut self, preset: u8, bands: Vec<u8>) -> Result<(), SessionError> {
+        self.check_band_count(&bands)?;
+        let mut eq = self.current_eq()?;
+        eq.preset = preset;
+        eq.bands = bands;
+        self.request(request::eq_ult_set(&eq))
+    }
+
+    fn check_band_count(&self, bands: &[u8]) -> Result<(), SessionError> {
         let expected = self
             .state
             .eq_capability
@@ -229,9 +247,7 @@ impl Session {
         if bands.len() != expected {
             return Err(SessionError::InvalidValue);
         }
-        let mut eq = self.current_eq()?;
-        eq.bands = bands;
-        self.request(request::eq_ult_set(&eq))
+        Ok(())
     }
 
     pub fn set_volume(&mut self, v: u8) -> Result<(), SessionError> {

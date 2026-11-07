@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, waitFor, within } from "@testing-library/svelte";
 
 const backend = vi.hoisted(() => ({
   curve: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] as number[],
@@ -40,17 +40,24 @@ vi.mock("@tauri-apps/api/event", () => ({
   emitTo: vi.fn(async () => {}),
 }));
 
+import { FADER_SIZES } from "../lib/controls/Fader.svelte";
+import faderSrc from "../lib/controls/Fader.svelte?raw";
 import { bestFitPreview, toRaw } from "../lib/eqCurve";
 import { emptyState, type DeviceState, type Status } from "../lib/state";
 import AdvancedEq from "./AdvancedEq.svelte";
+import advSrc from "./AdvancedEq.svelte?raw";
 
 const NOTE =
   "These bands run in Hairline only. The headphones keep their six-band curve; use Send best fit to put the closest match on them.";
 
-const connected = (status: Status = "Confirmed", bands = [10, 10, 10, 10, 10, 10]): DeviceState => ({
+const MANUAL = 0xa0;
+const CUSTOM_1 = 0xa1;
+const BRIGHT = 0x10;
+
+const connected = (status: Status = "Confirmed", bands = [10, 10, 10, 10, 10, 10], preset = MANUAL): DeviceState => ({
   ...emptyState(),
   connected: true,
-  eq_ult: { value: { preset: 0xa0, ult: "Off", bands }, status },
+  eq_ult: { value: { preset, ult: "Off", bands }, status },
   eq_capability: { bands: 6, steps: 21, ult2_additional_step: 0, presets: [] },
 });
 
@@ -60,6 +67,24 @@ const fitTexts = (c: HTMLElement) => [...c.querySelectorAll(".fit .best .dot")].
 const nowTexts = (c: HTMLElement) => [...c.querySelectorAll(".fit .now .dot")].map((n) => n.textContent);
 const levelText = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${-v}` : "0");
 const calls = (cmd: string) => backend.calls.filter((c) => c.cmd === cmd);
+const deviceWrites = () => backend.calls.filter((c) => c.cmd === "send_best_fit" || c.cmd === "set_eq_bands");
+const body = (target: string) =>
+  `The headphones hold six bands (Clear Bass, 400 Hz, 1 kHz, 2.5 kHz, 6.3 kHz, 16 kHz), not ten. Hairline fits your ten bands onto those six and writes them into ${target}.`;
+
+/** The declarations of the first `selector { ... }` rule in a component's styles. */
+const rule = (css: string, selector: string) => {
+  const at = css.indexOf(`\n  ${selector} {`);
+  expect(at, selector).toBeGreaterThanOrEqual(0);
+  return css.slice(at, css.indexOf("}", at));
+};
+
+/** Opens the confirmation from the Send button and confirms it. */
+async function confirmSend(container: HTMLElement) {
+  const r = within(container);
+  await fireEvent.click(r.getByRole("button", { name: "Send best fit to headphones" }));
+  const dialog = await r.findByRole("dialog");
+  await fireEvent.click(within(dialog).getByRole("button", { name: "Send" }));
+}
 
 describe("Advanced equalizer", () => {
   beforeEach(() => {
@@ -150,9 +175,10 @@ describe("Advanced equalizer", () => {
     await r.findByRole("slider", { name: "31 Hz" });
     const send = r.getByRole("button", { name: "Send best fit to headphones" });
     expect(send.getAttribute("aria-disabled")).toBe("false");
-    await fireEvent.click(send);
+    await confirmSend(r.container);
     await waitFor(() => expect(calls("send_best_fit")).toHaveLength(1));
-    expect(calls("send_best_fit")[0].args).toEqual({ bands: [6, 3, 0, -2, 0, 0, 0, 0, 0, 0] });
+    expect(calls("send_best_fit")[0].args).toEqual({ bands: [6, 3, 0, -2, 0, 0, 0, 0, 0, 0], preset: MANUAL });
+    expect(r.queryByRole("dialog")).toBeNull();
     expect(calls("set_eq_bands")).toHaveLength(0);
 
     // The device answers with the fitted bands: "Sent".
@@ -173,7 +199,7 @@ describe("Advanced equalizer", () => {
   it("send shows the refusal and is unavailable while disconnected", async () => {
     const r = render(AdvancedEq, { st: connected(), onback: () => {} });
     await r.findByRole("slider", { name: "31 Hz" });
-    await fireEvent.click(r.getByRole("button", { name: "Send best fit to headphones" }));
+    await confirmSend(r.container);
     await waitFor(() => expect(calls("send_best_fit")).toHaveLength(1));
     await r.rerender({ st: connected({ Pending: { since_ms: 1 } }), onback: () => {} });
     await r.rerender({ st: connected({ Refused: { reason: "Not now" } }), onback: () => {} });
@@ -185,6 +211,7 @@ describe("Advanced equalizer", () => {
     const before = calls("send_best_fit").length;
     await fireEvent.click(send);
     await new Promise((done) => setTimeout(done, 10));
+    expect(r.queryByRole("dialog")).toBeNull();
     expect(calls("send_best_fit")).toHaveLength(before);
     // The curve stays editable without headphones.
     expect(r.getByRole("slider", { name: "31 Hz" }).getAttribute("aria-disabled")).toBe("false");
@@ -280,5 +307,158 @@ describe("Advanced equalizer", () => {
     expect([...b.container.querySelectorAll(".fader .val")].map((n) => n.textContent)).toEqual(["−4", "−4", "−4", "−4"]);
     expect(fitTexts(b.container)).toEqual(bestFitPreview(backend.curve).map(levelText));
     b.unmount();
+  });
+
+  it("send_asks_first_and_names_the_target", async () => {
+    const r = render(AdvancedEq, { st: connected(), onback: () => {} });
+    await r.findByRole("slider", { name: "31 Hz" });
+    expect(r.queryByRole("dialog")).toBeNull();
+    await fireEvent.click(r.getByRole("button", { name: "Send best fit to headphones" }));
+    const dialog = await r.findByRole("dialog");
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(within(dialog).getByText("Send best fit to the headphones?")).toBeTruthy();
+    expect(within(dialog).getByText(body("Manual"))).toBeTruthy();
+    // The six fitted values with their labels.
+    const rows = [...dialog.querySelectorAll(".details > div")].map((d) => [
+      d.querySelector("dt")!.textContent,
+      d.querySelector("dd")!.textContent,
+    ]);
+    const labels = ["Clear Bass", "400 Hz", "1 kHz", "2.5 kHz", "6.3 kHz", "16 kHz"];
+    const fit = bestFitPreview([6, 3, 0, -2, 0, 0, 0, 0, 0, 0]).map(levelText);
+    expect(rows).toEqual(labels.map((l, k) => [l, fit[k]]));
+    // Focus starts on Cancel; nothing has been sent yet.
+    expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(deviceWrites()).toHaveLength(0);
+    r.unmount();
+
+    // From a fixed preset the fit goes into Custom 1 and the dialog says so.
+    const b = render(AdvancedEq, { st: connected("Confirmed", undefined, BRIGHT), onback: () => {} });
+    await b.findByRole("slider", { name: "31 Hz" });
+    await fireEvent.click(b.getByRole("button", { name: "Send best fit to headphones" }));
+    const d2 = await b.findByRole("dialog");
+    expect(within(d2).getByText(body("Custom 1 (the headphones will switch to it)"))).toBeTruthy();
+    await fireEvent.click(within(d2).getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(calls("send_best_fit")).toHaveLength(1));
+    expect(calls("send_best_fit")[0].args).toEqual({ bands: [6, 3, 0, -2, 0, 0, 0, 0, 0, 0], preset: CUSTOM_1 });
+    expect(calls("set_eq_bands")).toHaveLength(0);
+    b.unmount();
+  });
+
+  it("cancel_sends_nothing", async () => {
+    const r = render(AdvancedEq, { st: connected("Confirmed", undefined, BRIGHT), onback: () => {} });
+    await r.findByRole("slider", { name: "31 Hz" });
+    const open = async () => {
+      await fireEvent.click(r.getByRole("button", { name: "Send best fit to headphones" }));
+      return r.findByRole("dialog");
+    };
+    // The Cancel button.
+    let dialog = await open();
+    await fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(r.queryByRole("dialog")).toBeNull();
+    // Escape.
+    dialog = await open();
+    await fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(r.queryByRole("dialog")).toBeNull();
+    // A click on the backdrop; a click inside the panel keeps it open.
+    dialog = await open();
+    await fireEvent.click(within(dialog).getByText("Send best fit to the headphones?"));
+    expect(r.queryByRole("dialog")).not.toBeNull();
+    await fireEvent.click(r.container.querySelector(".backdrop")!);
+    expect(r.queryByRole("dialog")).toBeNull();
+    await new Promise((done) => setTimeout(done, 10));
+    expect(deviceWrites()).toHaveLength(0);
+    r.unmount();
+  });
+
+  it("reset_zeroes_and_saves", async () => {
+    const r = render(AdvancedEq, { st: connected(), onback: () => {} });
+    await r.findByRole("slider", { name: "31 Hz" });
+    const reset = r.getByRole("button", { name: "Reset" });
+    expect(reset.getAttribute("aria-disabled")).toBe("false");
+    await fireEvent.click(reset);
+    // All ten bands at 0 on the faders and in the fit, saved through set_eq_curve.
+    expect(sliderLabels(r.container)).toEqual(["31 Hz", "62 Hz", "125 Hz", "250 Hz"]);
+    for (const s of r.container.querySelectorAll("[role=slider]")) expect(s.getAttribute("aria-valuenow")).toBe(String(toRaw(0)));
+    expect(fitTexts(r.container)).toEqual(Array(6).fill("0"));
+    await waitFor(() => expect(calls("set_eq_curve")).toHaveLength(1));
+    expect(calls("set_eq_curve")[0].args).toEqual({ bands: Array(10).fill(0) });
+    await waitFor(() => expect(calls("best_fit_preview")).toHaveLength(1));
+    expect(backend.curve).toEqual(Array(10).fill(0));
+    expect(deviceWrites()).toHaveLength(0);
+
+    // Unavailable while a send is pending.
+    backend.curve = [6, 3, 0, -2, 0, 0, 0, 0, 0, 0];
+    await r.rerender({ st: connected({ Pending: { since_ms: 1 } }), onback: () => {} });
+    expect(reset.getAttribute("aria-disabled")).toBe("true");
+    await fireEvent.click(reset);
+    await new Promise((done) => setTimeout(done, 10));
+    expect(calls("set_eq_curve")).toHaveLength(1);
+    r.unmount();
+  });
+
+  it("advanced_layout_rules", () => {
+    // 880×560: tighter page padding, and the faders take the free height.
+    expect(rule(advSrc, ".adv")).toMatch(/padding:\s*20px 32px 16px/);
+    const faders = rule(advSrc, ".faders");
+    expect(faders).toMatch(/flex:\s*1;/);
+    expect(faders).toMatch(/min-height:\s*300px/);
+    const gap = Number(/\bgap:\s*(\d+)px/.exec(faders)?.[1]);
+    expect(gap).toBeGreaterThanOrEqual(24);
+    // No fixed track height at any size: the rail fills its column.
+    expect(rule(faderSrc, ".rail")).not.toMatch(/(^|[^-])height\s*:/);
+    expect(rule(faderSrc, ".rail")).toMatch(/flex:\s*1;/);
+    expect(rule(faderSrc, ".fader")).toMatch(/height:\s*100%/);
+    for (const size of Object.values(FADER_SIZES)) expect(Object.keys(size).some((k) => /height/i.test(k))).toBe(false);
+    // One compact bottom row: the mini table at 11px mono beside the actions.
+    const bottom = rule(advSrc, ".bottom");
+    expect(bottom).toMatch(/display:\s*flex/);
+    expect(bottom).not.toMatch(/flex-wrap:\s*wrap/);
+    const fit = rule(advSrc, ".fit");
+    expect(fit).toMatch(/font-family:\s*"DM Mono"/);
+    expect(fit).toMatch(/font-size:\s*11px/);
+    expect(fit).toMatch(/grid-template-columns:\s*auto repeat\(6,/);
+    // Nothing scrolls.
+    expect(advSrc).not.toMatch(/overflow(-y)?\s*:\s*(auto|scroll)/);
+  });
+
+  const FIXED_NOTE =
+    "Sony applies this preset inside the headphones and does not report its band values. Choose Manual, Custom 1 or Custom 2 to shape your own.";
+
+  it("fixed_or_off_preset_hides_device_values", async () => {
+    const r = render(AdvancedEq, { st: connected("Confirmed", [16, 12, 10, 7, 3, 20], BRIGHT), onback: () => {} });
+    await r.findByRole("slider", { name: "31 Hz" });
+    expect(nowTexts(r.container)).toEqual(Array(6).fill("--"));
+    const note = r.getByText(FIXED_NOTE);
+    expect(note.closest(".bottom")).not.toBeNull();
+    await r.rerender({ st: connected("Confirmed", [16, 12, 10, 7, 3, 20], 0x00), onback: () => {} });
+    expect(nowTexts(r.container)).toEqual(Array(6).fill("--"));
+    expect(r.getByText("Equalizer off.")).toBeTruthy();
+    expect(r.queryByText(FIXED_NOTE)).toBeNull();
+    await r.rerender({ st: connected("Confirmed", [16, 12, 10, 7, 3, 20], MANUAL), onback: () => {} });
+    expect(nowTexts(r.container)).toEqual(["+6", "+2", "0", "−3", "−7", "+10"]);
+    expect(r.queryByText(FIXED_NOTE)).toBeNull();
+    expect(r.queryByText("Equalizer off.")).toBeNull();
+    r.unmount();
+  });
+
+  it("send_unavailable_when_target_unlisted", async () => {
+    const st = connected("Confirmed", undefined, BRIGHT);
+    const listed = (ids: number[]) => ({
+      ...st,
+      eq_capability: { ...st.eq_capability!, presets: ids.map((id): [number, string] => [id, ""]) },
+    });
+    const r = render(AdvancedEq, { st: listed([BRIGHT, MANUAL]), onback: () => {} });
+    await r.findByRole("slider", { name: "31 Hz" });
+    expect(r.getByText("the headphones do not list Custom 1")).toBeTruthy();
+    const send = r.getByRole("button", { name: "Send best fit to headphones" });
+    expect(send.getAttribute("aria-disabled")).toBe("true");
+    await fireEvent.click(send);
+    expect(r.queryByRole("dialog")).toBeNull();
+    await r.rerender({ st: listed([BRIGHT, MANUAL, CUSTOM_1]), onback: () => {} });
+    expect(r.queryByText(/do not list/)).toBeNull();
+    expect(send.getAttribute("aria-disabled")).toBe("false");
+    await new Promise((done) => setTimeout(done, 10));
+    expect(deviceWrites()).toHaveLength(0);
+    r.unmount();
   });
 });

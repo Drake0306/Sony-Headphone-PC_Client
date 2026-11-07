@@ -2,7 +2,10 @@
   Sound: the full equalizer faders and the preset grid on the left; ULT, the
   codec box with the connection-quality switch, and DSEE on the right. Every
   value comes from DeviceState; faders, presets and ULT share the EQ group's
-  status (`eq_ult`).
+  status (`eq_ult`). On a fixed Sony preset the headphones apply the curve
+  inside and report centre values, so the faders show those values read-only
+  with a note; on Off they are disabled. Only Manual, Custom 1 and Custom 2
+  take band writes.
 -->
 <script lang="ts">
   import Boxes from "../lib/controls/Boxes.svelte";
@@ -11,7 +14,15 @@
   import Toggle from "../lib/controls/Toggle.svelte";
   import { control } from "../lib/control.svelte";
   import { setConnectionMode, setDseeAutoOff, setEqBands, setEqPreset, setUlt } from "../lib/ipc";
-  import { codecLabel, isPending, presetName, type DeviceState, type UltLevel } from "../lib/state";
+  import {
+    codecLabel,
+    isPending,
+    PRESET_LOCK_NOTES,
+    presetLock,
+    presetName,
+    type DeviceState,
+    type UltLevel,
+  } from "../lib/state";
 
   // `onadvanced` opens the Advanced equalizer (Main swaps it in for this screen).
   let { st, onadvanced }: { st: DeviceState; onadvanced?: () => void } = $props();
@@ -41,11 +52,15 @@
   const presets = $derived((st.eq_capability?.presets ?? []).map(([id]) => ({ label: presetName(id), value: id })));
   const eqOff = $derived(st.eq_ult.status === "Unavailable" || st.eq_ult.value === null);
   const eqBusy = $derived(isPending(bands.status));
+  /** A fixed Sony preset (bands applied inside, not reported) or Off: the faders are read-only. */
+  const lock = $derived(presetLock(preset.shown));
+  /** Band writes (faders, Reset) only go to Manual, Custom 1 and Custom 2. */
+  const bandsLocked = $derived(lock !== null);
   const codec = $derived(codecLabel(st.codec.value));
   const dsee = $derived(st.dsee.value);
 
   function reset() {
-    if (eqOff || eqBusy) return;
+    if (eqOff || eqBusy || bandsLocked) return;
     const flat = Array.from({ length: bandCount }, () => max / 2);
     bands.request(flat, () => setEqBands(flat));
   }
@@ -56,7 +71,7 @@
     <div>
       <div class="block">
         <div class="eqhead">
-          <h4>Equalizer{preset.shown === null ? "" : ` · ${presetName(preset.shown)}`} · drag a handle</h4>
+          <h4>Equalizer{preset.shown === null ? "" : ` · ${presetName(preset.shown)}`}{bandsLocked ? "" : " · drag a handle"}</h4>
           {#if onadvanced}
             <button class="btn" onclick={onadvanced}>Advanced</button>
           {/if}
@@ -66,10 +81,14 @@
             bands={bands.shown}
             labels={LABELS}
             status={bands.status}
+            disabled={bandsLocked}
             {max}
             oncommit={(next) => bands.request(next, () => setEqBands(next))}
           />
         </div>
+        {#if lock}
+          <p class="note">{PRESET_LOCK_NOTES[lock]}</p>
+        {/if}
       </div>
       <div class="block">
         <h4>Presets</h4>
@@ -90,9 +109,9 @@
           <button class="btn unavailable" aria-disabled="true" tabindex="-1" title="Phase 4">Save as Custom 1</button>
           <button
             class="btn"
-            class:unavailable={eqOff || eqBusy}
-            aria-disabled={eqOff || eqBusy}
-            tabindex={eqOff || eqBusy ? -1 : 0}
+            class:unavailable={eqOff || eqBusy || bandsLocked}
+            aria-disabled={eqOff || eqBusy || bandsLocked}
+            tabindex={eqOff || eqBusy || bandsLocked ? -1 : 0}
             onclick={reset}>Reset</button
           >
         </div>

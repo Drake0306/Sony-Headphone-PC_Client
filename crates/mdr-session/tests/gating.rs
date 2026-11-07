@@ -19,16 +19,27 @@ fn undeclared_capability_is_unavailable() {
 }
 
 #[test]
-fn proven_capability_is_allowed() {
+fn proven_capability_allows_a_get() {
     let mut s = connected_session_with_caps(&[0x20]);
     s.mark_proven(Table::T1, 0x6B);
-    assert!(s
-        .set_nc(NcAsmState {
+    assert!(s.request(request::ncasm_get()).is_ok());
+    let out = drain(&mut s, 500);
+    assert_eq!(decode_payload(&out[0]), request::ncasm_get().bytes);
+}
+
+#[test]
+fn proven_capability_does_not_allow_a_set() {
+    let mut s = connected_session_with_caps(&[0x20]);
+    s.mark_proven(Table::T1, 0x6B);
+    assert_eq!(
+        s.set_nc(NcAsmState {
             mode: NcMode::Off,
             level: 1,
             voice_focus: false
-        })
-        .is_ok());
+        }),
+        Err(SessionError::Unavailable(0x6B))
+    );
+    assert!(drain(&mut s, 10_000).is_empty());
 }
 
 #[test]

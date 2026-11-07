@@ -261,6 +261,53 @@ fn probe_proves_exactly_the_undeclared_answers() {
 }
 
 #[test]
+fn a_proven_function_does_not_unlock_its_typed_set() {
+    let dir = temp_dir("proven-set");
+    // Touch panel (D2) answered but undeclared: the probe proves it.
+    let mut fake = FakeDevice::ult_wear();
+    fake.without_capability(0xD2);
+    let points: Vec<_> = points_for(&[(Table::T1, 0xD6)])
+        .into_iter()
+        .filter(|p| p.inquired == Some(0xD2))
+        .collect();
+    assert_eq!(points.len(), 1);
+    let rig = Rig::start(
+        fake,
+        ProbeRunner::with_timing(60, 5).with_points(points),
+        &dir,
+    );
+    rig.tx.send(BrokerCmd::ProbeStart).unwrap();
+    rig.probe_until(|e| e.state == ProbeState::Done);
+    rig.state_until(|s| s.proven.contains(&(Table::T1, 0xD2)));
+
+    // The handshake reads volume too, so count the GETs sent after the SET.
+    let volume_gets = || {
+        rig.log
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, p)| p == &[0xA6, 0x20])
+            .count()
+    };
+    let before = volume_gets();
+    rig.tx.send(BrokerCmd::SetTouchPanel(false)).unwrap();
+    // A GET sent after it: once it is on the wire, an accepted SET would be too.
+    rig.tx.send(user_get()).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while volume_gets() == before {
+        assert!(Instant::now() < deadline, "the GET never went out");
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    let log = rig.stop();
+    assert!(
+        !log.lock().unwrap().iter().any(|(_, p)| p[0] == 0xD8),
+        "a typed SET on a proven function was written"
+    );
+    assert_get_only(&log);
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
 fn probe_stop_sends_nothing_more() {
     let dir = temp_dir("stop");
     let points = points_for(&[(Table::T1, 0xF0), (Table::T1, 0xF2)]);

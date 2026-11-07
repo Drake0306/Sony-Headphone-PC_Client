@@ -72,7 +72,7 @@ Settings has an "Advanced panel" switch; turning it on adds the Advanced screen.
 
 The probe, on the Advanced screen, walks the read-only requests of the protocol to find functions the headphones answer but do not declare. It sends 46 GET opcodes, 441 requests in all, one at a time, waiting 1.5 s for a reply and 150 ms between requests. That is about 13 minutes. You start it by typing `RUN`, and Stop ends it at any time. It never sends a SET.
 
-Results go to `captures/local/probe-<secs>.json`. A function that answered although the headphones did not declare it becomes "proven" for this unit and is remembered in `devices/<address>.json`. Two reads are left out: reset settings, and the LE Audio identity key (its reply is a pairing secret). The catalogue is in `crates/mdr-proto/src/probe.rs`.
+Results go to `captures/local/probe-<secs>.json`. A function that answered although the headphones did not declare it becomes "proven" for this unit and is remembered in `devices/<address>.json`. Hairline may then read it, but never changes it. Two reads are left out: reset settings, and the LE Audio identity key (its reply is a pairing secret). The catalogue is in `crates/mdr-proto/src/probe.rs`.
 
 ## Battery history
 
@@ -137,7 +137,7 @@ To record from a running app instead, turn on the Advanced panel and press Recor
 
 ## Safety
 
-Hairline never sends commands on the deny-list, and it only changes a setting the headphones declare as supported. The Advanced panel sends a SET only after you type `SEND`, the deny-list cannot be bypassed from there, and the probe and the socket never send a SET or a raw command. The one exception to the deny-list is power off, after the user confirms it. The details are in [docs/protocol-notes.md](docs/protocol-notes.md).
+Hairline never sends commands on the deny-list. The app, the scenes and the socket change a setting only when the headphones declare its function; a function the probe proved (it answered although it was not declared) unlocks reads, never changes. The only way to send a SET for anything else is a raw command in the Advanced panel, which asks you to type `SEND` first and cannot get past the deny-list. The probe sends only GETs, and neither the probe nor the socket can send a raw command. The one exception to the deny-list is power off, after the user confirms it. The details are in [docs/protocol-notes.md](docs/protocol-notes.md).
 
 ## Design
 

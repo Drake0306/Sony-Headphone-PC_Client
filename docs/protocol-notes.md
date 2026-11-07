@@ -32,6 +32,10 @@ Table 2 (COMMAND_2) used: `06`/`07` support functions; voice guidance `40..48` (
 
 `F8` with type `09` (RESET_SETTINGS; `F8 09 01` = factory reset), `98` (ALERT_SET_PARAM family, used for reboot/commit sequences), `24` (POWER_SET_STATUS; power off), `2D`/`30..3F` (UPDT firmware), `C4` (LOG_SET_STATUS). Note `98 00 06 01` is part of the multipoint-toggle sequence reported by Gadgetbridge/SonyBridge; it is allowed only inside that sequence.
 
+## Capability gating
+
+Every typed request names the support function it needs. The session sends it only if the headphones declared that function in the support-function reply. A function that is only *proven* (it answered the probe although it was not declared, stored per unit) satisfies the check for GETs only, by the opcode role table (`mdr_proto::function::opcode_role` is `Get`); a typed SET on a proven function is refused as unavailable and nothing is written. Raw requests from the Advanced panel name no function and are not gated: they are deny-listed like everything else, and anything but a GET needs the typed `SEND` confirmation.
+
 ## Handshake
 
 1. T1 `00 00` → `01 00 03 00 20 02 00 00` (`ConnectRetProtocolInfo`: type, protocolVersion i32 BE = 0x03002002, table1 enable, table2 enable). Reply length 8 ⇒ v2.

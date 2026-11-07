@@ -203,10 +203,12 @@ pub fn control_command(
                 Some(v) => check_level(number(v, "ambient level", "1..=20")?)?,
                 None => cur_level,
             };
-            // Voice focus belongs to Ambient; other modes keep what is set.
+            // Voice focus belongs to Ambient; asking for it elsewhere is refused.
             let voice_focus = match voice {
-                Some(v) if mode == NcMode::Ambient => boolean(v, "voice")?,
-                Some(v) => boolean(v, "voice").map(|_| cur_voice)?,
+                Some(_) if mode != NcMode::Ambient => {
+                    return Err("voice focus needs Ambient".into())
+                }
+                Some(v) => boolean(v, "voice")?,
                 None => cur_voice,
             };
             Ok(BrokerCmd::SetNc(NcAsmState {
@@ -540,11 +542,13 @@ mod tests {
             control_command("nc", &json!("nc"), &cur),
             nc(NcMode::NoiseCancelling, 9, true)
         );
-        // Voice is only taken for Ambient.
-        assert_eq!(
-            control_command("nc", &json!({"mode": "off", "voice": false}), &cur),
-            nc(NcMode::Off, 9, true)
-        );
+        // Voice focus belongs to Ambient: asking for it elsewhere is refused.
+        for mode in ["off", "nc"] {
+            assert_eq!(
+                control_command("nc", &json!({"mode": mode, "voice": false}), &cur),
+                Err("voice focus needs Ambient".into())
+            );
+        }
         assert_eq!(
             control_command("ambient_level", &json!(3), &with_nc(NcMode::Off, 9, false)),
             nc(NcMode::Ambient, 3, false)

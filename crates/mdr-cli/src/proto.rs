@@ -11,7 +11,7 @@ const SOCKET_NAME: &str = "hairline.sock";
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "hairline",
+    name = "hairlinectl",
     version,
     about = "Control the running Hairline app from a terminal",
     long_about = "Control the running Hairline app from a terminal.\n\nTalks to the app over a local socket; Hairline must be running. Set HAIRLINE_SOCKET to use another socket path."
@@ -34,7 +34,7 @@ pub enum Command {
         /// Ambient level, 1 to 20.
         #[arg(long)]
         level: Option<u8>,
-        /// Voice focus (ambient only).
+        /// Voice focus; ambient only (refused with nc or off).
         #[arg(long)]
         voice: Option<OnOff>,
     },
@@ -256,7 +256,7 @@ mod tests {
     use super::*;
 
     fn req(args: &[&str]) -> Value {
-        let mut argv = vec!["hairline"];
+        let mut argv = vec!["hairlinectl"];
         argv.extend_from_slice(args);
         request(&Cli::try_parse_from(argv).expect("parses").command)
     }
@@ -303,16 +303,16 @@ mod tests {
     #[test]
     fn bad_arguments_are_refused_before_sending() {
         for args in [
-            vec!["hairline"],
-            vec!["hairline", "nc", "loud"],
-            vec!["hairline", "nc", "ambient", "--voice", "maybe"],
-            vec!["hairline", "volume", "loud"],
-            vec!["hairline", "raw", "22"],
-            vec!["hairline", "power"],
+            vec!["hairlinectl"],
+            vec!["hairlinectl", "nc", "loud"],
+            vec!["hairlinectl", "nc", "ambient", "--voice", "maybe"],
+            vec!["hairlinectl", "volume", "loud"],
+            vec!["hairlinectl", "raw", "22"],
+            vec!["hairlinectl", "power"],
         ] {
             assert!(Cli::try_parse_from(&args).is_err(), "{args:?}");
         }
-        let cli = Cli::try_parse_from(["hairline", "--json", "state"]).unwrap();
+        let cli = Cli::try_parse_from(["hairlinectl", "--json", "state"]).unwrap();
         assert!(cli.json);
     }
 

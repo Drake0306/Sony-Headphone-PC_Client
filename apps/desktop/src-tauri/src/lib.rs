@@ -119,10 +119,7 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building Hairline")
         .run(|app, event| {
-            if matches!(
-                event,
-                tauri::RunEvent::Exit | tauri::RunEvent::ExitRequested { .. }
-            ) {
+            if matches!(event, tauri::RunEvent::Exit) {
                 socket::cleanup(app);
             }
             // Clicking the Dock icon reopens the main window.

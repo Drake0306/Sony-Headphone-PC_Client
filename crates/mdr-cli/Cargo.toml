@@ -1,13 +1,13 @@
 [package]
 name = "mdr-cli"
 version = "0.1.0"
-description = "hairline: control the running Hairline app from a terminal"
+description = "hairlinectl: control the running Hairline app from a terminal"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
 [[bin]]
-name = "hairline"
+name = "hairlinectl"
 path = "src/main.rs"
 
 [dependencies]

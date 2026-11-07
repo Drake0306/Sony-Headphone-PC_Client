@@ -1,4 +1,4 @@
-//! `hairline`: talks to the running Hairline app over its local socket.
+//! `hairlinectl`: talks to the running Hairline app over its local socket.
 
 mod proto;
 

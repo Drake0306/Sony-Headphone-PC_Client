@@ -1,4 +1,4 @@
-//! The local socket the `hairline` command-line tool talks to.
+//! The local socket the `hairlinectl` command-line tool talks to.
 //!
 //! One JSON object per line in, one JSON object per line out:
 //! `state`, `set` (the controls in `commands::SOCKET_CONTROLS`, validated by
@@ -172,16 +172,29 @@ pub use unix::{bind, serve};
 #[cfg(unix)]
 mod unix {
     use std::io::{self, BufRead, BufReader, Read, Write};
-    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::fs::{FileTypeExt, PermissionsExt};
     use std::os::unix::net::{UnixListener, UnixStream};
     use std::path::Path;
     use std::sync::Arc;
+    use std::time::Duration;
 
     use super::{error, handle_line, SocketContext, MAX_LINE};
 
-    /// Listens on `path`: a stale file there is removed first, and the new
-    /// socket is made readable and writable by this user only.
+    /// An idle client is dropped after this long, freeing its thread.
+    pub const IDLE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+
+    /// Listens on `path`, made readable and writable by this user only. A
+    /// socket another Hairline still answers on is left alone (an error); a
+    /// dead socket or stale file there is removed first.
     pub fn bind(path: &Path) -> io::Result<UnixListener> {
+        if std::fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_socket())
+            && UnixStream::connect(path).is_ok()
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::AddrInUse,
+                format!("another Hairline is already serving {}", path.display()),
+            ));
+        }
         match std::fs::remove_file(path) {
             Err(e) if e.kind() != io::ErrorKind::NotFound => return Err(e),
             _ => {}
@@ -208,6 +221,7 @@ mod unix {
     }
 
     fn connection(stream: UnixStream, ctx: &dyn SocketContext) -> io::Result<()> {
+        stream.set_read_timeout(Some(IDLE_TIMEOUT))?;
         let mut writer = stream.try_clone()?;
         let mut reader = BufReader::new(stream);
         let mut buf = Vec::new();
@@ -255,11 +269,16 @@ pub fn spawn(app: AppHandle) {
     }
     let listener = match bind(&path) {
         Ok(l) => l,
+        Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
+            eprintln!("hairline: {e}; this instance's socket is off");
+            return;
+        }
         Err(e) => {
             eprintln!("hairline: socket {} not started: {e}", path.display());
             return;
         }
     };
+    OWNS_SOCKET.store(true, std::sync::atomic::Ordering::SeqCst);
     let ctx: std::sync::Arc<dyn SocketContext + Send + Sync> = std::sync::Arc::new(AppContext(app));
     let _ = std::thread::Builder::new()
         .name("hairline-socket-accept".into())
@@ -270,9 +289,12 @@ pub fn spawn(app: AppHandle) {
 #[cfg(not(unix))]
 pub fn spawn(_: AppHandle) {}
 
-/// Removes the socket file on exit.
+/// Set once this instance has bound the socket; only the owner removes it.
+static OWNS_SOCKET: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Removes the socket file on exit, if this instance serves it.
 pub fn cleanup(app: &AppHandle) {
-    if cfg!(unix) {
+    if OWNS_SOCKET.load(std::sync::atomic::Ordering::SeqCst) {
         if let Some(path) = path(app) {
             let _ = std::fs::remove_file(path);
         }

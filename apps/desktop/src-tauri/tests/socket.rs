@@ -242,6 +242,38 @@ fn temp_sock(name: &str) -> PathBuf {
 }
 
 #[test]
+fn socket_bind_refuses_a_live_socket() {
+    let path = temp_sock("live");
+    let first = bind(&path).unwrap();
+    let err = bind(&path).unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("another Hairline is already serving"),
+        "{err}"
+    );
+    // The first server's socket is untouched and still answers.
+    let ctx: Arc<dyn SocketContext + Send + Sync> = Arc::new(connected());
+    std::thread::spawn(move || serve(first, ctx));
+    let stream = UnixStream::connect(&path).unwrap();
+    let mut reader = BufReader::new(stream.try_clone().unwrap());
+    let mut writer = stream;
+    writer.write_all(b"{\"cmd\":\"state\"}\n").unwrap();
+    let mut line = String::new();
+    reader.read_line(&mut line).unwrap();
+    assert!(line.contains("\"ok\":true"), "{line}");
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
+fn socket_bind_replaces_a_dead_socket() {
+    let path = temp_sock("dead");
+    drop(std::os::unix::net::UnixListener::bind(&path).unwrap());
+    assert!(path.exists());
+    assert!(bind(&path).is_ok());
+    let _ = std::fs::remove_dir_all(path.parent().unwrap());
+}
+
+#[test]
 fn socket_listener_serves_a_real_client() {
     let path = temp_sock("real");
     // A stale file from a crashed run is replaced.

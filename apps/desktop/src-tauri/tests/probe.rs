@@ -136,6 +136,25 @@ impl Rig {
         }
     }
 
+    /// How many frames carrying exactly `payload` the fake received.
+    fn count_sent(&self, payload: &[u8]) -> usize {
+        self.log
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, p)| p == payload)
+            .count()
+    }
+
+    /// Polls `cond` until it holds (10 s at most).
+    fn wait_until(&self, cond: impl Fn() -> bool) {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !cond() {
+            assert!(Instant::now() < deadline, "condition not met in time");
+            std::thread::sleep(Duration::from_millis(2));
+        }
+    }
+
     fn sent_count(&self) -> usize {
         self.log.lock().unwrap().len()
     }
@@ -281,23 +300,11 @@ fn a_proven_function_does_not_unlock_its_typed_set() {
     rig.state_until(|s| s.proven.contains(&(Table::T1, 0xD2)));
 
     // The handshake reads volume too, so count the GETs sent after the SET.
-    let volume_gets = || {
-        rig.log
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|(_, p)| p == &[0xA6, 0x20])
-            .count()
-    };
-    let before = volume_gets();
+    let before = rig.count_sent(&[0xA6, 0x20]);
     rig.tx.send(BrokerCmd::SetTouchPanel(false)).unwrap();
     // A GET sent after it: once it is on the wire, an accepted SET would be too.
     rig.tx.send(user_get()).unwrap();
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while volume_gets() == before {
-        assert!(Instant::now() < deadline, "the GET never went out");
-        std::thread::sleep(Duration::from_millis(5));
-    }
+    rig.wait_until(|| rig.count_sent(&[0xA6, 0x20]) > before);
     let log = rig.stop();
     assert!(
         !log.lock().unwrap().iter().any(|(_, p)| p[0] == 0xD8),
@@ -366,7 +373,7 @@ fn probe_ends_when_the_link_drops() {
 }
 
 #[test]
-fn probe_refused_until_connected_and_enabled() {
+fn probe_refused_until_connected_enabled_and_confirmed() {
     let off = AppSettings::default();
     let on = AppSettings {
         show_advanced: true,
@@ -377,14 +384,20 @@ fn probe_refused_until_connected_and_enabled() {
         ..DeviceState::default()
     };
     assert_eq!(
-        probe_allowed(&off, &connected),
+        probe_allowed(&off, &connected, "RUN"),
         Err("enable the Advanced panel in Settings first".to_string())
     );
     assert_eq!(
-        probe_allowed(&on, &DeviceState::default()),
+        probe_allowed(&on, &DeviceState::default(), "RUN"),
         Err("not connected".to_string())
     );
-    assert_eq!(probe_allowed(&on, &connected), Ok(()));
+    for wrong in ["", "run", "RUN "] {
+        assert_eq!(
+            probe_allowed(&on, &connected, wrong),
+            Err("type RUN to start the probe".to_string())
+        );
+    }
+    assert_eq!(probe_allowed(&on, &connected, "RUN"), Ok(()));
 }
 
 #[test]
@@ -489,10 +502,14 @@ fn probe_stop_recalls_a_get_still_queued() {
         ProbeRunner::with_timing(100, 5).with_points(t2_32_02()),
         &dir,
     );
+    // The handshake reads volume too; count from here.
+    let before = rig.count_sent(&[0xA6, 0x20]);
     rig.tx.send(user_get()).unwrap();
     rig.tx.send(BrokerCmd::ProbeStart).unwrap();
-    // The probe GET is queued behind the held user GET when Stop arrives.
-    std::thread::sleep(Duration::from_millis(100));
+    // The probe queues its GET as it starts, behind the user GET, whose ACK
+    // the fake holds back; Stop once both have happened.
+    rig.probe_until(|e| e.state == ProbeState::Running);
+    rig.wait_until(|| rig.count_sent(&[0xA6, 0x20]) > before);
     rig.tx.send(BrokerCmd::ProbeStop).unwrap();
     let done = rig
         .probe_until(|e| e.state == ProbeState::Done)

@@ -70,7 +70,7 @@ Settings has an "Advanced panel" switch; turning it on adds the Advanced screen.
 
 ## Probe
 
-The probe, on the Advanced screen, walks the read-only requests of the protocol to find functions the headphones answer but do not declare. It sends 46 GET opcodes, 441 requests in all, one at a time, waiting 1.5 s for a reply and 150 ms between requests. That is about 13 minutes. You start it by typing `RUN`, and Stop ends it at any time. It never sends a SET.
+The probe, on the Advanced screen, walks the read-only requests of the protocol to find functions the headphones answer but do not declare. It sends 46 GET opcodes, 441 requests in all, one at a time, waiting 1.5 s for a reply and 150 ms between requests. That is up to about 13 minutes (less when requests are answered). You start it by typing `RUN`, and Stop ends it at any time. It never sends a SET.
 
 Results go to `~/Library/Logs/com.drake0306.hairline/captures/probe-<secs>.json`. A function that answered although the headphones did not declare it becomes "proven" for this unit and is remembered in `devices/<address>.json`. Hairline may then read it, but never changes it. Two reads are left out: reset settings, and the LE Audio identity key (its reply is a pairing secret). The catalogue is in `crates/mdr-proto/src/probe.rs`.
 
@@ -80,10 +80,11 @@ While the headphones are connected, Hairline records the battery level to `batte
 
 ## Command line
 
-While Hairline runs, it listens on a local socket, `hairline.sock`, in the app's data directory (`~/Library/Application Support/com.drake0306.hairline/` on macOS). The protocol is JSON lines, and the commands are state, set, scene, scenes and battery. The socket has no raw, power or probe command. `hairlinectl` (crate `crates/mdr-cli`) talks to it:
+While Hairline runs, it listens on a local socket, `hairline.sock`, in the app's config directory, next to `settings.json` (on macOS that is the same as the data directory, `~/Library/Application Support/com.drake0306.hairline/`). The protocol is JSON lines, and the commands are state, set, scene, scenes and battery. The socket has no raw, power or probe command. `hairlinectl` (crate `crates/mdr-cli`) talks to it. Install it once, then use it from any terminal:
 
 ```
-cargo run -p mdr-cli --bin hairlinectl -- state
+cargo install --path crates/mdr-cli
+hairlinectl state
 hairlinectl nc ambient --level 12 --voice on
 hairlinectl ult 2
 hairlinectl volume 20

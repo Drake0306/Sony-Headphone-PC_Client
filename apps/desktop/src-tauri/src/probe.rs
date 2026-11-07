@@ -85,12 +85,22 @@ pub struct ProbeEvent {
     pub gap_ms: u64,
 }
 
-/// The probe may run only with the Advanced panel enabled and the
-/// headphones connected.
-pub fn probe_allowed(settings: &AppSettings, state: &DeviceState) -> Result<(), String> {
+/// The word the Advanced panel asks for before the probe runs.
+pub const PROBE_CONFIRMATION: &str = "RUN";
+
+/// The probe may run only with the Advanced panel enabled, the headphones
+/// connected, and `confirm` exactly `RUN`.
+pub fn probe_allowed(
+    settings: &AppSettings,
+    state: &DeviceState,
+    confirm: &str,
+) -> Result<(), String> {
     raw_allowed(settings)?;
     if !state.connected {
         return Err("not connected".into());
+    }
+    if confirm != PROBE_CONFIRMATION {
+        return Err("type RUN to start the probe".into());
     }
     Ok(())
 }
@@ -190,7 +200,7 @@ impl ProbeRunner {
     /// the session is recalled; one already on the wire cannot be.
     pub fn stop(&mut self, session: Option<&mut Session>) {
         if let (Some(c), Some(session)) = (self.current, session) {
-            session.cancel_queued_raw(c.point.table, &c.point.bytes());
+            session.cancel_queued_probe(c.point.table, &c.point.bytes());
         }
         self.queue.clear();
         self.current = None;
@@ -204,7 +214,7 @@ impl ProbeRunner {
             return;
         };
         let bytes = c.point.bytes();
-        if session.in_flight() == Some((c.point.table, &bytes[..], Group::Raw)) {
+        if session.in_flight() == Some((c.point.table, &bytes[..], Group::Probe)) {
             c.on_wire_at = Some(now_ms);
         }
     }
@@ -244,7 +254,7 @@ impl ProbeRunner {
                 return Step::Waiting;
             }
             if c.on_wire_at.is_none() {
-                session.cancel_queued_raw(c.point.table, &c.point.bytes());
+                session.cancel_queued_probe(c.point.table, &c.point.bytes());
             }
             self.record(c.point, None, session.state());
             self.next_at = now_ms + self.gap_ms;
@@ -267,7 +277,7 @@ impl ProbeRunner {
             table: point.table,
             bytes,
             capability: None,
-            group: Group::Raw,
+            group: Group::Probe,
         }) {
             Ok(()) => {
                 self.current = Some(Current {

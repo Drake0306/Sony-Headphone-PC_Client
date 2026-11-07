@@ -195,7 +195,7 @@ describe("Advanced", () => {
       await fireEvent.input(confirm, { target: { value: "RUN" } });
       expect(run()).not.toHaveClass("unavailable");
       await fireEvent.click(run());
-      expect(calls("probe_start")).toHaveLength(1);
+      expect(calls("probe_start")).toEqual([{ confirm: "RUN" }]);
     });
 
     it("shows the size and worst-case time before a run", async () => {

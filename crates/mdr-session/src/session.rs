@@ -78,7 +78,7 @@ fn refetch(group: Group) -> Option<Request> {
         Group::QuickAccess => Some(request::quick_access_get()),
         Group::VoiceGuide => Some(request::voice_guide_volume_get()),
         Group::Playback => Some(request::playback_status_get()),
-        Group::Connect | Group::Codec | Group::Power | Group::Raw => None,
+        Group::Connect | Group::Codec | Group::Power | Group::Raw | Group::Probe => None,
     }
 }
 
@@ -331,11 +331,11 @@ impl Session {
         self.arq.in_flight()
     }
 
-    /// Drops a queued `Group::Raw` request with exactly this payload before
-    /// it reaches the wire (one already sent cannot be recalled); true if
-    /// one was dropped.
-    pub fn cancel_queued_raw(&mut self, table: Table, payload: &[u8]) -> bool {
-        self.arq.cancel_queued_raw(table, payload)
+    /// Drops a queued `Group::Probe` request with exactly this payload
+    /// before it reaches the wire (one already sent cannot be recalled);
+    /// true if one was dropped.
+    pub fn cancel_queued_probe(&mut self, table: Table, payload: &[u8]) -> bool {
+        self.arq.cancel_queued_probe(table, payload)
     }
 
     /// Allows GETs for a function the device answers but does not declare.

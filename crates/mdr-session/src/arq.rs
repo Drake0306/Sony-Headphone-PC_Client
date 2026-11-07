@@ -115,11 +115,13 @@ impl Arq {
         Some((f.table, &f.payload, f.group))
     }
 
-    /// Drops the first queued (not yet handed out) `Group::Raw` request
+    /// Drops the first queued (not yet handed out) `Group::Probe` request
     /// with exactly this payload; true if one was dropped.
-    pub fn cancel_queued_raw(&mut self, table: Table, payload: &[u8]) -> bool {
+    pub fn cancel_queued_probe(&mut self, table: Table, payload: &[u8]) -> bool {
         let found = self.queue.iter().position(|o| {
-            o.request.group == Group::Raw && o.request.table == table && o.request.bytes == payload
+            o.request.group == Group::Probe
+                && o.request.table == table
+                && o.request.bytes == payload
         });
         found.and_then(|i| self.queue.remove(i)).is_some()
     }

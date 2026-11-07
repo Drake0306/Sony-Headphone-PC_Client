@@ -106,10 +106,11 @@ export const onFrames = (handler: (frames: FrameEntry[]) => void): Promise<Unlis
   listen<FrameEntry[]>("frames", (event) => handler(event.payload));
 
 /**
- * Starts the opcode probe; rejects unless the Advanced panel is on and the
- * headphones are connected. Progress and results arrive as "probe" events.
+ * Starts the opcode probe; rejects unless the Advanced panel is on, the
+ * headphones are connected and `confirm === "RUN"`. Progress and results
+ * arrive as "probe" events.
  */
-export const probeStart = () => invoke<null>("probe_start");
+export const probeStart = (confirm: string) => invoke<null>("probe_start", { confirm });
 
 /** Stops the probe; the results so far are kept and emitted. */
 export const probeStop = () => invoke<null>("probe_stop");

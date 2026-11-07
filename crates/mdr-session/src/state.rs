@@ -271,6 +271,7 @@ impl DeviceState {
             | Group::Connect
             | Group::Power
             | Group::Raw
+            | Group::Probe
             | Group::Playback => return None,
         })
     }

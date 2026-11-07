@@ -129,7 +129,7 @@
   function runProbe() {
     if (!canRun) return;
     probeError = null;
-    probeStart()
+    probeStart(probeConfirm)
       .then(() => (probeConfirm = ""))
       .catch((e) => (probeError = errText(e)));
   }

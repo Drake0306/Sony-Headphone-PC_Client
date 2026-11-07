@@ -111,7 +111,7 @@ Run with the real headphones connected. Use `HAIRLINE_FRAME_LOG=1` if you also w
 - [ ] Raw GET `66 17` (T1) returns a RET in the log, and it is sent without typing SEND.
 - [ ] Raw SET on a declared function, for example volume `A8 20 <n>`: it is refused until `SEND` is typed, and the NTFY in the log confirms the change.
 - [ ] A deny-listed raw (`24 03 01`) is refused even with `SEND`.
-- [ ] Run the probe to completion (about 13 minutes, type `RUN`). Record how many functions answered and how many became proven, and attach the `~/Library/Logs/com.drake0306.hairline/captures/probe-<secs>.json` summary. Check `devices/<address>.json` lists the proven functions.
+- [ ] Run the probe to completion (up to about 13 minutes, type `RUN`). Record how many functions answered and how many became proven, and attach the `~/Library/Logs/com.drake0306.hairline/captures/probe-<secs>.json` summary. Check `devices/<address>.json` lists the proven functions.
 - [ ] Time left appears after an hour of listening (30 minutes and a 2 % drop at least), and Clear in Settings empties it.
 - [ ] From a terminal, `hairlinectl state` and `hairlinectl battery` print the same values as the window.
 - [ ] `hairlinectl volume 31` is refused with the same text as the window.

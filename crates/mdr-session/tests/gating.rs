@@ -162,24 +162,63 @@ fn in_flight_shows_the_request_on_the_wire() {
     );
 }
 
+fn probe(bytes: &[u8]) -> Request {
+    Request {
+        group: Group::Probe,
+        ..raw(bytes)
+    }
+}
+
 #[test]
-fn cancel_queued_raw_drops_only_a_queued_raw_request() {
+fn cancel_queued_probe_drops_only_a_queued_probe_request() {
     let mut s = connected_session();
-    s.request(raw(&[0x22, 0x00])).unwrap();
+    s.request(probe(&[0x22, 0x00])).unwrap();
     s.request(raw(&[0xF6, 0x04])).unwrap();
+    s.request(probe(&[0xF6, 0x04])).unwrap();
     s.request(request::battery_get()).unwrap();
     let first = drain(&mut s, 500);
     assert_eq!(first.len(), 1);
-    // In flight: not cancelled. Queued raw: cancelled. Tracked GET with the same bytes: kept.
-    assert!(!s.cancel_queued_raw(Table::T1, &[0x22, 0x00]));
-    assert!(s.cancel_queued_raw(Table::T1, &[0xF6, 0x04]));
-    assert!(!s.cancel_queued_raw(Table::T1, &[0xF6, 0x04]));
+    // In flight: not cancelled. Queued probe: cancelled. A user raw request
+    // with the same bytes, and a tracked GET: kept.
+    assert!(!s.cancel_queued_probe(Table::T1, &[0x22, 0x00]));
+    assert!(s.cancel_queued_probe(Table::T1, &[0xF6, 0x04]));
+    assert!(!s.cancel_queued_probe(Table::T1, &[0xF6, 0x04]));
     s.handle_input(
         &frame(mdr_frame::FrameType::Ack, 1 - seq_of(&first[0]), &[]),
         510,
     );
     let next = drain(&mut s, 520);
-    assert_eq!(decode_payload(&next[0]), request::battery_get().bytes);
+    assert_eq!(decode_payload(&next[0]), [0xF6, 0x04]);
+    s.handle_input(
+        &frame(mdr_frame::FrameType::Ack, 1 - seq_of(&next[0]), &[]),
+        530,
+    );
+    let last = drain(&mut s, 540);
+    assert_eq!(decode_payload(&last[0]), request::battery_get().bytes);
+}
+
+#[test]
+fn probe_reply_is_a_payload_not_a_raw_reply_log() {
+    let mut s = connected_session();
+    s.request(probe(&[0x22, 0x00])).unwrap();
+    let req = drain(&mut s, 500).pop().unwrap();
+    s.handle_input(
+        &frame(mdr_frame::FrameType::Ack, 1 - seq_of(&req), &[]),
+        510,
+    );
+    let ev = s.handle_input(
+        &frame(mdr_frame::FrameType::Command1, 1, &[0x23, 0x00, 0x43, 0x00]),
+        520,
+    );
+    assert!(ev.contains(&Event::Payload {
+        table: Table::T1,
+        bytes: vec![0x23, 0x00, 0x43, 0x00],
+    }));
+    assert!(
+        !ev.iter()
+            .any(|e| matches!(e, Event::Log(m) if m.starts_with("raw reply"))),
+        "{ev:?}"
+    );
 }
 
 #[test]

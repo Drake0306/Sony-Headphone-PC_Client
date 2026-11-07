@@ -182,6 +182,8 @@ mod unix {
 
     /// An idle client is dropped after this long, freeing its thread.
     pub const IDLE_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+    /// Wait after a failed accept before trying again.
+    const ACCEPT_BACKOFF: Duration = Duration::from_millis(50);
 
     /// Listens on `path`, made readable and writable by this user only. A
     /// socket another Hairline still answers on is left alone (an error); a
@@ -210,7 +212,11 @@ mod unix {
     /// Accepts connections forever, one thread each.
     pub fn serve(listener: UnixListener, ctx: Arc<dyn SocketContext + Send + Sync>) {
         for stream in listener.incoming() {
-            let Ok(stream) = stream else { continue };
+            let Ok(stream) = stream else {
+                // Out of descriptors, say: back off instead of spinning.
+                std::thread::sleep(ACCEPT_BACKOFF);
+                continue;
+            };
             let ctx = ctx.clone();
             let _ = std::thread::Builder::new()
                 .name("hairline-socket".into())

@@ -309,6 +309,33 @@ pub fn send_raw(
     broker.send(raw_command(&table, &hex, &confirm)?)
 }
 
+/// Starts the opcode probe (read-only GETs, one at a time). Refused unless
+/// the Advanced panel is enabled and the headphones are connected; progress
+/// and results arrive as `"probe"` events.
+#[tauri::command]
+pub fn probe_start(
+    broker: State<'_, Broker>,
+    settings: State<'_, Mutex<settings::AppSettings>>,
+    state: State<'_, Mutex<DeviceState>>,
+) -> Result<(), String> {
+    let current = settings
+        .lock()
+        .map(|s| s.clone())
+        .map_err(|_| "settings unavailable".to_string())?;
+    let device = state
+        .lock()
+        .map(|s| s.clone())
+        .map_err(|_| "state unavailable".to_string())?;
+    crate::probe::probe_allowed(&current, &device)?;
+    broker.send(BrokerCmd::ProbeStart)
+}
+
+/// Stops the probe; the results so far are kept, saved and emitted.
+#[tauri::command]
+pub fn probe_stop(broker: State<'_, Broker>) -> Result<(), String> {
+    broker.send(BrokerCmd::ProbeStop)
+}
+
 #[cfg(test)]
 mod tests {
     use super::check_bands;

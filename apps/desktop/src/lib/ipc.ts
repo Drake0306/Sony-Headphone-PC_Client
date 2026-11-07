@@ -3,7 +3,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { CapabilityRow, FrameEntry, RecordingEvent } from "./advanced";
+import type { CapabilityRow, FrameEntry, ProbeEvent, RecordingEvent } from "./advanced";
 import type { Scene, ScenesEvent } from "./scenes";
 import type { AppSettings, DeviceState, RuntimeInfo } from "./state";
 
@@ -97,6 +97,18 @@ export const sendRaw = (table: "t1" | "t2", hex: string, confirm: string) =>
 
 export const onFrames = (handler: (frames: FrameEntry[]) => void): Promise<UnlistenFn> =>
   listen<FrameEntry[]>("frames", (event) => handler(event.payload));
+
+/**
+ * Starts the opcode probe; rejects unless the Advanced panel is on and the
+ * headphones are connected. Progress and results arrive as "probe" events.
+ */
+export const probeStart = () => invoke<null>("probe_start");
+
+/** Stops the probe; the results so far are kept and emitted. */
+export const probeStop = () => invoke<null>("probe_stop");
+
+export const onProbe = (handler: (e: ProbeEvent) => void): Promise<UnlistenFn> =>
+  listen<ProbeEvent>("probe", (event) => handler(event.payload));
 
 export const onRecording = (handler: (e: RecordingEvent) => void): Promise<UnlistenFn> =>
   listen<RecordingEvent>("recording", (event) => handler(event.payload));

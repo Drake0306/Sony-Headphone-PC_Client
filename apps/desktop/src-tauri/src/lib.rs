@@ -9,6 +9,7 @@ pub mod frame_log;
 pub mod frame_ring;
 pub mod hotkeys;
 mod popover;
+pub mod probe;
 pub mod scenes;
 mod sensors_macos;
 pub mod settings;
@@ -69,6 +70,8 @@ pub fn run() {
             commands::watch_frames,
             commands::record_frames,
             commands::send_raw,
+            commands::probe_start,
+            commands::probe_stop,
             settings::get_settings,
             settings::set_settings,
         ])

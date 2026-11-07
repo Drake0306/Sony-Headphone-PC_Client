@@ -18,6 +18,7 @@ vi.mock("@tauri-apps/api/core", () => ({
       setTimeout(() => backend.handlers.recording?.({ payload: { path } }), 0);
       return path;
     }
+    if (cmd === "probe_start" || cmd === "probe_stop") return null;
     if (cmd === "send_raw") {
       if (args.hex?.startsWith("58") && args.confirm !== "SEND") throw "type SEND to send a SET";
       return null;
@@ -34,7 +35,7 @@ vi.mock("@tauri-apps/api/event", () => ({
 }));
 
 import { invoke } from "@tauri-apps/api/core";
-import { emptyState } from "../lib/state";
+import { emptyState, type DeviceState } from "../lib/state";
 import Advanced from "./Advanced.svelte";
 
 const calls = (cmd: string) => vi.mocked(invoke).mock.calls.filter(([c]) => c === cmd).map(([, a]) => a);
@@ -157,5 +158,97 @@ describe("Advanced", () => {
     expect(calls("capability_list")).toHaveLength(1);
     await r.rerender({ st: { ...st, connected: true, model: "ULT WEAR" } });
     await waitFor(() => expect(calls("capability_list")).toHaveLength(2));
+  });
+
+  describe("probe", () => {
+    const connected = (): DeviceState => ({ ...emptyState(), connected: true, model: "ULT WEAR" });
+    const probeEvent = (payload: unknown) => backend.handlers.probe?.({ payload });
+
+    it("runs only when connected and RUN is typed", async () => {
+      const r = render(Advanced, { st: emptyState() });
+      const run = () => r.getByText("Run", { selector: "button" });
+      const confirm = r.getByPlaceholderText("type RUN");
+      expect(r.getByText("The probe sends read-only GET requests one at a time. Type RUN.")).toBeInTheDocument();
+      await fireEvent.input(confirm, { target: { value: "RUN" } });
+      expect(run()).toHaveClass("unavailable");
+      await fireEvent.click(run());
+      expect(calls("probe_start")).toHaveLength(0);
+
+      await r.rerender({ st: connected() });
+      await fireEvent.input(confirm, { target: { value: "run" } });
+      expect(run()).toHaveClass("unavailable");
+      await fireEvent.click(run());
+      expect(calls("probe_start")).toHaveLength(0);
+      await fireEvent.input(confirm, { target: { value: "RUN" } });
+      expect(run()).not.toHaveClass("unavailable");
+      await fireEvent.click(run());
+      expect(calls("probe_start")).toHaveLength(1);
+    });
+
+    it("shows progress, Stop, then the results and the file", async () => {
+      const r = render(Advanced, { st: connected() });
+      await waitFor(() => expect(backend.handlers.probe).toBeDefined());
+      probeEvent({
+        state: "Running",
+        done: 1,
+        total: 3,
+        file: null,
+        results: [
+          {
+            table: "T1",
+            opcode: 0x22,
+            inquired: 0x00,
+            name: "POWER_GET_STATUS",
+            function: 0x20,
+            function_name: "Battery level indicator",
+            reply: [0x23, 0x00, 0x43, 0x00],
+            declared: true,
+            proven: false,
+          },
+        ],
+      });
+      await waitFor(() => expect(r.getByText("1 / 3")).toBeInTheDocument());
+      expect(r.queryByText("Run", { selector: "button" })).toBeNull();
+      await fireEvent.click(r.getByText("Stop", { selector: ".probe button" }));
+      expect(calls("probe_stop")).toHaveLength(1);
+
+      probeEvent({
+        state: "Done",
+        done: 2,
+        total: 3,
+        file: "/captures/local/probe-1.json",
+        results: [
+          {
+            table: "T1",
+            opcode: 0x22,
+            inquired: 0x00,
+            name: "POWER_GET_STATUS",
+            function: 0x20,
+            function_name: "Battery level indicator",
+            reply: [0x23, 0x00, 0x43, 0x00],
+            declared: true,
+            proven: false,
+          },
+          {
+            table: "T2",
+            opcode: 0x32,
+            inquired: 0x02,
+            name: "PERI_GET_STATUS",
+            function: 0x32,
+            function_name: null,
+            reply: [0x33, 0x02, 0x00, 0x01],
+            declared: false,
+            proven: true,
+          },
+        ],
+      });
+      await waitFor(() => expect(r.getByText("/captures/local/probe-1.json")).toBeInTheDocument());
+      const proven = r.getByText("T2 32:02").closest("div")!;
+      expect(proven.textContent).toContain("PERI_GET_STATUS");
+      expect(proven.textContent).toContain("PROVEN");
+      expect(proven.textContent).toContain("33 02 00 01");
+      expect(r.getByText("T1 22:00").closest("div")!.textContent).toContain("DECLARED");
+      expect(r.getByText("Run", { selector: "button" })).toBeInTheDocument();
+    });
   });
 });

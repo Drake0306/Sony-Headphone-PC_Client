@@ -120,6 +120,111 @@ fn t2_role(op: u8) -> Role {
     }
 }
 
+/// The support function (libmdr `FunctionType`) that a GET of `opcode` with
+/// `inquired` reads, or `None` when it reads none we can name.
+///
+/// Rule: an answered GET proves a function only when its inquired type and a
+/// `FunctionType` carry the same libmdr name within the opcode's group (both
+/// enums are in `ProtocolV2T1.hpp` / `ProtocolV2T2.hpp`; `FunctionType` is
+/// in `ProtocolV2.hpp`). The pairs the session already sends agree (battery
+/// `22 00` → `20`, NC/ASM `66 17` → `6B`, volume `A6 20` → `A1`, voice
+/// guidance volume T2 `46 20` → `42`, ...). Connect reads, inquired types
+/// without a same-named function (T1 power `07` link control, NC/ASM `30`
+/// and `40`, play `40`) and opcodes that are not GETs prove nothing.
+pub fn for_opcode(table: Table, opcode: u8, inquired: Option<u8>) -> Option<u8> {
+    if opcode_role(table, opcode) != Role::Get {
+        return None;
+    }
+    let i = inquired?;
+    match table {
+        Table::T1 => t1_function(opcode & 0xF0, i),
+        Table::T2 => t2_function(opcode & 0xF0, i),
+    }
+}
+
+fn t1_function(group: u8, i: u8) -> Option<u8> {
+    Some(match (group, i) {
+        // COMMON: concierge, connection status, codec, upscaling, BLE setup;
+        // then connection time, special mode, device info, tandem, display fw.
+        (0x10, 0x00..=0x04) => 0x10 + i,
+        (0x10, 0x05) => 0x16,
+        (0x10, 0x06) => 0x18,
+        (0x10, 0x07) => 0x19,
+        (0x10, 0x08) => 0x1A,
+        (0x10, 0x09) => 0x1B,
+        // POWER: battery 20 .. touch panel backlight 2F (07 link control has no match).
+        (0x20, 0x00..=0x06 | 0x08..=0x0F) => 0x20 + i,
+        // EQEBB.
+        (0x50, 0x00..=0x03) => 0x50 + i,
+        (0x50, 0x04) => 0x57,
+        (0x50, 0x30) => 0x54,
+        (0x50, 0x31) => 0x55,
+        (0x50, 0x32) => 0x56,
+        (0x50, 0x33..=0x36) => 0x59,
+        (0x50, 0x40) => 0x58,
+        // NCASM.
+        (0x60, 0x01) => 0x61,
+        (0x60, 0x11) => 0x62,
+        (0x60, 0x12) => 0x63,
+        (0x60, 0x13) => 0x64,
+        (0x60, 0x14) => 0x65,
+        (0x60, 0x15) => 0x68,
+        (0x60, 0x16) => 0x6A,
+        (0x60, 0x17) => 0x6B,
+        (0x60, 0x18) => 0x6C,
+        (0x60, 0x19) => 0x6D,
+        (0x60, 0x21) => 0x66,
+        (0x60, 0x22) => 0x67,
+        // PLAY: playback controllers; volume belongs to the call-volume one.
+        (0xA0, 0x01) => 0xA1,
+        (0xA0, 0x02) => 0xA3,
+        (0xA0, 0x03) => 0xA4,
+        (0xA0, 0x20 | 0x21) => 0xA1,
+        (0xA0, 0x30 | 0x31) => 0xA2,
+        // GENERAL SETTING: the inquired type is the function id.
+        (0xD0, 0xD1..=0xD4) => i,
+        // AUDIO.
+        (0xE0, 0x00..=0x04) => 0xE1 + i,
+        (0xE0, 0x05..=0x0B) => 0xE2 + i,
+        // SYSTEM: vibrator F0 .. head gesture FF (training shares FF).
+        (0xF0, 0x00..=0x0F) => 0xF0 + i,
+        (0xF0, 0x10) => 0xFF,
+        _ => return None,
+    })
+}
+
+fn t2_function(group: u8, i: u8) -> Option<u8> {
+    Some(match (group, i) {
+        // POWER: auto standby, caring charge, USB submersion.
+        (0x20, 0x00) => 0x20,
+        (0x20, 0x01) => 0x22,
+        (0x20, 0x02) => 0x23,
+        // PERI.
+        (0x30, 0x00..=0x02) => 0x30 + i,
+        (0x30, 0x03) => 0x34,
+        // VOICE GUIDANCE.
+        (0x40, 0x00) => 0x40,
+        (0x40, 0x01) => 0x41,
+        (0x40, 0x02) => 0x44,
+        (0x40, 0x03) => 0x45,
+        (0x40, 0x20) => 0x42,
+        (0x40, 0x21) => 0x43,
+        (0x40, 0x30..=0x32) => 0x16 + i,
+        // SAFE LISTENING.
+        (0x50, 0x00..=0x05) => 0x50 + i,
+        // LEA.
+        (0x60, 0x00..=0x04) => 0x60 + i,
+        (0x60, 0xFE) => 0x6F,
+        // PARTY.
+        (0x70, 0x00..=0x05) => 0x70 + i,
+        // SYSTEM: wearing status checker F0 .. setup-link voice assistant FD,
+        // default lighting colour FE.
+        (0xF0, 0x00..=0x0F) => 0xF0 + i,
+        (0xF0, 0x10 | 0x11) => 0xFE,
+        _ => return None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,5 +285,43 @@ mod tests {
         for op in [0x50, 0x51, 0x52, 0x49, 0x3A, 0x64, 0x12] {
             assert_eq!(opcode_role(Table::T2, op), Role::Unknown, "T2 {op:#04X}");
         }
+    }
+
+    #[test]
+    fn for_opcode_maps_inquired_types_to_function_types() {
+        // The pairs the session already uses (request.rs).
+        assert_eq!(for_opcode(Table::T1, 0x22, Some(0x00)), Some(0x20));
+        assert_eq!(for_opcode(Table::T1, 0x26, Some(0x05)), Some(0x25));
+        assert_eq!(for_opcode(Table::T1, 0x12, Some(0x02)), Some(0x12));
+        assert_eq!(for_opcode(Table::T1, 0x12, Some(0x03)), Some(0x13));
+        assert_eq!(for_opcode(Table::T1, 0x56, Some(0x03)), Some(0x53));
+        assert_eq!(for_opcode(Table::T1, 0x66, Some(0x17)), Some(0x6B));
+        assert_eq!(for_opcode(Table::T1, 0xA6, Some(0x20)), Some(0xA1));
+        assert_eq!(for_opcode(Table::T1, 0xA2, Some(0x01)), Some(0xA1));
+        assert_eq!(for_opcode(Table::T1, 0xD6, Some(0xD2)), Some(0xD2));
+        assert_eq!(for_opcode(Table::T1, 0xE6, Some(0x01)), Some(0xE2));
+        assert_eq!(for_opcode(Table::T1, 0xE6, Some(0x02)), Some(0xE3));
+        assert_eq!(for_opcode(Table::T1, 0xF6, Some(0x01)), Some(0xF1));
+        assert_eq!(for_opcode(Table::T1, 0xF6, Some(0x04)), Some(0xF4));
+        assert_eq!(for_opcode(Table::T1, 0xFA, Some(0x0D)), Some(0xFD));
+        assert_eq!(for_opcode(Table::T2, 0x46, Some(0x20)), Some(0x42));
+        // Others by libmdr name.
+        assert_eq!(for_opcode(Table::T1, 0x10, Some(0x05)), Some(0x16));
+        assert_eq!(for_opcode(Table::T1, 0x50, Some(0x40)), Some(0x58));
+        assert_eq!(for_opcode(Table::T1, 0xE2, Some(0x05)), Some(0xE7));
+        assert_eq!(for_opcode(Table::T1, 0xF6, Some(0x10)), Some(0xFF));
+        assert_eq!(for_opcode(Table::T2, 0x32, Some(0x02)), Some(0x32));
+        assert_eq!(for_opcode(Table::T2, 0x32, Some(0x03)), Some(0x34));
+        assert_eq!(for_opcode(Table::T2, 0x22, Some(0x01)), Some(0x22));
+        assert_eq!(for_opcode(Table::T2, 0x56, Some(0x05)), Some(0x55));
+        assert_eq!(for_opcode(Table::T2, 0x60, Some(0xFE)), Some(0x6F));
+        assert_eq!(for_opcode(Table::T2, 0xF6, Some(0x11)), Some(0xFE));
+        // Nothing to prove: connect reads, unmatched names, no inquired byte, not a GET.
+        assert_eq!(for_opcode(Table::T1, 0x04, Some(0x01)), None);
+        assert_eq!(for_opcode(Table::T1, 0x26, Some(0x07)), None);
+        assert_eq!(for_opcode(Table::T1, 0x66, Some(0x30)), None);
+        assert_eq!(for_opcode(Table::T1, 0x22, None), None);
+        assert_eq!(for_opcode(Table::T1, 0x24, Some(0x00)), None);
+        assert_eq!(for_opcode(Table::T2, 0x48, Some(0x20)), None);
     }
 }

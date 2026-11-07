@@ -142,6 +142,11 @@ fn record_frames_creates_and_closes_a_file() {
     let dir = std::env::temp_dir().join(format!("hairline-record-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     let rig = Rig::start(Some(dir.clone()));
+    // Watching (from Rig::start) re-emits the recording state: none yet.
+    assert_eq!(
+        rig.recording.recv_timeout(Duration::from_secs(5)).unwrap(),
+        None
+    );
     rig.cmd(BrokerCmd::RecordFrames(true));
     let path = rig
         .recording
@@ -167,6 +172,30 @@ fn record_frames_creates_and_closes_a_file() {
     rig.cmd(BrokerCmd::Refresh);
     std::thread::sleep(Duration::from_millis(300));
     assert_eq!(std::fs::read_to_string(&path).unwrap(), text);
+    rig.stop();
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn watch_frames_re_emits_the_recording_state() {
+    let dir = std::env::temp_dir().join(format!("hairline-rewatch-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let rig = Rig::start(Some(dir.clone()));
+    assert_eq!(
+        rig.recording.recv_timeout(Duration::from_secs(5)).unwrap(),
+        None
+    );
+    rig.cmd(BrokerCmd::RecordFrames(true));
+    let path = rig.recording.recv_timeout(Duration::from_secs(5)).unwrap();
+    assert!(path.is_some());
+    // A remounted Advanced screen asks to watch again and learns the file.
+    rig.cmd(BrokerCmd::WatchFrames(false));
+    rig.cmd(BrokerCmd::WatchFrames(true));
+    assert_eq!(
+        rig.recording.recv_timeout(Duration::from_secs(5)).unwrap(),
+        path
+    );
+    rig.cmd(BrokerCmd::RecordFrames(false));
     rig.stop();
     std::fs::remove_dir_all(&dir).unwrap();
 }

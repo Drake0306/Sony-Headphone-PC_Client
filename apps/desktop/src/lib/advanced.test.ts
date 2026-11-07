@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { afterMark, frameLine, hexGroups, isSetOpcode, parseHex, type FrameEntry } from "./advanced";
+import {
+  afterMark,
+  canRunProbe,
+  frameLine,
+  hexGroups,
+  isSetOpcode,
+  parseHex,
+  probeChip,
+  probeRow,
+  type FrameEntry,
+  type ProbeResult,
+} from "./advanced";
 
 const entry = (t_ms: number, dir: FrameEntry["dir"], table: FrameEntry["table"], bytes: number[]): FrameEntry => ({
   t_ms,
@@ -94,5 +105,52 @@ describe("afterMark", () => {
 
   it("shows everything once the mark has left the ring", () => {
     expect(afterMark([b, c], entry(0, "Sent", "T1", [9]))).toEqual([b, c]);
+  });
+});
+
+const result = (over: Partial<ProbeResult>): ProbeResult => ({
+  table: "T1",
+  opcode: 0xf6,
+  inquired: 0x04,
+  name: "SYSTEM_GET_PARAM",
+  function: 0xf4,
+  function_name: "Voice assistant settings",
+  reply: [0xf7, 0x04, 0xff],
+  declared: true,
+  proven: false,
+  ...over,
+});
+
+describe("probe helpers", () => {
+  it("probeChip: silent, declared, proven, or nothing", () => {
+    expect(probeChip(result({ reply: null }))).toBe("SILENT");
+    expect(probeChip(result({ reply: null, declared: true }))).toBe("SILENT");
+    expect(probeChip(result({}))).toBe("DECLARED");
+    expect(probeChip(result({ declared: false, proven: true }))).toBe("PROVEN");
+    // Answered, but it maps to no function: no chip.
+    expect(probeChip(result({ declared: false, proven: false, function: null }))).toBeNull();
+  });
+
+  it("probeRow: table, opcode:inquired, name, reply hex", () => {
+    expect(probeRow(result({}))).toEqual({
+      key: "T1 F6:04",
+      name: "Voice assistant settings",
+      chip: "DECLARED",
+      reply: "F7 04 FF",
+    });
+    const t2 = probeRow(
+      result({ table: "T2", opcode: 0x32, inquired: 0x02, function_name: null, reply: null, declared: false }),
+    );
+    expect(t2).toEqual({ key: "T2 32:02", name: "SYSTEM_GET_PARAM", chip: "SILENT", reply: "" });
+    expect(probeRow(result({ inquired: null })).key).toBe("T1 F6");
+  });
+
+  it("canRunProbe: connected, RUN typed exactly, not already running", () => {
+    expect(canRunProbe(true, "RUN", "Idle")).toBe(true);
+    expect(canRunProbe(true, "RUN", "Done")).toBe(true);
+    expect(canRunProbe(false, "RUN", "Idle")).toBe(false);
+    expect(canRunProbe(true, "run", "Idle")).toBe(false);
+    expect(canRunProbe(true, " RUN", "Idle")).toBe(false);
+    expect(canRunProbe(true, "RUN", "Running")).toBe(false);
   });
 });

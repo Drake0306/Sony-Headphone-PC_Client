@@ -101,6 +101,32 @@ fn raw_request_reply_surfaces_as_log() {
 }
 
 #[test]
+fn every_device_data_frame_surfaces_as_a_payload() {
+    let mut s = connected_session();
+    s.request(Request {
+        table: Table::T2,
+        ..raw(&[0x32, 0x02])
+    })
+    .unwrap();
+    let req = drain(&mut s, 500).pop().unwrap();
+    s.handle_input(
+        &frame(mdr_frame::FrameType::Ack, 1 - seq_of(&req), &[]),
+        510,
+    );
+    let ev = s.handle_input(
+        &frame(mdr_frame::FrameType::Command2, 1, &[0x33, 0x02, 0x00, 0x01]),
+        520,
+    );
+    assert!(
+        ev.contains(&Event::Payload {
+            table: Table::T2,
+            bytes: vec![0x33, 0x02, 0x00, 0x01],
+        }),
+        "{ev:?}"
+    );
+}
+
+#[test]
 fn phase2_setters_are_gated() {
     let mut s = connected_session_with_caps(&[0x20]);
     assert_eq!(

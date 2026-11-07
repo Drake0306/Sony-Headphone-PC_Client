@@ -87,3 +87,59 @@ export function afterMark(entries: FrameEntry[], mark: FrameEntry | null): Frame
   for (let i = entries.length - 1; i >= 0; i--) if (same(entries[i], mark)) return entries.slice(i + 1);
   return entries;
 }
+
+// The opcode probe (apps/desktop/src-tauri/src/probe.rs).
+
+export type ProbeState = "Idle" | "Running" | "Done";
+
+/** `ProbeResult`: one GET the probe sent and what came back. */
+export interface ProbeResult {
+  table: TableName;
+  opcode: number;
+  inquired: number | null;
+  /** The libmdr command name. */
+  name: string;
+  /** The support function this read belongs to, if any. */
+  function: number | null;
+  function_name: string | null;
+  /** The reply payload; null when the headphones stayed silent. */
+  reply: number[] | null;
+  declared: boolean;
+  proven: boolean;
+}
+
+/** The "probe" event. */
+export interface ProbeEvent {
+  state: ProbeState;
+  done: number;
+  total: number;
+  results: ProbeResult[];
+  /** The results file, once written. */
+  file: string | null;
+}
+
+/** The word the probe asks for before it runs. */
+export const PROBE_CONFIRMATION = "RUN";
+
+/** SILENT (no reply), DECLARED, PROVEN, or null for an answer that maps to no function. */
+export function probeChip(r: ProbeResult): "SILENT" | "DECLARED" | "PROVEN" | null {
+  if (r.reply === null) return "SILENT";
+  if (r.declared) return "DECLARED";
+  if (r.proven) return "PROVEN";
+  return null;
+}
+
+/** One results line: "T1 F6:04", the function (or command) name, the chip, the reply hex. */
+export function probeRow(r: ProbeResult) {
+  const op = r.inquired === null ? byte(r.opcode) : `${byte(r.opcode)}:${byte(r.inquired)}`;
+  return {
+    key: `${r.table} ${op}`,
+    name: r.function_name ?? r.name,
+    chip: probeChip(r),
+    reply: r.reply === null ? "" : hexGroups(r.reply),
+  };
+}
+
+/** Run is offered only while connected, with RUN typed exactly, and not already running. */
+export const canRunProbe = (connected: boolean, confirm: string, state: ProbeState) =>
+  connected && confirm === PROBE_CONFIRMATION && state !== "Running";

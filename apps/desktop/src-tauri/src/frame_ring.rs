@@ -211,12 +211,14 @@ impl<'a> FrameTap<'a> {
         self.ring.reset_partial();
     }
 
-    /// Starts or stops streaming; starting emits the current snapshot at once.
+    /// Starts or stops streaming; starting emits the current snapshot and
+    /// the recording state at once (a window that just opened knows neither).
     pub fn watch(&mut self, on: bool) {
         self.watching = on;
         if on {
             (self.emit_frames)(&self.ring.snapshot());
             self.dirty = false;
+            (self.emit_recording)(self.recorder.path().as_deref());
         }
     }
 

@@ -21,6 +21,12 @@ pub enum Event {
     Connected,
     Disconnected,
     Log(String),
+    /// A data frame from the device, once (retransmits are dropped), whatever
+    /// the session made of it. The probe matches its replies on these.
+    Payload {
+        table: Table,
+        bytes: Vec<u8>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -412,6 +418,10 @@ impl Session {
     }
 
     fn dispatch(&mut self, table: Table, payload: &[u8], events: &mut Vec<Event>) {
+        events.push(Event::Payload {
+            table,
+            bytes: payload.to_vec(),
+        });
         if std::mem::take(&mut self.raw_reply_due) {
             events.push(Event::Log(format!("raw reply {table:?} {}", hex(payload))));
         }

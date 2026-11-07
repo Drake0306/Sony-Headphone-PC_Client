@@ -5,6 +5,7 @@ mod deny;
 pub mod function;
 mod message;
 pub mod opcode;
+pub mod probe;
 pub mod request;
 mod types;
 

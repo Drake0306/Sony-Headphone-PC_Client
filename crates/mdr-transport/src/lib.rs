@@ -12,7 +12,7 @@ use std::io;
 use std::time::Duration;
 
 pub use discover::{connect, discover};
-pub use fake::FakeDevice;
+pub use fake::{FakeDevice, ReceivedLog};
 
 /// SDP service UUID of the Sony MDR v2 protocol.
 pub const V2_SERVICE_UUID: &str = "956C7B26-D49A-4BA8-B03F-B17D393CB6E2";

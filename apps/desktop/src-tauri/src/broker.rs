@@ -18,6 +18,7 @@ use crate::audio_macos::current_output_device_name;
 use crate::device_record;
 use crate::frame_log;
 use crate::frame_ring::{FrameEntry, FrameTap, Recorder};
+use crate::probe::{ProbeEvent, ProbeHost, ProbeRunner};
 use crate::scenes::engine::{apply_actions, Engine};
 use crate::scenes::model::{Actions, Inputs, Scene};
 use crate::sensors_macos::{frontmost_app_name, mic_in_use};
@@ -69,6 +70,10 @@ pub enum BrokerCmd {
         bytes: Vec<u8>,
         confirmed_set: bool,
     },
+    /// Starts the opcode probe (connected only; GETs only).
+    ProbeStart,
+    /// Stops the probe, keeping the results so far.
+    ProbeStop,
 }
 
 /// The word the Advanced panel asks for before a raw SET.
@@ -222,7 +227,7 @@ pub fn run_broker<E: Fn(&DeviceState)>(
 
 /// What a connection runs with besides the transport; all optional.
 #[derive(Default)]
-pub struct BrokerContext<'a, 's, 'f> {
+pub struct BrokerContext<'a, 's, 'f, 'p> {
     /// The connected headphones as discovered: the Bluetooth name is matched
     /// against the default audio output (without it the model name is used),
     /// the address is shown in the UI and keys the device record.
@@ -233,6 +238,8 @@ pub struct BrokerContext<'a, 's, 'f> {
     pub frames: Option<&'a mut FrameTap<'f>>,
     /// The settings directory; device records live in its `devices/`.
     pub record_dir: Option<&'a Path>,
+    /// The opcode probe; handles `ProbeStart`/`ProbeStop`.
+    pub probe: Option<&'a mut ProbeHost<'p>>,
 }
 
 /// As `run_broker`, with the device, scenes, frame tap and device records
@@ -243,14 +250,23 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
     cmds: impl Borrow<Receiver<BrokerCmd>>,
     emit: E,
     mut clock: impl FnMut() -> u64,
-    ctx: BrokerContext<'_, '_, '_>,
+    ctx: BrokerContext<'_, '_, '_, '_>,
 ) -> io::Result<()> {
     let BrokerContext {
         device,
         mut scenes,
         mut frames,
         record_dir,
+        mut probe,
     } = ctx;
+    let address = device.map(|d| d.address.as_str());
+    // Ends a running probe with its partial results (Stop or a lost link).
+    // Returns true when the probe marked functions proven.
+    let end_probe = |probe: &mut Option<&mut ProbeHost<'_>>, session: &mut Session| {
+        probe
+            .as_deref_mut()
+            .is_some_and(|host| host.abort(Some(session), address, record_dir))
+    };
     let cmds = cmds.borrow();
     let device_name = device.map(|d| d.name.as_str());
     let mut session = Session::new(clock());
@@ -298,6 +314,7 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
                 tap.sent(now, &frame);
             }
             if let Err(e) = transport.write(&frame) {
+                end_probe(&mut probe, &mut session);
                 return Err(link_lost(&mut session, &emit, e));
             }
         }
@@ -311,7 +328,10 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
                 events.extend(session.handle_input(&bytes, now));
             }
             Ok(None) => {}
-            Err(e) => return Err(link_lost(&mut session, &emit, e)),
+            Err(e) => {
+                end_probe(&mut probe, &mut session);
+                return Err(link_lost(&mut session, &emit, e));
+            }
         }
         let now = clock();
         if session.next_timeout_ms().is_some_and(|t| now >= t) {
@@ -321,6 +341,7 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
         loop {
             match cmds.try_recv() {
                 Ok(BrokerCmd::Disconnect) | Err(TryRecvError::Disconnected) => {
+                    end_probe(&mut probe, &mut session);
                     transport.close();
                     session.mark_disconnected();
                     emit(session.state());
@@ -344,7 +365,18 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
                     if let Some(tap) = frames.as_deref_mut() {
                         tap.watch(on);
                     }
+                    if let (true, Some(host)) = (on, probe.as_deref()) {
+                        host.emit_current();
+                    }
                 }
+                Ok(BrokerCmd::ProbeStart) => {
+                    if let Some(host) = probe.as_deref_mut() {
+                        if let Some(why) = host.start(&session, clock()) {
+                            events.push(Event::Log(why));
+                        }
+                    }
+                }
+                Ok(BrokerCmd::ProbeStop) => changed |= end_probe(&mut probe, &mut session),
                 Ok(BrokerCmd::RecordFrames(on)) => {
                     if let Some(tap) = frames.as_deref_mut() {
                         tap.record(on);
@@ -379,6 +411,10 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
             }
         }
 
+        if let Some(host) = probe.as_deref_mut() {
+            changed |= host.step(&mut session, &events, clock(), address, record_dir);
+        }
+
         let mut gave_up = false;
         for event in &events {
             match event {
@@ -393,6 +429,7 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
                         tap.note(clock(), msg);
                     }
                 }
+                Event::Payload { .. } => {}
             }
         }
         if changed {
@@ -402,6 +439,7 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
             tap.flush();
         }
         if gave_up {
+            end_probe(&mut probe, &mut session);
             transport.close();
             return Err(io::Error::new(
                 io::ErrorKind::TimedOut,
@@ -441,11 +479,13 @@ fn apply(session: &mut Session, cmd: BrokerCmd) -> Result<(), SessionError> {
             session.request(request::ncasm_get())?;
             session.request(request::eq_ult_get())
         }
-        // Already connected, or handled by the frame tap; nothing to do.
+        // Already connected, or handled by the frame tap or the probe host.
         BrokerCmd::Connect
         | BrokerCmd::Disconnect
         | BrokerCmd::WatchFrames(_)
-        | BrokerCmd::RecordFrames(_) => Ok(()),
+        | BrokerCmd::RecordFrames(_)
+        | BrokerCmd::ProbeStart
+        | BrokerCmd::ProbeStop => Ok(()),
     }
 }
 
@@ -533,6 +573,13 @@ pub fn spawn_broker(
             if std::env::var("HAIRLINE_FRAME_LOG").is_ok_and(|v| v == "1") {
                 tap.record(true);
             }
+            let mut probe = ProbeHost::new(
+                ProbeRunner::new(),
+                frame_log::default_dir(),
+                Box::new(|event: &ProbeEvent| {
+                    let _ = app.emit("probe", event);
+                }),
+            );
             let mut backoff = 0;
             loop {
                 let result = match open_transport(fake) {
@@ -548,13 +595,14 @@ pub fn spawn_broker(
                                 scenes: Some(&mut host),
                                 frames: Some(&mut tap),
                                 record_dir: record_dir.as_deref(),
+                                probe: Some(&mut probe),
                             },
                         )
                     }
                     Err(e) => Err(e),
                 };
                 let next = match result {
-                    Ok(()) => wait_for_connect(&rx, None, &mut host, &mut tap),
+                    Ok(()) => wait_for_connect(&rx, None, &mut host, &mut tap, &probe),
                     Err(e) => {
                         backoff = next_backoff(backoff);
                         eprintln!(
@@ -566,6 +614,7 @@ pub fn spawn_broker(
                             Some(Duration::from_secs(backoff)),
                             &mut host,
                             &mut tap,
+                            &probe,
                         )
                     }
                 };
@@ -621,6 +670,7 @@ fn wait_for_connect(
     timeout: Option<Duration>,
     host: &mut SceneHost<'_>,
     tap: &mut FrameTap<'_>,
+    probe: &ProbeHost<'_>,
 ) -> Result<(), ()> {
     let deadline = timeout.map(|t| Instant::now() + t);
     let tick_every = Duration::from_millis(SCENES_EVERY_MS);
@@ -642,8 +692,14 @@ fn wait_for_connect(
         };
         match cmd {
             BrokerCmd::Connect => return Ok(()),
-            BrokerCmd::WatchFrames(on) => tap.watch(on),
+            BrokerCmd::WatchFrames(on) => {
+                tap.watch(on);
+                if on {
+                    probe.emit_current();
+                }
+            }
             BrokerCmd::RecordFrames(on) => tap.record(on),
+            BrokerCmd::ProbeStart => eprintln!("hairline: probe not started: not connected"),
             cmd => {
                 host.command(&cmd, false);
             }

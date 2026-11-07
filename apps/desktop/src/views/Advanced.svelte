@@ -1,8 +1,8 @@
 <!--
   Advanced (shown when Settings enables it): the support functions the
   headphones declare or a probe proved on the left with the raw command,
-  the live frame log on the right. Frames stream only while this screen is
-  mounted.
+  the live frame log and the opcode probe on the right. Frames stream only
+  while this screen is mounted.
 -->
 <script lang="ts">
   import { onMount } from "svelte";
@@ -10,14 +10,27 @@
   import FrameList from "../lib/controls/FrameList.svelte";
   import {
     afterMark,
+    canRunProbe,
     hexGroups,
     isSetOpcode,
     parseHex,
+    probeRow,
     type CapabilityRow,
     type FrameEntry,
+    type ProbeEvent,
     type TableName,
   } from "../lib/advanced";
-  import { capabilityList, onFrames, onRecording, recordFrames, sendRaw, watchFrames } from "../lib/ipc";
+  import {
+    capabilityList,
+    onFrames,
+    onProbe,
+    onRecording,
+    probeStart,
+    probeStop,
+    recordFrames,
+    sendRaw,
+    watchFrames,
+  } from "../lib/ipc";
   import type { DeviceState } from "../lib/state";
 
   let { st }: { st: DeviceState } = $props();
@@ -93,10 +106,31 @@
       .catch((e) => (recordError = errText(e)));
   }
 
+  // Probe: the backend's last "probe" event (re-sent when watching starts).
+  let probe = $state<ProbeEvent | null>(null);
+  let probeConfirm = $state("");
+  let probeError = $state<string | null>(null);
+  const probeState = $derived(probe?.state ?? "Idle");
+  const canRun = $derived(canRunProbe(st.connected, probeConfirm, probeState));
+  const probeRows = $derived((probe?.results ?? []).map(probeRow));
+
+  function runProbe() {
+    if (!canRun) return;
+    probeError = null;
+    probeStart()
+      .then(() => (probeConfirm = ""))
+      .catch((e) => (probeError = errText(e)));
+  }
+
+  function stopProbe() {
+    probeStop().catch((e) => (probeError = errText(e)));
+  }
+
   onMount(() => {
     let alive = true;
     const offFrames = onFrames(takeFrames);
     const offRecording = onRecording((e) => (recording = e.path));
+    const offProbe = onProbe((e) => (probe = e));
     // Watch only once listening, and never after the screen has gone.
     offFrames
       .then(() => (alive ? watchFrames(true) : null))
@@ -104,7 +138,7 @@
     return () => {
       alive = false;
       watchFrames(false).catch((e) => console.error(e));
-      for (const off of [offFrames, offRecording]) off.then((stop) => stop()).catch(() => {});
+      for (const off of [offFrames, offRecording, offProbe]) off.then((stop) => stop()).catch(() => {});
     };
   });
 </script>
@@ -179,6 +213,49 @@
           <p class="note live">{recordError}</p>
         {/if}
       </div>
+      <div class="block probe">
+        <h4>Probe</h4>
+        <p class="note">The probe sends read-only GET requests one at a time. Type RUN.</p>
+        {#if probeState === "Running"}
+          <div class="btnrow">
+            <button class="btn fill" onclick={stopProbe}>Stop</button>
+          </div>
+        {:else}
+          <input
+            class="field confirm"
+            aria-label="Confirm probe"
+            placeholder="type RUN"
+            spellcheck="false"
+            autocomplete="off"
+            bind:value={probeConfirm}
+            onkeydown={(e) => e.key === "Enter" && runProbe()}
+          />
+          <div class="btnrow">
+            <button class="btn fill" class:unavailable={!canRun} onclick={runProbe}>Run</button>
+          </div>
+        {/if}
+        {#if probe && probe.state !== "Idle"}
+          <p class="note">{probe.done} / {probe.total}</p>
+        {/if}
+        {#if probeError}
+          <p class="note live">{probeError}</p>
+        {/if}
+        {#if probeRows.length > 0}
+          <div class="link results">
+            {#each probeRows as row (row.key)}
+              <div class:faded={row.chip === "SILENT"}>
+                <span>{row.key}</span>
+                <span class="name">{row.name}</span>
+                <span class="chips">{#if row.chip}<span>{row.chip}</span>{/if}</span>
+                <span class="reply">{row.reply}</span>
+              </div>
+            {/each}
+          </div>
+        {/if}
+        {#if probe?.state === "Done" && probe.file}
+          <p class="note path">{probe.file}</p>
+        {/if}
+      </div>
     </div>
   </div>
 </div>
@@ -195,8 +272,39 @@
     align-items: center;
   }
 
-  .caps div.faded {
+  .caps div.faded,
+  .results div.faded {
     opacity: 0.35;
+  }
+
+  .results {
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  .results div {
+    display: grid;
+    grid-template-columns: 64px 1fr auto;
+    gap: 2px 10px;
+    align-items: center;
+    font-size: 11px;
+  }
+
+  .results span:first-child,
+  .reply {
+    font-family: "DM Mono", monospace;
+  }
+
+  .reply {
+    grid-column: 2 / -1;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  .reply:empty {
+    display: none;
   }
 
   .name {

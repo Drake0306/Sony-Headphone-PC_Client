@@ -1,0 +1,215 @@
+import { describe, expect, it } from "vitest";
+import {
+  accelerator,
+  actionChips,
+  modeBoxes,
+  moveScene,
+  newScene,
+  relevantScenes,
+  triggerSentence,
+  validateScene,
+  validateScenes,
+  type Actions,
+  type Scene,
+} from "./scenes";
+
+const KEEP: Actions = {
+  nc: null,
+  ambient_level: null,
+  voice_focus: null,
+  ult: null,
+  eq_preset: null,
+  volume: null,
+  dsee_auto_off: null,
+};
+
+const scene = (id: string, over: Partial<Scene> = {}): Scene => ({
+  id,
+  name: id,
+  enabled: true,
+  trigger: { kind: "manual" },
+  actions: { ...KEEP },
+  hotkey: null,
+  ...over,
+});
+
+describe("triggerSentence", () => {
+  it("trigger_sentence_reads_each_kind", () => {
+    expect(triggerSentence({ kind: "headphones_connected" })).toBe("Headphones connect");
+    expect(triggerSentence({ kind: "time_range", from: "22:00", to: "07:00" })).toBe("Between 22:00 and 07:00");
+    expect(triggerSentence({ kind: "frontmost_app", name: "Zoom" })).toBe("Zoom is in front");
+    expect(triggerSentence({ kind: "mic_in_use" })).toBe("Microphone is in use");
+    expect(triggerSentence({ kind: "manual" })).toBe("By hand only");
+  });
+});
+
+describe("actionChips", () => {
+  it("action_chips_keep_everything_is_empty", () => {
+    expect(actionChips(KEEP)).toEqual([]);
+  });
+
+  it("action_chips_follow_the_fixed_order", () => {
+    const chips = actionChips({
+      nc: "NoiseCancelling",
+      ambient_level: null,
+      voice_focus: true,
+      ult: 1,
+      eq_preset: 0x16,
+      volume: 12,
+      dsee_auto_off: true,
+    });
+    expect(chips).toEqual([
+      { label: "NC" },
+      { label: "VOICE" },
+      { label: "ULT 1", ult: true },
+      { label: "Bass Boost" },
+      { label: "VOL 12" },
+      { label: "DSEE AUTO" },
+    ]);
+  });
+
+  it("action_chips_merge_ambient_mode_and_level", () => {
+    expect(actionChips({ ...KEEP, nc: "Ambient", ambient_level: 14 })).toEqual([{ label: "AMB 14" }]);
+    expect(actionChips({ ...KEEP, nc: "Ambient" })).toEqual([{ label: "AMB" }]);
+    expect(actionChips({ ...KEEP, ambient_level: 5 })).toEqual([{ label: "AMB 5" }]);
+    expect(actionChips({ ...KEEP, nc: "Off" })).toEqual([{ label: "OFF" }]);
+  });
+
+  it("action_chips_name_the_off_values", () => {
+    expect(actionChips({ ...KEEP, voice_focus: false, ult: 0, dsee_auto_off: false, volume: 0 })).toEqual([
+      { label: "VOICE OFF" },
+      { label: "ULT OFF" },
+      { label: "VOL 0" },
+      { label: "DSEE OFF" },
+    ]);
+    expect(actionChips({ ...KEEP, ult: 2 })).toEqual([{ label: "ULT 2", ult: true }]);
+  });
+});
+
+describe("validateScene", () => {
+  it("validate_scene_accepts_a_good_scene", () => {
+    expect(validateScene(scene("a"))).toBeNull();
+    expect(validateScene(newScene())).toBeNull();
+    expect(
+      validateScene(
+        scene("a", {
+          trigger: { kind: "time_range", from: "7:05", to: "23:59" },
+          actions: { nc: "Ambient", ambient_level: 20, voice_focus: true, ult: 2, eq_preset: 0xa2, volume: 30, dsee_auto_off: false },
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it("validate_scene_mirrors_the_backend_messages", () => {
+    expect(validateScene(scene("x", { name: " " }))).toBe('scene " ": name is empty');
+    expect(validateScene(scene("Late", { trigger: { kind: "time_range", from: "25:00", to: "07:00" } }))).toBe(
+      'scene "Late": from "25:00" is not HH:MM',
+    );
+    expect(validateScene(scene("Late", { trigger: { kind: "time_range", from: "22:00", to: "7:5" } }))).toBe(
+      'scene "Late": to "7:5" is not HH:MM',
+    );
+    expect(validateScene(scene("X", { trigger: { kind: "frontmost_app", name: "  " } }))).toBe(
+      'scene "X": app name is empty',
+    );
+    expect(validateScene(scene("X", { actions: { ...KEEP, ambient_level: 21 } }))).toBe(
+      'scene "X": ambient_level 21 is outside 1..=20',
+    );
+    expect(validateScene(scene("X", { actions: { ...KEEP, ambient_level: 0 } }))).toBe(
+      'scene "X": ambient_level 0 is outside 1..=20',
+    );
+    expect(validateScene(scene("X", { actions: { ...KEEP, ult: 3 } }))).toBe('scene "X": ult 3 is outside 0..=2');
+    expect(validateScene(scene("X", { actions: { ...KEEP, eq_preset: 0x42 } }))).toBe(
+      'scene "X": eq_preset 0x42 is not a known preset',
+    );
+    expect(validateScene(scene("X", { actions: { ...KEEP, volume: 31 } }))).toBe(
+      'scene "X": volume 31 is outside 0..=30',
+    );
+  });
+
+  it("validate_scenes_rejects_a_repeated_id", () => {
+    expect(validateScenes([scene("a"), scene("b")])).toBeNull();
+    expect(validateScenes([scene("a"), scene("a", { name: "X" })])).toBe('scene "X": id "a" is used twice');
+    expect(validateScenes([scene("a"), scene("b", { name: "" })])).toBe('scene "": name is empty');
+  });
+});
+
+describe("newScene", () => {
+  it("new_scene_is_off_manual_and_keeps_everything", () => {
+    const s = newScene();
+    expect(s.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(s.enabled).toBe(false);
+    expect(s.trigger).toEqual({ kind: "manual" });
+    expect(s.actions).toEqual(KEEP);
+    expect(s.hotkey).toBeNull();
+    expect(s.name.trim()).not.toBe("");
+    expect(newScene().id).not.toBe(s.id);
+  });
+});
+
+describe("moveScene", () => {
+  const list = [scene("a"), scene("b"), scene("c")];
+  const ids = (l: Scene[]) => l.map((s) => s.id);
+
+  it("move_scene_swaps_with_the_neighbour", () => {
+    expect(ids(moveScene(list, "b", -1))).toEqual(["b", "a", "c"]);
+    expect(ids(moveScene(list, "b", 1))).toEqual(["a", "c", "b"]);
+    expect(ids(list)).toEqual(["a", "b", "c"]);
+  });
+
+  it("move_scene_stops_at_the_ends_and_ignores_unknown_ids", () => {
+    expect(ids(moveScene(list, "a", -1))).toEqual(["a", "b", "c"]);
+    expect(ids(moveScene(list, "c", 1))).toEqual(["a", "b", "c"]);
+    expect(ids(moveScene(list, "z", 1))).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("accelerator", () => {
+  const key = (code: string, mods: Partial<Record<"ctrlKey" | "altKey" | "shiftKey" | "metaKey", boolean>> = {}) => ({
+    code,
+    ctrlKey: false,
+    altKey: false,
+    shiftKey: false,
+    metaKey: false,
+    ...mods,
+  });
+
+  it("accelerator_orders_modifiers_then_key", () => {
+    expect(accelerator(key("Digit1", { altKey: true, metaKey: true }))).toBe("Alt+Super+1");
+    expect(accelerator(key("KeyM", { metaKey: true, shiftKey: true, ctrlKey: true, altKey: true }))).toBe(
+      "Ctrl+Alt+Shift+Super+M",
+    );
+    expect(accelerator(key("F5"))).toBe("F5");
+    expect(accelerator(key("ArrowUp", { ctrlKey: true }))).toBe("Ctrl+ArrowUp");
+  });
+
+  it("accelerator_ignores_a_bare_modifier", () => {
+    for (const code of ["ShiftLeft", "ControlRight", "AltLeft", "MetaRight", "OSLeft"]) {
+      expect(accelerator(key(code, { shiftKey: true }))).toBeNull();
+    }
+  });
+});
+
+describe("relevantScenes", () => {
+  it("relevant_scenes_put_the_active_one_first_then_the_first_enabled", () => {
+    const list = [scene("a", { enabled: false }), scene("b"), scene("c"), scene("d")];
+    expect(relevantScenes({ scenes: list, active: "c" }).map((s) => s.id)).toEqual(["c", "b"]);
+    expect(relevantScenes({ scenes: list, active: "b" }).map((s) => s.id)).toEqual(["b", "c"]);
+    expect(relevantScenes({ scenes: list, active: null }).map((s) => s.id)).toEqual(["b"]);
+    expect(relevantScenes({ scenes: [scene("a", { enabled: false })], active: null })).toEqual([]);
+  });
+});
+
+describe("modeBoxes", () => {
+  it("mode_boxes_list_enabled_scenes_up_to_four", () => {
+    const list = [scene("a"), scene("b", { enabled: false }), scene("c")];
+    expect(modeBoxes(list)).toEqual({ shown: [list[0], list[2]], more: false });
+  });
+
+  it("mode_boxes_add_more_past_four_or_when_none_is_enabled", () => {
+    const list = ["a", "b", "c", "d", "e"].map((id) => scene(id));
+    const boxes = modeBoxes(list);
+    expect(boxes.shown.map((s) => s.id)).toEqual(["a", "b", "c", "d"]);
+    expect(boxes.more).toBe(true);
+    expect(modeBoxes([scene("a", { enabled: false })])).toEqual({ shown: [], more: true });
+  });
+});

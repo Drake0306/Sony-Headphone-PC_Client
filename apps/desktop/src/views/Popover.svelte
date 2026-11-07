@@ -4,9 +4,10 @@
   import Boxes from "../lib/controls/Boxes.svelte";
   import LinkList from "../lib/controls/LinkList.svelte";
   import Ticks from "../lib/controls/Ticks.svelte";
-  import { connect, getRuntimeInfo, openMainWindow, setUlt, watchState } from "../lib/ipc";
+  import { connect, getRuntimeInfo, openMainWindow, openMainWindowOn, setUlt, watchState } from "../lib/ipc";
   import * as noise from "../lib/noise";
   import { displayStatus, pending, shownValue } from "../lib/pending";
+  import { applyScene, modeBoxes, scenes } from "../lib/scenes";
   import {
     codecLabel,
     colourway,
@@ -16,6 +17,7 @@
     type DeviceState,
     type NcAsmState,
     type NcMode,
+    type Status,
     type UltLevel,
   } from "../lib/state";
 
@@ -36,10 +38,14 @@
     { label: "OFF", value: false },
   ];
   const noop = () => {};
+  const MORE = "more";
+  const PENDING: Status = { Pending: { since_ms: 0 } };
 
   let st = $state<DeviceState>(emptyState());
   const nc = pending<NcAsmState>();
   const ult = pending<UltLevel>();
+  // A scene applied here is pending until the next "scenes" event.
+  const mode = pending<string>();
   let lastSeen = $state<{ at: number; battery: number | null } | null>(null);
   let now = $state(Date.now());
   let fake = $state(false);
@@ -57,6 +63,28 @@
   const devices = $derived(
     st.devices.map((d) => ({ label: d.name, value: d.playing ? "▶ Playing" : "Idle", live: d.playing })),
   );
+
+  const modeOptions = $derived.by(() => {
+    const { shown, more } = modeBoxes($scenes.scenes);
+    return [
+      ...shown.map((s) => ({ label: s.name, value: s.id, title: s.name })),
+      ...(more ? [{ label: "…", value: MORE, title: "All scenes" }] : []),
+    ];
+  });
+  const modeStatus = $derived<Status>($mode.want !== null ? PENDING : "Confirmed");
+
+  $effect(() => {
+    void $scenes;
+    mode.receive("Confirmed");
+  });
+
+  function pickMode(id: string) {
+    if (id === MORE) {
+      openMainWindowOn("scenes").catch((e) => console.error(e));
+      return;
+    }
+    mode.request(id, () => applyScene(id));
+  }
 
   function receive(next: DeviceState) {
     if (st.connected && !next.connected) {
@@ -146,6 +174,7 @@
         onpick={pickUlt}
       />
     </div>
+    {@render modeRow()}
     {#if devices.length > 0}
       <div class="devices"><LinkList items={devices} /></div>
     {/if}
@@ -170,12 +199,28 @@
       <span class="lab">ULT</span>
       <Boxes options={ULT} value={null} status="Unavailable" width="190px" onpick={noop} />
     </div>
+    {@render modeRow()}
     <div class="row hint">
       <span>Turn the headphones on, or reconnect from the Bluetooth menu. Controls return the moment they link.</span>
     </div>
     <div class="btnrow"><button class="btn fill" onclick={() => connect()}>Connect</button></div>
   </div>
 {/if}
+
+{#snippet modeRow()}
+  {#if $scenes.scenes.length > 0}
+    <div class="row mode">
+      <span class="lab">Mode</span>
+      <Boxes
+        options={modeOptions}
+        value={$mode.want ?? $scenes.active}
+        status={modeStatus}
+        width="190px"
+        onpick={pickMode}
+      />
+    </div>
+  {/if}
+{/snippet}
 
 <style>
   .pop {
@@ -184,6 +229,15 @@
     border: 1px solid var(--hair);
     border-radius: 10px;
     padding: 14px 16px;
+  }
+
+  .mode :global(.boxes) {
+    grid-auto-columns: minmax(0, 1fr);
+  }
+
+  .mode :global(.boxes button) {
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .name {

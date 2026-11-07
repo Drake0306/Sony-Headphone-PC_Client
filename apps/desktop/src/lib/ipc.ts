@@ -1,7 +1,8 @@
-// Typed wrappers around the Tauri commands and the "state" and "settings" events.
+// Typed wrappers around the Tauri commands and the "state", "settings" and "scenes" events.
 
 import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { emitTo, listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { Scene, ScenesEvent } from "./scenes";
 import type { AppSettings, DeviceState, RuntimeInfo } from "./state";
 
 export type NcModeArg = "off" | "nc" | "ambient";
@@ -62,6 +63,35 @@ export const setSettings = (s: AppSettings) => invoke<void>("set_settings", { s 
 
 export const onSettings = (handler: (s: AppSettings) => void): Promise<UnlistenFn> =>
   listen<AppSettings>("settings", (event) => handler(event.payload));
+
+/** The managed scene list; the broker then re-emits "scenes" with the active id. */
+export const getScenes = () => invoke<Scene[]>("get_scenes");
+
+/** Replaces the whole list; rejects with a human message when a scene is invalid. */
+export const setScenes = (scenes: Scene[]) => invoke<void>("set_scenes", { scenes });
+
+/** Applies a scene now (or on the next connect while it stays active). */
+export const applySceneCmd = (id: string) => invoke<void>("apply_scene", { id });
+
+export const onScenes = (handler: (e: ScenesEvent) => void): Promise<UnlistenFn> =>
+  listen<ScenesEvent>("scenes", (event) => handler(event.payload));
+
+/** Where the popover leaves the tab for a main window it has just created (not listening yet). */
+export const OPEN_TAB_KEY = "hairline.openTab";
+
+/** Opens the main window on `tab`: the "navigate" event for an open window, localStorage for a new one. */
+export async function openMainWindowOn(tab: string) {
+  try {
+    localStorage.setItem(OPEN_TAB_KEY, tab);
+  } catch {
+    // Storage may be blocked; an open window still gets the event.
+  }
+  await openMainWindow();
+  await emitTo("main", "navigate", tab);
+}
+
+export const onNavigate = (handler: (tab: string) => void): Promise<UnlistenFn> =>
+  listen<string>("navigate", (event) => handler(event.payload));
 
 /**
  * Calls `handler` with the current state and every later one; the event wins

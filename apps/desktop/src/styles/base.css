@@ -333,7 +333,7 @@ body.kbd a:focus-visible {
   opacity: 0.35;
 }
 
-/* Scene cards (static until the modes module lands) */
+/* Scene cards and key chips */
 .scene {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -342,6 +342,10 @@ body.kbd a:focus-visible {
   padding: 10px 12px;
   border: 1px solid var(--hair);
   font-size: 13px;
+}
+
+.scene.on {
+  border-color: var(--ink);
 }
 
 .scene .when {
@@ -369,6 +373,18 @@ body.kbd a:focus-visible {
 .scene .then span.u {
   border-color: var(--ult);
   color: var(--ult);
+}
+
+.keys {
+  display: flex;
+  gap: 4px;
+}
+
+.keys span {
+  padding: 2px 6px;
+  border: 1px solid var(--hair);
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,15 +1,16 @@
 <!--
   Noise: the big switch, the ambient level and Focus on voice on the left;
-  the cup-button block (not readable yet) and the Scenes placeholder on the right.
+  the cup-button block (not readable yet) and the two most relevant scenes on the right.
 -->
 <script lang="ts">
   import Boxes from "../lib/controls/Boxes.svelte";
   import Row from "../lib/controls/Row.svelte";
+  import SceneCard from "../lib/controls/SceneCard.svelte";
   import Ticks from "../lib/controls/Ticks.svelte";
   import Toggle from "../lib/controls/Toggle.svelte";
   import { control } from "../lib/control.svelte";
   import * as noise from "../lib/noise";
-  import { SCENES_PREVIEW } from "../lib/scenesPreview";
+  import { relevantScenes, scenes } from "../lib/scenes";
   import { refusedReason, type DeviceState, type NcAsmState, type NcMode } from "../lib/state";
 
   let { st }: { st: DeviceState } = $props();
@@ -21,6 +22,8 @@
   ];
   const CUP = ["Noise cancelling", "Ambient", "Off"];
   const noop = () => {};
+
+  const shownScenes = $derived(relevantScenes($scenes));
 
   const nc = control<NcAsmState>(() => st.nc);
   const shown = $derived(nc.shown);
@@ -81,22 +84,24 @@
       </div>
       <div class="block">
         <h4>Automatic</h4>
-        {#each SCENES_PREVIEW as card (card.name)}
-          <div class="scene">
-            <span>{card.name}</span><span class="lab">Preview</span>
-            <span class="when">{card.when}</span>
-            <div class="then">
-              {#each card.then as action (action.label)}<span class:u={action.ult}>{action.label}</span>{/each}
-            </div>
-          </div>
+        {#each shownScenes as scene (scene.id)}
+          <SceneCard {scene} active={scene.id === $scenes.active} />
+        {:else}
+          <p class="note">No scene is on.</p>
         {/each}
-        <p class="note">Modes arrive after Phase 2.</p>
+        <div class="btnrow"><button class="btn" onclick={() => (location.hash = "#scenes")}>Edit in Scenes</button></div>
       </div>
     </div>
   </div>
 </div>
 
 <style>
+  .btnrow {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+
   .level {
     display: flex;
     align-items: center;

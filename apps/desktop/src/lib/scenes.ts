@@ -1,0 +1,251 @@
+// Scenes (named modes): a TypeScript mirror of `Scene`
+// (apps/desktop/src-tauri/src/scenes/model.rs) as `scenes.json` stores it,
+// a store fed by `get_scenes` and the "scenes" event, and the pure helpers
+// the Scenes screen, the Noise screen and the popover share.
+
+import { writable, type Readable } from "svelte/store";
+import { applySceneCmd, getScenes, onScenes, setScenes } from "./ipc";
+import { presetName, type NcMode } from "./state";
+
+export type Trigger =
+  | { kind: "manual" }
+  | { kind: "headphones_connected" }
+  | { kind: "time_range"; from: string; to: string }
+  | { kind: "frontmost_app"; name: string }
+  | { kind: "mic_in_use" };
+
+export type TriggerKind = Trigger["kind"];
+
+/** What a scene changes; `null` keeps the current setting. */
+export interface Actions {
+  nc: NcMode | null;
+  /** 1..=20 */
+  ambient_level: number | null;
+  voice_focus: boolean | null;
+  /** 0 off, 1, 2 */
+  ult: number | null;
+  eq_preset: number | null;
+  /** 0..=30 */
+  volume: number | null;
+  dsee_auto_off: boolean | null;
+}
+
+export interface Scene {
+  id: string;
+  name: string;
+  enabled: boolean;
+  trigger: Trigger;
+  actions: Actions;
+  /** Tauri accelerator string, e.g. `Alt+Super+1`. */
+  hotkey: string | null;
+}
+
+/** The "scenes" event payload. */
+export interface ScenesEvent {
+  scenes: Scene[];
+  active: string | null;
+  /** Hotkey registration errors by scene id (arrives with the hotkeys task; not shown yet). */
+  hotkey_errors?: Record<string, string>;
+}
+
+export interface ScenesView {
+  scenes: Scene[];
+  active: string | null;
+}
+
+/** Preset ids the backend accepts (commands.rs `EQ_PRESETS`). */
+export const EQ_PRESETS = [0x00, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0xa0, 0xa1, 0xa2];
+export const VOLUME_MAX = 30;
+export const AMBIENT_MAX = 20;
+
+const view = writable<ScenesView>({ scenes: [], active: null }, () => {
+  const unlisten = onScenes(({ scenes, active }) => view.set({ scenes, active }));
+  loadScenes().catch((e) => console.error(e));
+  return () => {
+    unlisten.then((stop) => stop()).catch(() => {});
+  };
+});
+
+/** The scene list and the active id. `get_scenes` makes the broker re-emit "scenes", which carries `active`. */
+export const scenes: Readable<ScenesView> = { subscribe: view.subscribe };
+
+/** Reads the list; the "scenes" event that follows brings the active id. */
+export async function loadScenes(): Promise<Scene[]> {
+  const list = await getScenes();
+  view.update((v) => ({ ...v, scenes: list }));
+  return list;
+}
+
+/** Validates and saves the whole list. Returns the error message, or null on success. */
+export async function saveScenes(list: Scene[]): Promise<string | null> {
+  const error = validateScenes(list);
+  if (error !== null) return error;
+  try {
+    await setScenes(list);
+    return null;
+  } catch (e) {
+    return typeof e === "string" ? e : e instanceof Error ? e.message : String(e);
+  }
+}
+
+export const applyScene = (id: string) => applySceneCmd(id);
+
+export function triggerSentence(t: Trigger): string {
+  switch (t.kind) {
+    case "headphones_connected":
+      return "Headphones connect";
+    case "time_range":
+      return `Between ${t.from} and ${t.to}`;
+    case "frontmost_app":
+      return `${t.name} is in front`;
+    case "mic_in_use":
+      return "Microphone is in use";
+    case "manual":
+      return "By hand only";
+  }
+}
+
+export interface Chip {
+  label: string;
+  /** Drawn orange, like an active ULT box. */
+  ult?: boolean;
+}
+
+const NC_CHIP: Record<NcMode, string> = { NoiseCancelling: "NC", Ambient: "AMB", Off: "OFF" };
+
+/** The chips a scene card shows, in a fixed order; Keep fields show nothing. */
+export function actionChips(a: Actions): Chip[] {
+  const chips: Chip[] = [];
+  if (a.ambient_level !== null && (a.nc === null || a.nc === "Ambient")) {
+    chips.push({ label: `AMB ${a.ambient_level}` });
+  } else if (a.nc !== null) {
+    chips.push({ label: NC_CHIP[a.nc] });
+    if (a.ambient_level !== null) chips.push({ label: `AMB ${a.ambient_level}` });
+  }
+  if (a.voice_focus !== null) chips.push({ label: a.voice_focus ? "VOICE" : "VOICE OFF" });
+  if (a.ult !== null) chips.push(a.ult === 0 ? { label: "ULT OFF" } : { label: `ULT ${a.ult}`, ult: true });
+  if (a.eq_preset !== null) chips.push({ label: presetName(a.eq_preset) });
+  if (a.volume !== null) chips.push({ label: `VOL ${a.volume}` });
+  if (a.dsee_auto_off !== null) chips.push({ label: a.dsee_auto_off ? "DSEE AUTO" : "DSEE OFF" });
+  return chips;
+}
+
+/** `parse_hhmm` (scenes/eval.rs): H or HH, a colon, MM; 00:00..23:59. */
+export function isHhmm(s: string): boolean {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim());
+  return m !== null && Number(m[1]) < 24 && Number(m[2]) < 60;
+}
+
+const inRange = (v: number, lo: number, hi: number) => Number.isInteger(v) && v >= lo && v <= hi;
+const hex = (v: number) => `0x${v.toString(16).toUpperCase().padStart(2, "0")}`;
+
+/** `check_scenes` (commands.rs) for one scene: the backend's message, or null. */
+export function validateScene(s: Scene): string | null {
+  const bad = (field: string, why: string) => `scene ${JSON.stringify(s.name)}: ${field} ${why}`;
+  if (s.name.trim() === "") return bad("name", "is empty");
+  const t = s.trigger;
+  if (t.kind === "time_range") {
+    for (const [field, value] of [
+      ["from", t.from],
+      ["to", t.to],
+    ] as const) {
+      if (!isHhmm(value)) return bad(field, `${JSON.stringify(value)} is not HH:MM`);
+    }
+  }
+  if (t.kind === "frontmost_app" && t.name.trim() === "") return bad("app name", "is empty");
+  const a = s.actions;
+  if (a.ambient_level !== null && !inRange(a.ambient_level, 1, AMBIENT_MAX))
+    return bad("ambient_level", `${a.ambient_level} is outside 1..=${AMBIENT_MAX}`);
+  if (a.ult !== null && !inRange(a.ult, 0, 2)) return bad("ult", `${a.ult} is outside 0..=2`);
+  if (a.eq_preset !== null && !EQ_PRESETS.includes(a.eq_preset))
+    return bad("eq_preset", `${hex(a.eq_preset)} is not a known preset`);
+  if (a.volume !== null && !inRange(a.volume, 0, VOLUME_MAX))
+    return bad("volume", `${a.volume} is outside 0..=${VOLUME_MAX}`);
+  return null;
+}
+
+/** `check_scenes` for the whole list, in the backend's order (repeated id first). */
+export function validateScenes(list: Scene[]): string | null {
+  const ids = new Set<string>();
+  for (const s of list) {
+    if (ids.has(s.id)) return `scene ${JSON.stringify(s.name)}: id ${JSON.stringify(s.id)} is used twice`;
+    ids.add(s.id);
+    const error = validateScene(s);
+    if (error !== null) return error;
+  }
+  return null;
+}
+
+export const keepAll = (): Actions => ({
+  nc: null,
+  ambient_level: null,
+  voice_focus: null,
+  ult: null,
+  eq_preset: null,
+  volume: null,
+  dsee_auto_off: null,
+});
+
+/** A new scene: off, by hand only, keeps everything, no hotkey. */
+export const newScene = (): Scene => ({
+  id: crypto.randomUUID(),
+  name: "New scene",
+  enabled: false,
+  trigger: { kind: "manual" },
+  actions: keepAll(),
+  hotkey: null,
+});
+
+/** The list with scene `id` moved one place up (-1) or down (1); the order is the priority. */
+export function moveScene(list: Scene[], id: string, dir: -1 | 1): Scene[] {
+  const i = list.findIndex((s) => s.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= list.length) return list.slice();
+  const next = list.slice();
+  [next[i], next[j]] = [next[j], next[i]];
+  return next;
+}
+
+export interface KeyPress {
+  code: string;
+  ctrlKey: boolean;
+  altKey: boolean;
+  shiftKey: boolean;
+  metaKey: boolean;
+}
+
+const MODIFIER_CODES = /^(Shift|Control|Alt|Meta|OS)(Left|Right)?$/;
+
+/**
+ * Tauri's accelerator string for a key press: `Ctrl`, `Alt`, `Shift`, `Super`
+ * in that order, then the key (`KeyA` → `A`, `Digit1` → `1`, others by their
+ * code). A bare modifier press gives null.
+ */
+export function accelerator(e: KeyPress): string | null {
+  if (MODIFIER_CODES.test(e.code) || e.code === "") return null;
+  const key = e.code.replace(/^Key(?=[A-Z]$)/, "").replace(/^Digit(?=\d$)/, "");
+  const mods = [e.ctrlKey && "Ctrl", e.altKey && "Alt", e.shiftKey && "Shift", e.metaKey && "Super"].filter(
+    (m): m is string => typeof m === "string",
+  );
+  return [...mods, key].join("+");
+}
+
+const MAC_KEYS: Record<string, string> = { Ctrl: "⌃", Alt: "⌥", Shift: "⇧", Super: "⌘" };
+
+/** One accelerator part as a key chip: the macOS symbols on a Mac, the names elsewhere. */
+export const keyLabel = (part: string, mac: boolean): string => (mac ? (MAC_KEYS[part] ?? part) : part);
+
+/** Up to two scenes for the Noise screen: the active one, then the first enabled other one. */
+export function relevantScenes(v: ScenesView): Scene[] {
+  const active = v.scenes.find((s) => s.id === v.active);
+  const other = v.scenes.find((s) => s.enabled && s.id !== v.active);
+  return [active, other].filter((s): s is Scene => s !== undefined);
+}
+
+export const MODE_BOXES_MAX = 4;
+
+/** The popover's MODE boxes: the first four enabled scenes, and whether a "…" box leads to the rest. */
+export function modeBoxes(list: Scene[]): { shown: Scene[]; more: boolean } {
+  const enabled = list.filter((s) => s.enabled);
+  return { shown: enabled.slice(0, MODE_BOXES_MAX), more: enabled.length === 0 || enabled.length > MODE_BOXES_MAX };
+}

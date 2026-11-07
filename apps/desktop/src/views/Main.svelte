@@ -152,7 +152,10 @@
     right: 16px;
   }
 
+  /* The content column scrolls inside the window so the paper never ends
+     above tall screens such as the Advanced panel. */
   main {
     height: 100%;
+    overflow-y: auto;
   }
 </style>

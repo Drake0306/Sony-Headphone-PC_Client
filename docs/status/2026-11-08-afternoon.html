@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Status, 8 November afternoon</title>
+<style>
+  :root { --paper:#efede6; --ink:#161614; --hair:#cfccc2; --muted:#6f726d; --ult:#ff6600; --box:#f8f7f3; }
+  @media (prefers-color-scheme: dark) { :root { --paper:#161614; --ink:#efede6; --hair:#3a3a36; --muted:#9a9c97; --box:#1f1f1c; } }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--paper); color:var(--ink); font:15px/1.5 "Instrument Sans", system-ui, sans-serif; font-variant-numeric:tabular-nums; }
+  main { max-width:760px; margin:0 auto; padding:48px max(16px, env(safe-area-inset-left)) 64px max(16px, env(safe-area-inset-right)); }
+  h1 { font-size:28px; font-weight:600; letter-spacing:-0.01em; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 32px; }
+  h2 { font:400 11px/1 "DM Mono", ui-monospace, monospace; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:36px 0 12px; padding-top:12px; border-top:1px solid var(--hair); }
+  p { margin:0 0 12px; max-width:70ch; }
+  ul { margin:0 0 12px; padding-left:18px; max-width:70ch; }
+  li { margin:0 0 6px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; margin:0 0 12px; }
+  td, th { text-align:left; padding:7px 8px 7px 0; border-bottom:1px solid var(--hair); vertical-align:top; }
+  th { font:400 11px/1 "DM Mono", ui-monospace, monospace; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  td:last-child, th:last-child { text-align:right; white-space:nowrap; }
+  .num { font-family:"DM Mono", ui-monospace, monospace; }
+  code { font:13px "DM Mono", ui-monospace, monospace; background:var(--box); padding:1px 4px; }
+  .todo li::marker { color:var(--ult); }
+  .live { color:var(--ult); font-weight:600; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Status, afternoon</h1>
+  <p class="sub">Hairline, Saturday 8 November 2026. What landed while you were out, all on <code>main</code> and pushed.</p>
+
+  <h2>Short version</h2>
+  <p>Phase 4 and Phase 5 are merged and green. Phase 4 gives you the Advanced panel, the opcode probe, battery history and the <code>hairlinectl</code> command line. Phase 5 gives you the redesigned faders and the Advanced equalizer you described. Phases 7a and 8a make the app build and pass its tests on Windows and Linux, with CI jobs on both, but neither has touched real headphones on those systems.</p>
+
+  <h2>Merged today</h2>
+  <table>
+    <tr><th>Phase</th><th>What</th><th>Merge</th></tr>
+    <tr><td>4</td><td>Advanced panel (capability list, live frame log with Record, raw command with typed SEND), opcode probe (441 read-only requests, results to a file, answered undeclared functions become "proven" for reads only), battery history with time left, local socket and <code>hairlinectl</code></td><td class="num">fb56974</td></tr>
+    <tr><td>5</td><td>Sound faders with 21 segments, zero line, orange knob and a readable scale; Advanced equalizer: ten bands, four at a time with ‹ › paging, curve saved in the app, "Send best fit to headphones", the headphones' current six values beside the fit, and the app-only note in the view</td><td class="num">883cd37</td></tr>
+    <tr><td>7a</td><td>The app builds and passes its tests on Windows: a plain always-on-top popover above the tray icon in place of the macOS panel, a full-colour tray icon (the black template glyph would vanish on a dark taskbar), a frontmost-app sensor, blanks for audio "playing" and the microphone trigger, and a Windows CI job that builds the whole app. Not run on Windows hardware.</td><td class="num">950ea07</td></tr>
+    <tr><td>8a</td><td>Linux: an RFCOMM transport over BlueZ (discovery through D-Bus, a plain socket for the link), the v2 channel taken from <code>HAIRLINE_RFCOMM_CHANNEL</code>, then the device record, then a read-only scan that sends one protocol-info request per channel; the app builds with a tray menu entry and the plain popover; a Linux CI job builds and tests the whole workspace. Not run on Linux hardware.</td><td class="num">b454e48</td></tr>
+  </table>
+
+  <h2>Checks on main</h2>
+  <table>
+    <tr><th>Suite</th><th>Result</th></tr>
+    <tr><td>Rust workspace tests</td><td class="num">236 passed, 0 failed</td></tr>
+    <tr><td>Frontend tests</td><td class="num">143 passed, 0 failed</td></tr>
+    <tr><td>Clippy, rustfmt, svelte-check, colour grep, Windows cross-check</td><td>clean</td></tr>
+    <tr><td>GitHub CI: macOS job, Windows crates job, Windows app job, Linux app job</td><td>green</td></tr>
+  </table>
+
+  <h2>Things the reviews caught before merge</h2>
+  <ul>
+    <li>Once the probe marked a function "proven", the normal controls, scenes and the CLI could have sent a SET to an undeclared function. Proven now unlocks reads only; typed writes still need a declared function, as the repo rule says.</li>
+    <li>A hand-derived table would have recorded the wrong function as proven for ten of the probe's reads. It is now written out pair by pair against the protocol headers, with a test over every catalogue entry.</li>
+    <li>The frame log streamed a 50 KB snapshot up to 100 times a second while the Advanced screen was open. It is throttled to five a second.</li>
+    <li>In a packaged app the capture files would have landed in the wrong folder. They now go to <code>~/Library/Logs/com.drake0306.hairline/captures/</code>.</li>
+    <li>The CLI and the app both built to a file called <code>hairline</code>, which caused one of my agents to kill your dev session by mistake. The CLI is now <code>hairlinectl</code>.</li>
+    <li>In the Advanced equalizer, Send is refused unless the headphones report exactly six bands of 21 steps, and the faders freeze while a send is in flight so what you see is what goes out.</li>
+  </ul>
+
+  <h2>Needs your hands</h2>
+  <ul class="todo">
+    <li>Restart <code>pnpm tauri dev</code>; your previous session was ended by mistake during the CLI work.</li>
+    <li>Settings → turn on "Advanced panel". Run the probe once with the headphones connected (about 13 minutes) and glance at which functions answered. Checklist: <code>docs/hardware-validation.md</code> section 8.</li>
+    <li>Open Sound → Advanced, draw a curve, press "Send best fit to headphones", and confirm the Sound faders show the fitted six. Section 9.</li>
+    <li>Try <code>cargo install --path crates/mdr-cli</code> then <code>hairlinectl state</code> and <code>hairlinectl battery</code>.</li>
+    <li>Decide on pink versus orange for the Advanced equalizer strip; it is orange today.</li>
+    <li>Phase 6, the in-app audio engine, needs your Apple Developer account and a one-time admin install. It is not started. The research note has the trade-offs.</li>
+    <li>Windows and Linux are compiled and tested in CI only. Each has its own checklist (sections 10 and 11) for whenever a machine is available. On Linux the first connect may scan RFCOMM channels; <code>HAIRLINE_RFCOMM_CHANNEL=18</code> skips the scan on your unit.</li>
+  </ul>
+
+  <h2>Left as is</h2>
+  <ul>
+    <li>The merged remote branches still exist on GitHub, since deleting branches is blocked for me: <code>phase2-main-window</code>, <code>phase3-windows-transport</code>, <code>phase7-windows-app</code>, <code>phase8-linux</code>.</li>
+    <li>The approved design file still says "Turn DSEE off at low battery" on the Sound mockup; the app says "DSEE Extreme".</li>
+  </ul>
+</main>
+</body>
+</html>

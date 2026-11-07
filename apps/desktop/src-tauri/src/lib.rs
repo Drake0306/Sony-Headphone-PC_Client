@@ -1,6 +1,8 @@
 //! Hairline desktop app: wires the broker, the tray, the popover and the commands.
 
+#[cfg(not(target_os = "windows"))]
 mod audio_macos;
+pub mod audio_windows;
 pub mod battery_history;
 pub mod broker;
 pub mod commands;
@@ -10,10 +12,12 @@ pub mod eq_curve;
 pub mod frame_log;
 pub mod frame_ring;
 pub mod hotkeys;
-mod popover;
+pub mod popover;
 pub mod probe;
 pub mod scenes;
+#[cfg(not(target_os = "windows"))]
 mod sensors_macos;
+pub mod sensors_windows;
 pub mod settings;
 pub mod socket;
 mod tray;

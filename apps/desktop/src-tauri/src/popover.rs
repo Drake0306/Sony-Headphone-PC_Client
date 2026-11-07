@@ -1,4 +1,5 @@
-//! The popover window (an NSPanel on macOS) and the main window.
+//! The popover window (an NSPanel on macOS, a plain borderless window beside
+//! the tray elsewhere) and the main window.
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -16,6 +17,32 @@ pub(crate) const MAIN: &str = "main";
 const REOPEN_GUARD: Duration = Duration::from_millis(300);
 
 static HIDDEN_AT: Mutex<Option<Instant>> = Mutex::new(None);
+
+/// What a left click on the tray icon does to the popover.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrayAction {
+    /// The popover is showing: hide it.
+    Hide,
+    /// The popover is hidden: show it.
+    Show,
+    /// The popover was hidden by focus loss within the reopen guard: this is
+    /// the same click that took the focus away, so leave it hidden.
+    Ignore,
+}
+
+/// The tray-click decision on every platform: `hidden_at` is when focus loss
+/// last hid the popover, `visible` whether it shows now.
+pub fn tray_click_action(hidden_at: Option<Instant>, now: Instant, visible: bool) -> TrayAction {
+    if visible {
+        return TrayAction::Hide;
+    }
+    let just_hidden = hidden_at.is_some_and(|t| now.saturating_duration_since(t) < REOPEN_GUARD);
+    if just_hidden {
+        TrayAction::Ignore
+    } else {
+        TrayAction::Show
+    }
+}
 
 #[cfg(target_os = "macos")]
 tauri_nspanel::tauri_panel! {
@@ -66,22 +93,24 @@ pub fn toggle(app: &AppHandle) {
     let Some(window) = app.get_webview_window(LABEL) else {
         return;
     };
-    if window.is_visible().unwrap_or(false) {
-        hide(app);
-        return;
-    }
-    let just_hidden = HIDDEN_AT
-        .lock()
-        .ok()
-        .and_then(|at| *at)
-        .is_some_and(|t| t.elapsed() < REOPEN_GUARD);
-    if !just_hidden {
-        show(app, &window);
+    let hidden_at = HIDDEN_AT.lock().ok().and_then(|at| *at);
+    let visible = window.is_visible().unwrap_or(false);
+    match tray_click_action(hidden_at, Instant::now(), visible) {
+        TrayAction::Hide => hide(app),
+        TrayAction::Show => show(app, &window),
+        TrayAction::Ignore => {}
     }
 }
 
+/// Where the popover opens: under the menu-bar icon on macOS, above the
+/// notification-area icon at the bottom right on Windows.
+#[cfg(target_os = "windows")]
+const POSITION: Position = Position::TrayBottomRight;
+#[cfg(not(target_os = "windows"))]
+const POSITION: Position = Position::TrayCenter;
+
 fn show(app: &AppHandle, window: &WebviewWindow) {
-    let _ = window.move_window(Position::TrayCenter);
+    let _ = window.move_window(POSITION);
     #[cfg(target_os = "macos")]
     {
         use tauri_nspanel::ManagerExt;

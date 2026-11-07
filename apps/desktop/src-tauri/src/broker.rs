@@ -14,6 +14,7 @@ use mdr_session::{DeviceState, Event, PairedDevice, Session, SessionError};
 use mdr_transport::{connect, discover, is_ult_wear_name, Candidate, FakeDevice, Transport};
 use tauri::{AppHandle, Emitter, Manager};
 
+#[cfg(not(target_os = "windows"))]
 use crate::audio_macos::current_output_device_name;
 use crate::battery_history::{self, BatteryHost};
 use crate::device_record;
@@ -21,7 +22,11 @@ use crate::frame_ring::{FrameEntry, FrameTap, Recorder};
 use crate::probe::{ProbeEvent, ProbeHost, ProbeRunner};
 use crate::scenes::engine::{apply_actions, Engine};
 use crate::scenes::model::{Actions, Inputs, Scene};
+// macOS reads its sensors; other non-Windows systems get the stubs in the same module.
+#[cfg(not(target_os = "windows"))]
 use crate::sensors_macos::{frontmost_app_name, mic_in_use};
+#[cfg(target_os = "windows")]
+use crate::sensors_windows::{frontmost_app_name, mic_in_use};
 
 const RECV_TIMEOUT: Duration = Duration::from_millis(10);
 /// First wait, in seconds, after a failed connect; it doubles up to the maximum.
@@ -588,7 +593,15 @@ pub fn is_playing(output_name: Option<&str>, device_name: Option<&str>) -> bool 
     matches!((output_name, device_name), (Some(out), Some(dev)) if out.eq_ignore_ascii_case(dev))
 }
 
+/// The host's own entry in the Link list: none on Windows until its audio
+/// module exists.
+#[cfg(target_os = "windows")]
+fn paired_devices(device_name: Option<&str>) -> Vec<PairedDevice> {
+    crate::audio_windows::paired_devices(device_name)
+}
+
 /// The host's own entry in the Link list.
+#[cfg(not(target_os = "windows"))]
 fn paired_devices(device_name: Option<&str>) -> Vec<PairedDevice> {
     if !cfg!(target_os = "macos") {
         return Vec::new();
@@ -759,7 +772,7 @@ impl RecordingEvent {
     }
 }
 
-/// Trigger inputs from the desktop: local time and the macOS sensors.
+/// Trigger inputs from the desktop: local time and the platform's sensors.
 fn desktop_inputs(connected: bool) -> Inputs {
     use chrono::Timelike;
     let now = chrono::Local::now();

@@ -124,7 +124,9 @@ fn scene(req: &Map<String, Value>, ctx: &dyn SocketContext) -> Result<(), String
     ctx.send(BrokerCmd::ApplyScene(scene.id.clone()))
 }
 
-/// The app's context: managed state and the broker channel.
+/// The app's context: managed state and the broker channel. Only the Unix
+/// server constructs it.
+#[cfg_attr(not(unix), allow(dead_code))]
 struct AppContext(AppHandle);
 
 impl SocketContext for AppContext {
@@ -293,7 +295,9 @@ pub fn spawn(app: AppHandle) {
 
 /// The socket server is Unix only for now.
 #[cfg(not(unix))]
-pub fn spawn(_: AppHandle) {}
+pub fn spawn(_: AppHandle) {
+    eprintln!("hairline: the socket is not supported on this system yet");
+}
 
 /// Set once this instance has bound the socket; only the owner removes it.
 static OWNS_SOCKET: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);

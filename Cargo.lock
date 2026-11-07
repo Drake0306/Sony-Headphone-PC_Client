@@ -1414,6 +1414,7 @@ dependencies = [
  "tauri-plugin-global-shortcut",
  "tauri-plugin-positioner",
  "uuid",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

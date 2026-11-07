@@ -20,6 +20,7 @@ fn load_defaults_when_missing() {
             theme: Theme::Paper,
             launch_at_login: false,
             hide_dock_icon: true,
+            show_advanced: false,
         }
     );
     assert!(s == AppSettings::default());
@@ -32,6 +33,7 @@ fn round_trip_save_load() {
         theme: Theme::Ink,
         launch_at_login: true,
         hide_dock_icon: false,
+        show_advanced: true,
     };
     save(&dir, &s).unwrap();
     let text = std::fs::read_to_string(dir.join("settings.json")).unwrap();
@@ -46,5 +48,20 @@ fn corrupt_file_falls_back_to_defaults() {
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join("settings.json"), "{ not json").unwrap();
     assert!(load(&dir) == AppSettings::default());
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn a_file_without_show_advanced_keeps_its_settings() {
+    let dir = temp_dir("no-advanced");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("settings.json"),
+        r#"{ "theme": "ink", "launch_at_login": true, "hide_dock_icon": false }"#,
+    )
+    .unwrap();
+    let s = load(&dir);
+    assert_eq!(s.theme, Theme::Ink);
+    assert!(!s.show_advanced);
     std::fs::remove_dir_all(&dir).unwrap();
 }

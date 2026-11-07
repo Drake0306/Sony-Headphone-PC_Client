@@ -6,9 +6,12 @@ use std::sync::Mutex;
 use mdr_proto::{NcAsmState, NcMode, UltLevel};
 use mdr_session::DeviceState;
 use serde::Serialize;
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 
-use crate::broker::{parse_raw, BrokerCmd};
+use crate::broker::{raw_command, BrokerCmd, RecordingEvent};
+use crate::device_record::{capability_rows, CapabilityRow};
+use crate::frame_log;
+use crate::frame_ring::Recorder;
 use crate::popover;
 use crate::scenes::model::Scene;
 use crate::scenes::store;
@@ -255,11 +258,48 @@ pub fn open_main_window(app: AppHandle) -> Result<(), String> {
     popover::open_main_window(&app).map_err(|e| e.to_string())
 }
 
-/// Sends a hand-written request (`table` is `"t1"` or `"t2"`, `hex` the payload).
-/// Registered only when `HAIRLINE_DEBUG=1`; the deny-list still applies.
+/// Every declared or proven support function of the connected headphones.
 #[tauri::command]
-pub fn debug_raw(broker: State<'_, Broker>, table: String, hex: String) -> Result<(), String> {
-    broker.send(parse_raw(&table, &hex)?)
+pub fn capability_list(state: State<'_, Mutex<DeviceState>>) -> Vec<CapabilityRow> {
+    state
+        .lock()
+        .map(|s| capability_rows(&s))
+        .unwrap_or_default()
+}
+
+/// Starts or stops the `"frames"` event stream.
+#[tauri::command]
+pub fn watch_frames(broker: State<'_, Broker>, on: bool) -> Result<(), String> {
+    broker.send(BrokerCmd::WatchFrames(on))
+}
+
+/// Starts or stops recording frames to `captures/local`; returns the file
+/// being written (`None` once stopped) and emits `"recording"`.
+#[tauri::command]
+pub fn record_frames(
+    app: AppHandle,
+    recorder: State<'_, Recorder>,
+    on: bool,
+) -> Result<Option<String>, String> {
+    let path = recorder
+        .set(&frame_log::default_dir(), on)
+        .map_err(|e| format!("could not record frames: {e}"))?;
+    let event = RecordingEvent::new(path.as_deref());
+    let _ = app.emit("recording", event.clone());
+    Ok(event.path)
+}
+
+/// Sends a hand-written request from the Advanced panel (`table` is `"t1"`
+/// or `"t2"`, `hex` the payload). Anything but a GET needs `confirm` to be
+/// `SEND`; the session's deny-list still applies.
+#[tauri::command]
+pub fn send_raw(
+    broker: State<'_, Broker>,
+    table: String,
+    hex: String,
+    confirm: String,
+) -> Result<(), String> {
+    broker.send(raw_command(&table, &hex, &confirm)?)
 }
 
 #[cfg(test)]

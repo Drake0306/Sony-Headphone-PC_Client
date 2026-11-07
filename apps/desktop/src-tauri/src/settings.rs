@@ -26,6 +26,9 @@ pub struct AppSettings {
     pub theme: Theme,
     pub launch_at_login: bool,
     pub hide_dock_icon: bool,
+    /// Shows the Advanced screen (frame log, capabilities, raw command).
+    #[serde(default)]
+    pub show_advanced: bool,
 }
 
 impl Default for AppSettings {
@@ -34,6 +37,7 @@ impl Default for AppSettings {
             theme: Theme::Paper,
             launch_at_login: false,
             hide_dock_icon: true,
+            show_advanced: false,
         }
     }
 }

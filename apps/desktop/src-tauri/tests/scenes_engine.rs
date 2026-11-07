@@ -411,7 +411,7 @@ mod broker_level {
     use std::sync::{Arc, Mutex, OnceLock};
     use std::time::{Duration, Instant};
 
-    use hairline_lib::broker::{run_broker_logged, BrokerCmd, SceneHost};
+    use hairline_lib::broker::{run_broker_logged, BrokerCmd, BrokerContext, SceneHost};
     use hairline_lib::scenes::engine::Engine;
     use hairline_lib::scenes::model::{Actions, Inputs, Nc, Scene, Trigger};
     use mdr_frame::{Decoder, FrameType};
@@ -524,9 +524,10 @@ mod broker_level {
                     let _ = stx.send(s.clone());
                 },
                 monotonic_ms,
-                None,
-                None,
-                Some(&mut host),
+                BrokerContext {
+                    scenes: Some(&mut host),
+                    ..BrokerContext::default()
+                },
             )
         });
         Running {

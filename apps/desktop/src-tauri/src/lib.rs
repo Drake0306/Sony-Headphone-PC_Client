@@ -3,8 +3,10 @@
 mod audio_macos;
 pub mod broker;
 mod commands;
+pub mod device_record;
 pub mod dock;
 pub mod frame_log;
+pub mod frame_ring;
 pub mod hotkeys;
 mod popover;
 pub mod scenes;
@@ -23,17 +25,24 @@ fn wants_fake_device() -> bool {
         || std::env::var("HAIRLINE_FAKE").is_ok_and(|v| v == "1")
 }
 
-/// `HAIRLINE_DEBUG=1` registers the `debug_raw` command.
-fn wants_debug() -> bool {
-    std::env::var("HAIRLINE_DEBUG").is_ok_and(|v| v == "1")
-}
-
-type InvokeHandler = Box<dyn Fn(tauri::ipc::Invoke) -> bool + Send + Sync>;
-
-/// The handler for every command, plus any `extra` ones.
-macro_rules! handler {
-    ($($extra:path),*) => {
-        Box::new(tauri::generate_handler![
+pub fn run() {
+    let fake = wants_fake_device();
+    let recorder = frame_ring::Recorder::default();
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_positioner::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build());
+    #[cfg(target_os = "macos")]
+    let builder = builder.plugin(tauri_nspanel::init());
+    builder
+        .manage(Mutex::new(DeviceState::default()))
+        .manage(commands::Runtime { fake })
+        .manage(hotkeys::HotkeyErrors::default())
+        .manage(recorder.clone())
+        .invoke_handler(tauri::generate_handler![
             commands::runtime_info,
             commands::get_state,
             commands::set_nc,
@@ -56,37 +65,13 @@ macro_rules! handler {
             commands::apply_scene,
             commands::connect,
             commands::open_main_window,
+            commands::capability_list,
+            commands::watch_frames,
+            commands::record_frames,
+            commands::send_raw,
             settings::get_settings,
             settings::set_settings,
-            $($extra),*
         ])
-    };
-}
-
-fn invoke_handler(debug: bool) -> InvokeHandler {
-    if debug {
-        handler!(commands::debug_raw)
-    } else {
-        handler!()
-    }
-}
-
-pub fn run() {
-    let fake = wants_fake_device();
-    let builder = tauri::Builder::default()
-        .plugin(tauri_plugin_positioner::init())
-        .plugin(tauri_plugin_autostart::init(
-            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None,
-        ))
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build());
-    #[cfg(target_os = "macos")]
-    let builder = builder.plugin(tauri_nspanel::init());
-    builder
-        .manage(Mutex::new(DeviceState::default()))
-        .manage(commands::Runtime { fake })
-        .manage(hotkeys::HotkeyErrors::default())
-        .invoke_handler(invoke_handler(wants_debug()))
         .setup(move |app| {
             let dir = settings::dir(app.handle());
             let app_settings = match &dir {
@@ -113,7 +98,12 @@ pub fn run() {
             app.manage(Mutex::new(scenes));
             tray::create(app.handle())?;
             popover::create(app.handle())?;
-            let tx = broker::spawn_broker(app.handle().clone(), fake);
+            let tx = broker::spawn_broker(
+                app.handle().clone(),
+                fake,
+                dir.as_ref().ok().cloned(),
+                recorder.clone(),
+            );
             app.manage(commands::Broker(tx));
             Ok(())
         })

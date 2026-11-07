@@ -3,17 +3,21 @@
 
 use std::borrow::Borrow;
 use std::io;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Receiver, RecvTimeoutError, Sender, TryRecvError};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+use mdr_proto::function::{opcode_role, Role};
 use mdr_proto::{request, Group, NcAsmState, Request, Table, UltLevel};
 use mdr_session::{DeviceState, Event, PairedDevice, Session, SessionError};
 use mdr_transport::{connect, discover, is_ult_wear_name, Candidate, FakeDevice, Transport};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::audio_macos::current_output_device_name;
-use crate::frame_log::FrameLog;
+use crate::device_record;
+use crate::frame_log;
+use crate::frame_ring::{FrameEntry, FrameTap, Recorder};
 use crate::scenes::engine::{apply_actions, Engine};
 use crate::scenes::model::{Actions, Inputs, Scene};
 use crate::sensors_macos::{frontmost_app_name, mic_in_use};
@@ -53,16 +57,68 @@ pub enum BrokerCmd {
     /// Re-emits the `"scenes"` event (list and active scene); nothing else.
     EmitScenes,
     Refresh,
-    /// A hand-written request (`HAIRLINE_DEBUG=1` only); still deny-listed.
+    /// Starts or stops the `"frames"` stream (starting emits a snapshot).
+    WatchFrames(bool),
+    /// Starts or stops recording frames to a file; emits `"recording"`.
+    RecordFrames(bool),
+    /// A hand-written request from the Advanced panel; still deny-listed.
+    /// Anything but a GET is refused unless `confirmed_set` (the typed
+    /// confirmation was given).
     Raw {
         table: Table,
         bytes: Vec<u8>,
+        confirmed_set: bool,
     },
+}
+
+/// The word the Advanced panel asks for before a raw SET.
+pub const RAW_SET_CONFIRMATION: &str = "SEND";
+
+/// Whether a raw payload needs the typed confirmation: everything whose
+/// opcode is not a GET in the libmdr role table (SETs, and unknown opcodes
+/// to be safe).
+pub fn needs_confirmation(table: Table, bytes: &[u8]) -> bool {
+    bytes
+        .first()
+        .is_none_or(|&op| opcode_role(table, op) != Role::Get)
+}
+
+/// The Advanced panel's raw command: parses like `parse_raw`, then refuses
+/// a deny-listed payload, and a SET unless `confirm` is exactly `SEND`. The
+/// session applies the deny-list again when sending.
+pub fn raw_command(table: &str, hex: &str, confirm: &str) -> Result<BrokerCmd, String> {
+    let (table, bytes) = parse_table_hex(table, hex)?;
+    // The session refuses these too; checking here lets the panel say why.
+    if let Some(reason) = mdr_proto::denied(table, &bytes) {
+        return Err(format!("never sent: {reason}"));
+    }
+    let confirmed_set = if needs_confirmation(table, &bytes) {
+        if confirm != RAW_SET_CONFIRMATION {
+            return Err("type SEND to send a SET".into());
+        }
+        true
+    } else {
+        false
+    };
+    Ok(BrokerCmd::Raw {
+        table,
+        bytes,
+        confirmed_set,
+    })
 }
 
 /// Builds `BrokerCmd::Raw` from a table name (`t1`/`t2`) and hex bytes, which
 /// may be separated by spaces, colons or dashes.
 pub fn parse_raw(table: &str, hex: &str) -> Result<BrokerCmd, String> {
+    let (table, bytes) = parse_table_hex(table, hex)?;
+    Ok(BrokerCmd::Raw {
+        table,
+        bytes,
+        confirmed_set: false,
+    })
+}
+
+fn parse_table_hex(table: &str, hex: &str) -> Result<(Table, Vec<u8>), String> {
     let table = match table.to_ascii_lowercase().as_str() {
         "t1" => Table::T1,
         "t2" => Table::T2,
@@ -82,7 +138,7 @@ pub fn parse_raw(table: &str, hex: &str) -> Result<BrokerCmd, String> {
             u8::from_str_radix(&pair, 16).map_err(|_| format!("{pair:?} is not a hex byte"))
         })
         .collect::<Result<_, _>>()?;
-    Ok(BrokerCmd::Raw { table, bytes })
+    Ok((table, bytes))
 }
 
 /// The scenes engine and how it reaches the outside world. It outlives each
@@ -161,27 +217,52 @@ pub fn run_broker<E: Fn(&DeviceState)>(
     emit: E,
     clock: impl FnMut() -> u64,
 ) -> io::Result<()> {
-    run_broker_logged(transport, cmds, emit, clock, None, None, None)
+    run_broker_logged(transport, cmds, emit, clock, BrokerContext::default())
 }
 
-/// As `run_broker`, also writing every frame and log line to `log`.
-/// `device` is the connected headphones as discovered: its Bluetooth name is
-/// matched against the default audio output (without it the model name is
-/// used) and its address is shown in the UI. `scenes`, when given, is ticked
-/// every two seconds and handles the scene commands.
+/// What a connection runs with besides the transport; all optional.
+#[derive(Default)]
+pub struct BrokerContext<'a, 's, 'f> {
+    /// The connected headphones as discovered: the Bluetooth name is matched
+    /// against the default audio output (without it the model name is used),
+    /// the address is shown in the UI and keys the device record.
+    pub device: Option<&'a Candidate>,
+    /// Ticked every two seconds; handles the scene commands.
+    pub scenes: Option<&'a mut SceneHost<'s>>,
+    /// The frame ring, recording and stream; handles `WatchFrames`/`RecordFrames`.
+    pub frames: Option<&'a mut FrameTap<'f>>,
+    /// The settings directory; device records live in its `devices/`.
+    pub record_dir: Option<&'a Path>,
+}
+
+/// As `run_broker`, with the device, scenes, frame tap and device records
+/// in `ctx`. The device record for the connected address is loaded into the
+/// session (`mark_proven`) before the handshake.
 pub fn run_broker_logged<E: Fn(&DeviceState)>(
     mut transport: Box<dyn Transport>,
     cmds: impl Borrow<Receiver<BrokerCmd>>,
     emit: E,
     mut clock: impl FnMut() -> u64,
-    mut log: Option<&mut FrameLog>,
-    device: Option<&Candidate>,
-    mut scenes: Option<&mut SceneHost<'_>>,
+    ctx: BrokerContext<'_, '_, '_>,
 ) -> io::Result<()> {
+    let BrokerContext {
+        device,
+        mut scenes,
+        mut frames,
+        record_dir,
+    } = ctx;
     let cmds = cmds.borrow();
     let device_name = device.map(|d| d.name.as_str());
     let mut session = Session::new(clock());
     session.set_link(device.map(|d| d.address.clone()), transport.channel());
+    if let (Some(dir), Some(device)) = (record_dir, device) {
+        for (table, function) in device_record::load(dir, &device.address).proven {
+            session.mark_proven(table, function);
+        }
+    }
+    if let Some(tap) = frames.as_deref_mut() {
+        tap.new_link();
+    }
     session.start();
     let mut devices_checked_at: Option<u64> = None;
     let mut scenes_checked_at: Option<u64> = None;
@@ -213,8 +294,8 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
 
         let now = clock();
         while let Some(frame) = session.poll_output(now) {
-            if let Some(log) = log.as_deref_mut() {
-                log.sent(now, &frame);
+            if let Some(tap) = frames.as_deref_mut() {
+                tap.sent(now, &frame);
             }
             if let Err(e) = transport.write(&frame) {
                 return Err(link_lost(&mut session, &emit, e));
@@ -224,8 +305,8 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
         match transport.recv_timeout(RECV_TIMEOUT) {
             Ok(Some(bytes)) => {
                 let now = clock();
-                if let Some(log) = log.as_deref_mut() {
-                    log.received(now, &bytes);
+                if let Some(tap) = frames.as_deref_mut() {
+                    tap.received(now, &bytes);
                 }
                 events.extend(session.handle_input(&bytes, now));
             }
@@ -259,6 +340,25 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
                         changed = true;
                     }
                 }
+                Ok(BrokerCmd::WatchFrames(on)) => {
+                    if let Some(tap) = frames.as_deref_mut() {
+                        tap.watch(on);
+                    }
+                }
+                Ok(BrokerCmd::RecordFrames(on)) => {
+                    if let Some(tap) = frames.as_deref_mut() {
+                        tap.record(on);
+                    }
+                }
+                Ok(BrokerCmd::Raw {
+                    table,
+                    ref bytes,
+                    confirmed_set: false,
+                }) if needs_confirmation(table, bytes) => {
+                    events.push(Event::Log(format!(
+                        "raw {table:?} {bytes:02X?} not sent: a SET needs confirmation"
+                    )));
+                }
                 Ok(cmd) => {
                     if let Err(e) = apply(&mut session, cmd.clone()) {
                         events.push(Event::Log(format!("{cmd:?} not sent: {e:?}")));
@@ -289,14 +389,17 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
                 }
                 Event::Log(msg) => {
                     eprintln!("hairline: {msg}");
-                    if let Some(log) = log.as_deref_mut() {
-                        log.note(clock(), msg);
+                    if let Some(tap) = frames.as_deref_mut() {
+                        tap.note(clock(), msg);
                     }
                 }
             }
         }
         if changed {
             emit(session.state());
+        }
+        if let Some(tap) = frames.as_deref_mut() {
+            tap.flush();
         }
         if gave_up {
             transport.close();
@@ -327,7 +430,7 @@ fn apply(session: &mut Session, cmd: BrokerCmd) -> Result<(), SessionError> {
         BrokerCmd::SetSidetone(on) => session.set_sidetone(on),
         // Handled by the scene host; without one there is nothing to do.
         BrokerCmd::ApplyScene(_) | BrokerCmd::SetScenes(_) | BrokerCmd::EmitScenes => Ok(()),
-        BrokerCmd::Raw { table, bytes } => session.request(Request {
+        BrokerCmd::Raw { table, bytes, .. } => session.request(Request {
             table,
             bytes,
             capability: None,
@@ -338,8 +441,11 @@ fn apply(session: &mut Session, cmd: BrokerCmd) -> Result<(), SessionError> {
             session.request(request::ncasm_get())?;
             session.request(request::eq_ult_get())
         }
-        // Already connected; nothing to do.
-        BrokerCmd::Connect | BrokerCmd::Disconnect => Ok(()),
+        // Already connected, or handled by the frame tap; nothing to do.
+        BrokerCmd::Connect
+        | BrokerCmd::Disconnect
+        | BrokerCmd::WatchFrames(_)
+        | BrokerCmd::RecordFrames(_) => Ok(()),
     }
 }
 
@@ -374,8 +480,15 @@ pub fn next_backoff(prev: u64) -> u64 {
 
 /// Starts the broker thread: connects (or uses the fake device), runs the
 /// session, and retries with an exponential back-off after a failed connect or
-/// a lost link. A `Connect` command cuts the wait short.
-pub fn spawn_broker(app: AppHandle, fake: bool) -> Sender<BrokerCmd> {
+/// a lost link. A `Connect` command cuts the wait short. `record_dir` is the
+/// settings directory (device records); `recorder` is shared with the
+/// `record_frames` command.
+pub fn spawn_broker(
+    app: AppHandle,
+    fake: bool,
+    record_dir: Option<PathBuf>,
+    recorder: Recorder,
+) -> Sender<BrokerCmd> {
     let (tx, rx) = channel();
     std::thread::Builder::new()
         .name("hairline-broker".into())
@@ -407,7 +520,19 @@ pub fn spawn_broker(app: AppHandle, fake: bool) -> Sender<BrokerCmd> {
                     );
                 }),
             };
-            let mut log = FrameLog::from_env();
+            let mut tap = FrameTap::new(
+                frame_log::default_dir(),
+                recorder,
+                Box::new(|frames: &[FrameEntry]| {
+                    let _ = app.emit("frames", frames);
+                }),
+                Box::new(|path: Option<&Path>| {
+                    let _ = app.emit("recording", RecordingEvent::new(path));
+                }),
+            );
+            if std::env::var("HAIRLINE_FRAME_LOG").is_ok_and(|v| v == "1") {
+                tap.record(true);
+            }
             let mut backoff = 0;
             loop {
                 let result = match open_transport(fake) {
@@ -418,22 +543,30 @@ pub fn spawn_broker(app: AppHandle, fake: bool) -> Sender<BrokerCmd> {
                             &rx,
                             emit,
                             clock,
-                            log.as_mut(),
-                            device.as_ref(),
-                            Some(&mut host),
+                            BrokerContext {
+                                device: device.as_ref(),
+                                scenes: Some(&mut host),
+                                frames: Some(&mut tap),
+                                record_dir: record_dir.as_deref(),
+                            },
                         )
                     }
                     Err(e) => Err(e),
                 };
                 let next = match result {
-                    Ok(()) => wait_for_connect(&rx, None, &mut host),
+                    Ok(()) => wait_for_connect(&rx, None, &mut host, &mut tap),
                     Err(e) => {
                         backoff = next_backoff(backoff);
                         eprintln!(
                             "hairline: no link ({:?}: {e}); retrying in {backoff}s",
                             e.kind()
                         );
-                        wait_for_connect(&rx, Some(Duration::from_secs(backoff)), &mut host)
+                        wait_for_connect(
+                            &rx,
+                            Some(Duration::from_secs(backoff)),
+                            &mut host,
+                            &mut tap,
+                        )
                     }
                 };
                 if next.is_err() {
@@ -454,6 +587,20 @@ struct ScenesEvent<'a> {
     hotkey_errors: std::collections::HashMap<String, String>,
 }
 
+/// The `"recording"` event payload: the file being written, or null.
+#[derive(Clone, serde::Serialize)]
+pub struct RecordingEvent {
+    pub path: Option<String>,
+}
+
+impl RecordingEvent {
+    pub fn new(path: Option<&Path>) -> RecordingEvent {
+        RecordingEvent {
+            path: path.map(|p| p.display().to_string()),
+        }
+    }
+}
+
 /// Trigger inputs from the desktop: local time and the macOS sensors.
 fn desktop_inputs(connected: bool) -> Inputs {
     use chrono::Timelike;
@@ -468,11 +615,12 @@ fn desktop_inputs(connected: bool) -> Inputs {
 
 /// Blocks until `Connect` arrives or `timeout` passes; `Err` once the app is
 /// gone. Scenes keep ticking (nothing is sent; due actions are held for the
-/// next connect) and scene commands are handled meanwhile.
+/// next connect) and scene and frame-tap commands are handled meanwhile.
 fn wait_for_connect(
     rx: &Receiver<BrokerCmd>,
     timeout: Option<Duration>,
     host: &mut SceneHost<'_>,
+    tap: &mut FrameTap<'_>,
 ) -> Result<(), ()> {
     let deadline = timeout.map(|t| Instant::now() + t);
     let tick_every = Duration::from_millis(SCENES_EVERY_MS);
@@ -492,10 +640,14 @@ fn wait_for_connect(
             Err(RecvTimeoutError::Timeout) => continue,
             Err(RecvTimeoutError::Disconnected) => return Err(()),
         };
-        if cmd == BrokerCmd::Connect {
-            return Ok(());
+        match cmd {
+            BrokerCmd::Connect => return Ok(()),
+            BrokerCmd::WatchFrames(on) => tap.watch(on),
+            BrokerCmd::RecordFrames(on) => tap.record(on),
+            cmd => {
+                host.command(&cmd, false);
+            }
         }
-        host.command(&cmd, false);
     }
 }
 

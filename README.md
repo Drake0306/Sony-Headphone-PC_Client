@@ -40,7 +40,9 @@ Phase 4: the Advanced panel, the opcode probe, battery history with a time-left 
 
 Phase 5: the Advanced equalizer, described below, and a redesigned Sound fader (21 segments with a zero line, an orange knob and a dot-matrix value). It is verified against the fake device and the unit tests; the checklist for the real headphones is section 9 of `docs/hardware-validation.md`.
 
-Next: the Windows tray app, then Linux. The in-app audio engine (Phase 6) is undecided; see [the equalizer research](<docs/research/reports/Advanced equalizer research.html>).
+Phase 7a: the app builds and its tests pass on Windows CI. The tray popover is a plain window there; audio 'playing' and the microphone trigger are blank until Windows modules exist. Not run against the headphones on Windows. The checklist for a Windows machine is section 10 of `docs/hardware-validation.md`.
+
+Next: running the Windows app on a Windows machine, then Linux. The in-app audio engine (Phase 6) is undecided; see [the equalizer research](<docs/research/reports/Advanced equalizer research.html>).
 
 The popover is validated on a real WH-ULT900N (firmware 2.1.4) on macOS 27.2; see `docs/hardware-validation.md`. The Phase 2 screens are verified against the fake device and still need a session with the real headphones. Use `--fake-device` (below) to run without headphones; a fake run says `FAKE` in the popover and the window so it is never mistaken for the real thing.
 

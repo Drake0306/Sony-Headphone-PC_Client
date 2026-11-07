@@ -111,15 +111,25 @@
         {#snippet aside()}{ult.shown ? ULT_NOTE[ult.shown] : ""}{/snippet}
       </Row>
       <Row kind="overview" label="Equalizer">
-        <div class="faders" class:unavailable={!eq}>
-          {#if eq}
-            {#each eq.bands as band, i (i)}
-              <div class:cb={i === 0}><div class="track"><i style:bottom={`${(band / top) * 90}%`}></i></div></div>
-            {/each}
-          {:else}
-            {#each [0, 1, 2, 3, 4, 5] as i (i)}<div><div class="track"></div></div>{/each}
-          {/if}
-        </div>
+        <!-- A read-only sketch of the curve: bars, not handles. Clicking it goes to Sound. -->
+        <button
+          class="preview"
+          class:unavailable={!eq}
+          title="Preview. Change the equalizer on the Sound screen."
+          aria-label="Equalizer preview. Opens the Sound screen."
+          onclick={() => (location.hash = "#sound")}
+        >
+          <div class="bars">
+            {#if eq}
+              {#each eq.bands as band, i (i)}
+                <div class:cb={i === 0}><div class="track"><b style:height={`${(band / top) * 100}%`}></b></div></div>
+              {/each}
+            {:else}
+              {#each [0, 1, 2, 3, 4, 5] as i (i)}<div><div class="track"></div></div>{/each}
+            {/if}
+          </div>
+          <span class="lab">preview · edit on Sound</span>
+        </button>
         {#snippet aside()}{eq ? presetName(eq.preset) : ""}{/snippet}
       </Row>
       <Row kind="overview" label="Codec">
@@ -177,42 +187,61 @@
     font-size: 18px;
   }
 
-  .faders {
+  .preview {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .preview.unavailable {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .preview .lab {
+    font-size: 9px;
+  }
+
+  .bars {
     display: flex;
     gap: 8px;
     align-items: flex-end;
-    height: 56px;
+    height: 48px;
   }
 
-  .faders.unavailable {
-    opacity: 0.35;
-  }
-
-  .faders > div {
+  .bars > div {
     display: flex;
     flex: 1;
     flex-direction: column;
-    align-items: center;
     justify-content: flex-end;
     height: 100%;
   }
 
   .track {
     position: relative;
-    width: 3px;
+    width: 100%;
     height: 100%;
-    background: var(--hair);
+    background: var(--box);
+    border-bottom: 1px solid var(--hair);
   }
 
-  .track i {
+  .track b {
     position: absolute;
-    left: -6px;
-    width: 15px;
-    height: 6px;
-    background: var(--ink);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--muted);
+    opacity: 0.6;
   }
 
-  .cb .track i {
-    background: var(--forest);
+  .cb .track b {
+    background: var(--ult);
+    opacity: 0.6;
   }
 </style>

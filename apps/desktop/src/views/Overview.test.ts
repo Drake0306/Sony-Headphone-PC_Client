@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, waitFor } from "@testing-library/svelte";
 
 const backend = vi.hoisted(() => ({
   estimate: { minutes_left: null as number | null, samples: 3, since: 1_000 },
@@ -47,5 +47,23 @@ describe("Overview time left", () => {
     await new Promise((done) => setTimeout(done, 20));
     expect(r.container.querySelector(".left")).toBeNull();
     r.unmount();
+  });
+});
+
+describe("equalizer preview", () => {
+  it("overview_equalizer_is_a_read_only_preview_that_opens_sound", async () => {
+    const st: DeviceState = {
+      ...withBattery(),
+      eq_ult: { value: { preset: 0xa1, ult: "Off", bands: [10, 13, 10, 14, 20, 12] }, status: "Confirmed" },
+    };
+    const r = render(Overview, { st });
+    const preview = r.container.querySelector("button.preview") as HTMLButtonElement;
+    expect(preview).not.toBeNull();
+    expect(r.container.querySelectorAll("[role=slider]").length).toBe(0);
+    expect(r.container.querySelectorAll(".bars .track b").length).toBe(6);
+    expect(preview.textContent).toContain("preview · edit on Sound");
+    location.hash = "";
+    await fireEvent.click(preview);
+    expect(location.hash).toBe("#sound");
   });
 });

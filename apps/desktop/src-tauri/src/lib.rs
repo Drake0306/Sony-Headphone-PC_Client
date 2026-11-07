@@ -5,7 +5,10 @@ pub mod broker;
 mod commands;
 pub mod dock;
 pub mod frame_log;
+pub mod hotkeys;
 mod popover;
+pub mod scenes;
+mod sensors_macos;
 pub mod settings;
 mod tray;
 
@@ -48,6 +51,9 @@ macro_rules! handler {
             commands::set_voice_guide_volume,
             commands::set_touch_panel,
             commands::set_sidetone,
+            commands::get_scenes,
+            commands::set_scenes,
+            commands::apply_scene,
             commands::connect,
             commands::open_main_window,
             settings::get_settings,
@@ -72,12 +78,14 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
-        ));
+        ))
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build());
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init());
     builder
         .manage(Mutex::new(DeviceState::default()))
         .manage(commands::Runtime { fake })
+        .manage(hotkeys::HotkeyErrors::default())
         .invoke_handler(invoke_handler(wants_debug()))
         .setup(move |app| {
             let dir = settings::dir(app.handle());
@@ -96,6 +104,13 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(dock::policy(false, app_settings.hide_dock_icon).into());
             app.manage(Mutex::new(app_settings));
+            let scenes = match &dir {
+                Ok(dir) => scenes::store::load(dir),
+                Err(_) => scenes::store::seed_scenes(),
+            };
+            // Read by the broker thread when it starts.
+            hotkeys::apply(app.handle(), &scenes);
+            app.manage(Mutex::new(scenes));
             tray::create(app.handle())?;
             popover::create(app.handle())?;
             let tx = broker::spawn_broker(app.handle().clone(), fake);

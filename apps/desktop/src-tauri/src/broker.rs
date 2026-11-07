@@ -14,6 +14,9 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use crate::audio_macos::current_output_device_name;
 use crate::frame_log::FrameLog;
+use crate::scenes::engine::{apply_actions, Engine};
+use crate::scenes::model::{Actions, Inputs, Scene};
+use crate::sensors_macos::{frontmost_app_name, mic_in_use};
 
 const RECV_TIMEOUT: Duration = Duration::from_millis(10);
 /// First wait, in seconds, after a failed connect; it doubles up to the maximum.
@@ -21,6 +24,8 @@ const BACKOFF_START_S: u64 = 5;
 const BACKOFF_MAX_S: u64 = 60;
 /// How often the host's default audio output is re-read.
 const DEVICES_EVERY_MS: u64 = 1000;
+/// How often scene triggers are re-evaluated.
+const SCENES_EVERY_MS: u64 = 2000;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BrokerCmd {
@@ -41,6 +46,12 @@ pub enum BrokerCmd {
     SetVoiceGuideVolume(i8),
     SetTouchPanel(bool),
     SetSidetone(bool),
+    /// Applies a scene by hand.
+    ApplyScene(String),
+    /// The saved scene list.
+    SetScenes(Vec<Scene>),
+    /// Re-emits the `"scenes"` event (list and active scene); nothing else.
+    EmitScenes,
     Refresh,
     /// A hand-written request (`HAIRLINE_DEBUG=1` only); still deny-listed.
     Raw {
@@ -74,6 +85,71 @@ pub fn parse_raw(table: &str, hex: &str) -> Result<BrokerCmd, String> {
     Ok(BrokerCmd::Raw { table, bytes })
 }
 
+/// The scenes engine and how it reaches the outside world. It outlives each
+/// connection, so the active scene survives reconnects.
+pub struct SceneHost<'a> {
+    pub engine: Engine,
+    /// Builds the trigger inputs; the argument is whether the headphones are connected.
+    pub sense: Box<dyn FnMut(bool) -> Inputs + 'a>,
+    /// Publishes the list and the active scene (the `"scenes"` event).
+    pub emit: Box<dyn Fn(&Engine) + 'a>,
+}
+
+impl SceneHost<'_> {
+    /// Handles `ApplyScene`, `SetScenes` (an edited active scene is
+    /// re-applied) and `EmitScenes` (other commands are ignored), emits
+    /// `"scenes"`, and returns the actions to send now (none while
+    /// disconnected).
+    fn command(&mut self, cmd: &BrokerCmd, connected: bool) -> Option<Actions> {
+        let actions = match cmd {
+            BrokerCmd::ApplyScene(id) => {
+                let actions = self.engine.apply_manual(id);
+                if actions.is_none() {
+                    eprintln!("hairline: no scene {id:?} to apply");
+                }
+                actions
+            }
+            BrokerCmd::SetScenes(scenes) => self.engine.set_scenes(scenes.clone()),
+            BrokerCmd::EmitScenes => None,
+            _ => return None,
+        };
+        (self.emit)(&self.engine);
+        self.engine.deliver(actions, connected)
+    }
+
+    /// After a connect: re-evaluates as connected and returns what to send,
+    /// either a newly outranking scene or the held actions (never both).
+    fn on_connected(&mut self) -> Option<Actions> {
+        let inputs = (self.sense)(true);
+        let before = self.engine.active().map(str::to_owned);
+        let actions = self.engine.on_connected(&inputs);
+        if self.engine.active() != before.as_deref() {
+            (self.emit)(&self.engine);
+        }
+        actions
+    }
+
+    /// Re-evaluates the triggers, emitting when the active scene changes.
+    fn tick(&mut self, connected: bool) -> Option<Actions> {
+        let inputs = (self.sense)(connected);
+        let before = self.engine.active().map(str::to_owned);
+        let actions = self.engine.tick(&inputs);
+        if self.engine.active() != before.as_deref() {
+            (self.emit)(&self.engine);
+        }
+        self.engine.deliver(actions, connected)
+    }
+}
+
+/// Sends a scene's actions, logging each refusal.
+fn send_scene(session: &mut Session, actions: &Actions, events: &mut Vec<Event>) {
+    for result in apply_actions(session, actions) {
+        if let Err(e) = result {
+            events.push(Event::Log(format!("scene action not sent: {e:?}")));
+        }
+    }
+}
+
 /// Runs one connection until `Disconnect` (or the command channel closing)
 /// returns `Ok`, or the link is lost, which returns `Err` after emitting the
 /// disconnected state.
@@ -85,13 +161,14 @@ pub fn run_broker<E: Fn(&DeviceState)>(
     emit: E,
     clock: impl FnMut() -> u64,
 ) -> io::Result<()> {
-    run_broker_logged(transport, cmds, emit, clock, None, None)
+    run_broker_logged(transport, cmds, emit, clock, None, None, None)
 }
 
 /// As `run_broker`, also writing every frame and log line to `log`.
 /// `device` is the connected headphones as discovered: its Bluetooth name is
 /// matched against the default audio output (without it the model name is
-/// used) and its address is shown in the UI.
+/// used) and its address is shown in the UI. `scenes`, when given, is ticked
+/// every two seconds and handles the scene commands.
 pub fn run_broker_logged<E: Fn(&DeviceState)>(
     mut transport: Box<dyn Transport>,
     cmds: impl Borrow<Receiver<BrokerCmd>>,
@@ -99,6 +176,7 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
     mut clock: impl FnMut() -> u64,
     mut log: Option<&mut FrameLog>,
     device: Option<&Candidate>,
+    mut scenes: Option<&mut SceneHost<'_>>,
 ) -> io::Result<()> {
     let cmds = cmds.borrow();
     let device_name = device.map(|d| d.name.as_str());
@@ -106,8 +184,21 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
     session.set_link(device.map(|d| d.address.clone()), transport.channel());
     session.start();
     let mut devices_checked_at: Option<u64> = None;
+    let mut scenes_checked_at: Option<u64> = None;
     loop {
         let mut changed = false;
+        let mut events = Vec::new();
+
+        let now = clock();
+        if let Some(host) = scenes.as_deref_mut() {
+            if scenes_checked_at.is_none_or(|t| now >= t + SCENES_EVERY_MS) {
+                scenes_checked_at = Some(now);
+                if let Some(actions) = host.tick(session.state().connected) {
+                    send_scene(&mut session, &actions, &mut events);
+                    changed = true;
+                }
+            }
+        }
 
         let now = clock();
         if devices_checked_at.is_none_or(|t| now >= t + DEVICES_EVERY_MS) {
@@ -130,7 +221,6 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
             }
         }
 
-        let mut events = Vec::new();
         match transport.recv_timeout(RECV_TIMEOUT) {
             Ok(Some(bytes)) => {
                 let now = clock();
@@ -155,6 +245,20 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
                     emit(session.state());
                     return Ok(());
                 }
+                Ok(
+                    cmd @ (BrokerCmd::ApplyScene(_)
+                    | BrokerCmd::SetScenes(_)
+                    | BrokerCmd::EmitScenes),
+                ) => {
+                    let connected = session.state().connected;
+                    let due = scenes
+                        .as_deref_mut()
+                        .and_then(|h| h.command(&cmd, connected));
+                    if let Some(actions) = due {
+                        send_scene(&mut session, &actions, &mut events);
+                        changed = true;
+                    }
+                }
                 Ok(cmd) => {
                     if let Err(e) = apply(&mut session, cmd.clone()) {
                         events.push(Event::Log(format!("{cmd:?} not sent: {e:?}")));
@@ -163,6 +267,15 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
                     changed = true;
                 }
                 Err(TryRecvError::Empty) => break,
+            }
+        }
+
+        if events.contains(&Event::Connected) {
+            if let Some(host) = scenes.as_deref_mut() {
+                if let Some(actions) = host.on_connected() {
+                    send_scene(&mut session, &actions, &mut events);
+                }
+                scenes_checked_at = Some(clock());
             }
         }
 
@@ -212,6 +325,8 @@ fn apply(session: &mut Session, cmd: BrokerCmd) -> Result<(), SessionError> {
         BrokerCmd::SetVoiceGuideVolume(v) => session.set_voice_guide_volume(v),
         BrokerCmd::SetTouchPanel(on) => session.set_touch_panel(on),
         BrokerCmd::SetSidetone(on) => session.set_sidetone(on),
+        // Handled by the scene host; without one there is nothing to do.
+        BrokerCmd::ApplyScene(_) | BrokerCmd::SetScenes(_) | BrokerCmd::EmitScenes => Ok(()),
         BrokerCmd::Raw { table, bytes } => session.request(Request {
             table,
             bytes,
@@ -273,25 +388,52 @@ pub fn spawn_broker(app: AppHandle, fake: bool) -> Sender<BrokerCmd> {
                 }
                 let _ = app.emit("state", state);
             };
+            let scenes = app
+                .state::<Mutex<Vec<Scene>>>()
+                .lock()
+                .map(|s| s.clone())
+                .unwrap_or_default();
+            let mut host = SceneHost {
+                engine: Engine::new(scenes),
+                sense: Box::new(desktop_inputs),
+                emit: Box::new(|engine: &Engine| {
+                    let _ = app.emit(
+                        "scenes",
+                        ScenesEvent {
+                            scenes: engine.scenes(),
+                            active: engine.active(),
+                            hotkey_errors: crate::hotkeys::latest_errors(&app),
+                        },
+                    );
+                }),
+            };
             let mut log = FrameLog::from_env();
             let mut backoff = 0;
             loop {
                 let result = match open_transport(fake) {
                     Ok((t, device)) => {
                         backoff = 0;
-                        run_broker_logged(t, &rx, emit, clock, log.as_mut(), device.as_ref())
+                        run_broker_logged(
+                            t,
+                            &rx,
+                            emit,
+                            clock,
+                            log.as_mut(),
+                            device.as_ref(),
+                            Some(&mut host),
+                        )
                     }
                     Err(e) => Err(e),
                 };
                 let next = match result {
-                    Ok(()) => wait_for_connect(&rx, None),
+                    Ok(()) => wait_for_connect(&rx, None, &mut host),
                     Err(e) => {
                         backoff = next_backoff(backoff);
                         eprintln!(
                             "hairline: no link ({:?}: {e}); retrying in {backoff}s",
                             e.kind()
                         );
-                        wait_for_connect(&rx, Some(Duration::from_secs(backoff)))
+                        wait_for_connect(&rx, Some(Duration::from_secs(backoff)), &mut host)
                     }
                 };
                 if next.is_err() {
@@ -303,21 +445,57 @@ pub fn spawn_broker(app: AppHandle, fake: bool) -> Sender<BrokerCmd> {
     tx
 }
 
-/// Blocks until `Connect` arrives or `timeout` passes; `Err` once the app is gone.
-fn wait_for_connect(rx: &Receiver<BrokerCmd>, timeout: Option<Duration>) -> Result<(), ()> {
+/// The `"scenes"` event payload.
+#[derive(Clone, serde::Serialize)]
+struct ScenesEvent<'a> {
+    scenes: &'a [Scene],
+    active: Option<&'a str>,
+    /// Refused or failed hotkeys by scene id; empty when none.
+    hotkey_errors: std::collections::HashMap<String, String>,
+}
+
+/// Trigger inputs from the desktop: local time and the macOS sensors.
+fn desktop_inputs(connected: bool) -> Inputs {
+    use chrono::Timelike;
+    let now = chrono::Local::now();
+    Inputs {
+        connected,
+        now_minutes: (now.hour() * 60 + now.minute()) as u16,
+        frontmost_app: frontmost_app_name(),
+        mic_in_use: mic_in_use(),
+    }
+}
+
+/// Blocks until `Connect` arrives or `timeout` passes; `Err` once the app is
+/// gone. Scenes keep ticking (nothing is sent; due actions are held for the
+/// next connect) and scene commands are handled meanwhile.
+fn wait_for_connect(
+    rx: &Receiver<BrokerCmd>,
+    timeout: Option<Duration>,
+    host: &mut SceneHost<'_>,
+) -> Result<(), ()> {
     let deadline = timeout.map(|t| Instant::now() + t);
+    let tick_every = Duration::from_millis(SCENES_EVERY_MS);
+    let mut next_tick = Instant::now();
     loop {
-        let cmd = match deadline {
-            Some(d) => match rx.recv_timeout(d.saturating_duration_since(Instant::now())) {
-                Ok(cmd) => cmd,
-                Err(RecvTimeoutError::Timeout) => return Ok(()),
-                Err(RecvTimeoutError::Disconnected) => return Err(()),
-            },
-            None => rx.recv().map_err(|_| ())?,
+        let now = Instant::now();
+        if now >= next_tick {
+            host.tick(false);
+            next_tick = now + tick_every;
+        }
+        if deadline.is_some_and(|d| now >= d) {
+            return Ok(());
+        }
+        let wake = deadline.map_or(next_tick, |d| d.min(next_tick));
+        let cmd = match rx.recv_timeout(wake.saturating_duration_since(Instant::now())) {
+            Ok(cmd) => cmd,
+            Err(RecvTimeoutError::Timeout) => continue,
+            Err(RecvTimeoutError::Disconnected) => return Err(()),
         };
         if cmd == BrokerCmd::Connect {
             return Ok(());
         }
+        host.command(&cmd, false);
     }
 }
 

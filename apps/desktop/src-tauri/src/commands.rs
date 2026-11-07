@@ -10,6 +10,10 @@ use tauri::{AppHandle, State};
 
 use crate::broker::{parse_raw, BrokerCmd};
 use crate::popover;
+use crate::scenes::model::Scene;
+use crate::scenes::store;
+use crate::scenes::validate::check_scenes;
+use crate::settings;
 
 /// The broker's command channel, held in Tauri state.
 pub struct Broker(pub Sender<BrokerCmd>);
@@ -88,12 +92,12 @@ pub fn set_multipoint(broker: State<'_, Broker>, on: bool) -> Result<(), String>
 }
 
 /// EQ preset ids the device offers (Off, the eight named presets, Manual, Custom 1/2).
-const EQ_PRESETS: [u8; 12] = [
+pub const EQ_PRESETS: [u8; 12] = [
     0x00, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0xA0, 0xA1, 0xA2,
 ];
 const EQ_BANDS: usize = 6;
 const EQ_BAND_MAX: u8 = 20;
-const VOLUME_MAX: u8 = 30;
+pub const VOLUME_MAX: u8 = 30;
 /// Auto power-off: 5, 15, 30, 60, 180 min, when removed from ears, disabled.
 const AUTO_POWER_OFF_VALUES: [u8; 7] = [0x00, 0x04, 0x01, 0x02, 0x03, 0x10, 0x11];
 /// Voice assistant: phone default, Google, Alexa, Sony, none.
@@ -192,6 +196,53 @@ pub fn set_touch_panel(broker: State<'_, Broker>, on: bool) -> Result<(), String
 #[tauri::command]
 pub fn set_sidetone(broker: State<'_, Broker>, on: bool) -> Result<(), String> {
     broker.send(BrokerCmd::SetSidetone(on))
+}
+
+/// The list; also asks the broker to re-emit `"scenes"` so a newly opened
+/// window learns the active scene.
+#[tauri::command]
+pub fn get_scenes(broker: State<'_, Broker>, scenes: State<'_, Mutex<Vec<Scene>>>) -> Vec<Scene> {
+    let list = scenes.lock().map(|s| s.clone()).unwrap_or_default();
+    let _ = broker.send(BrokerCmd::EmitScenes);
+    list
+}
+
+/// Validates and saves the whole list, re-registers the hotkeys, then hands
+/// the list to the broker, which emits the `"scenes"` event (with any hotkey
+/// errors).
+#[tauri::command]
+pub fn set_scenes(
+    app: AppHandle,
+    broker: State<'_, Broker>,
+    state: State<'_, Mutex<Vec<Scene>>>,
+    scenes: Vec<Scene>,
+) -> Result<(), String> {
+    check_scenes(&scenes)?;
+    let dir = settings::dir(&app).map_err(|e| e.to_string())?;
+    // Held across save, update and send so concurrent saves cannot interleave.
+    let mut current = state
+        .lock()
+        .map_err(|_| "scene list unavailable".to_string())?;
+    store::save(&dir, &scenes).map_err(|e| format!("could not save scenes: {e}"))?;
+    *current = scenes.clone();
+    crate::hotkeys::apply(&app, &scenes);
+    broker.send(BrokerCmd::SetScenes(scenes))
+}
+
+#[tauri::command]
+pub fn apply_scene(
+    broker: State<'_, Broker>,
+    state: State<'_, Mutex<Vec<Scene>>>,
+    id: String,
+) -> Result<(), String> {
+    let known = state
+        .lock()
+        .map(|s| s.iter().any(|scene| scene.id == id))
+        .unwrap_or(false);
+    if !known {
+        return Err(format!("no scene {id:?}"));
+    }
+    broker.send(BrokerCmd::ApplyScene(id))
 }
 
 #[tauri::command]

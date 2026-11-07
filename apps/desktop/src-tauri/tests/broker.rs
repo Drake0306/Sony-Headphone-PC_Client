@@ -173,6 +173,7 @@ fn broker_writes_frames_and_logs_to_the_frame_log() {
             monotonic_ms,
             Some(&mut log),
             None,
+            None,
         )
     });
     wait_for(&erx, |s| s.connected);

@@ -275,6 +275,13 @@ body.kbd a:focus-visible {
   color: var(--paper);
 }
 
+.btnrow {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
 .btn.unavailable {
   opacity: 0.35;
   cursor: default;
@@ -329,11 +336,16 @@ body.kbd a:focus-visible {
   font-size: 11px;
 }
 
+/* An error under a control: orange, like the refused outline. */
+.block .note.live {
+  color: var(--ult);
+}
+
 .unavailable-block {
   opacity: 0.35;
 }
 
-/* Scene cards (static until the modes module lands) */
+/* Scene cards and key chips */
 .scene {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -342,6 +354,10 @@ body.kbd a:focus-visible {
   padding: 10px 12px;
   border: 1px solid var(--hair);
   font-size: 13px;
+}
+
+.scene.on {
+  border-color: var(--ink);
 }
 
 .scene .when {
@@ -367,6 +383,23 @@ body.kbd a:focus-visible {
 }
 
 .scene .then span.u {
+  border-color: var(--ult);
+  color: var(--ult);
+}
+
+.keys {
+  display: flex;
+  gap: 4px;
+}
+
+.keys span {
+  padding: 2px 6px;
+  border: 1px solid var(--hair);
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+}
+
+.keys.refused span {
   border-color: var(--ult);
   color: var(--ult);
 }

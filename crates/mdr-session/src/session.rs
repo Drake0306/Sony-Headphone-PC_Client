@@ -2,7 +2,7 @@
 //! `poll_output` hands back.
 
 use mdr_frame::{Decoder, Frame, FrameType};
-use mdr_proto::opcode::t1;
+use mdr_proto::opcode::{function, t1};
 use mdr_proto::request::{self, Group, Request};
 use mdr_proto::{decode, denied, EqUltState, Message, NcAsmState, Table, UltLevel};
 
@@ -202,6 +202,15 @@ impl Session {
         self.request(request::eq_ult_set(&eq))
     }
 
+    /// Changes the EQ preset and the ULT level in one request, keeping the
+    /// bands. Two separate calls would each re-send the other's old value.
+    pub fn set_eq_preset_ult(&mut self, preset: u8, ult: UltLevel) -> Result<(), SessionError> {
+        let mut eq = self.current_eq()?;
+        eq.preset = preset;
+        eq.ult = ult;
+        self.request(request::eq_ult_set(&eq))
+    }
+
     /// Changes only the band levels, keeping the device's current preset and ULT
     /// level. The band count must match the device's EQ capability (6 if unknown).
     pub fn set_eq_bands(&mut self, bands: Vec<u8>) -> Result<(), SessionError> {
@@ -279,8 +288,17 @@ impl Session {
         self.request(request::multipoint_commit())
     }
 
-    /// The last EQ state the device reported, for read-modify-write.
-    fn current_eq(&self) -> Result<EqUltState, SessionError> {
+    /// The last EQ state the device reported, for read-modify-write. A device
+    /// that does not declare EQ/ULT is `Unavailable`, not `Busy`.
+    fn current_eq(&mut self) -> Result<EqUltState, SessionError> {
+        if !self.state.connected {
+            return Err(SessionError::NotConnected);
+        }
+        let id = function::PRESET_EQ_AND_ULT_MODE;
+        if !self.is_capable(Table::T1, id) {
+            self.state.eq_ult.status = Status::Unavailable;
+            return Err(SessionError::Unavailable(id));
+        }
         self.state
             .eq_ult
             .value

@@ -4,9 +4,10 @@
   import Boxes from "../lib/controls/Boxes.svelte";
   import LinkList from "../lib/controls/LinkList.svelte";
   import Ticks from "../lib/controls/Ticks.svelte";
-  import { connect, getRuntimeInfo, openMainWindow, setUlt, watchState } from "../lib/ipc";
+  import { connect, getRuntimeInfo, openMainWindow, openMainWindowOn, setUlt, watchState } from "../lib/ipc";
   import * as noise from "../lib/noise";
   import { displayStatus, pending, shownValue } from "../lib/pending";
+  import { applyScene, hotkeyChips, modeBoxes, scenes, WINDOW_ERROR_KEY, WINDOW_SHORTCUT } from "../lib/scenes";
   import {
     codecLabel,
     colourway,
@@ -16,6 +17,7 @@
     type DeviceState,
     type NcAsmState,
     type NcMode,
+    type Status,
     type UltLevel,
   } from "../lib/state";
 
@@ -36,10 +38,19 @@
     { label: "OFF", value: false },
   ];
   const noop = () => {};
+  const mac = typeof navigator !== "undefined" && navigator.userAgent.includes("Mac");
+  // ⌥⌘N on a Mac, Alt+Super+N elsewhere (hotkeys.rs registers it).
+  const windowKeys = hotkeyChips(WINDOW_SHORTCUT, mac).join(mac ? "" : "+");
+  // Hidden when macOS refused it (Settings says why).
+  const windowRefused = $derived($scenes.hotkey_errors?.[WINDOW_ERROR_KEY] !== undefined);
+  const MORE = "more";
+  const PENDING: Status = { Pending: { since_ms: 0 } };
 
   let st = $state<DeviceState>(emptyState());
   const nc = pending<NcAsmState>();
   const ult = pending<UltLevel>();
+  // A scene applied here is pending until the next "scenes" event.
+  const mode = pending<string>();
   let lastSeen = $state<{ at: number; battery: number | null } | null>(null);
   let now = $state(Date.now());
   let fake = $state(false);
@@ -57,6 +68,34 @@
   const devices = $derived(
     st.devices.map((d) => ({ label: d.name, value: d.playing ? "▶ Playing" : "Idle", live: d.playing })),
   );
+
+  const boxes = $derived(modeBoxes($scenes.scenes));
+  const modeOptions = $derived.by(() => {
+    const { shown, more } = boxes;
+    return [
+      ...shown.map((s) => ({ label: s.name, value: s.id, title: s.name })),
+      ...(more ? [{ label: "…", value: MORE, title: "All scenes" }] : []),
+    ];
+  });
+  const modeStatus = $derived<Status>(
+    $mode.want !== null ? PENDING : $mode.refused ? { Refused: { reason: $mode.refused.reason } } : "Confirmed",
+  );
+
+  $effect(() => {
+    void $scenes;
+    mode.receive("Confirmed");
+  });
+
+  function pickMode(id: string) {
+    if (id === MORE) {
+      openMainWindowOn("scenes").catch((e) => console.error(e));
+      return;
+    }
+    // A failed apply is shown as refused on that box (held for a few seconds).
+    mode.request(id, () =>
+      applyScene(id).catch((e) => mode.receive({ Refused: { reason: typeof e === "string" ? e : String(e) } })),
+    );
+  }
 
   function receive(next: DeviceState) {
     if (st.connected && !next.connected) {
@@ -146,11 +185,12 @@
         onpick={pickUlt}
       />
     </div>
+    {@render modeRow()}
     {#if devices.length > 0}
       <div class="devices"><LinkList items={devices} /></div>
     {/if}
     <button class="row footer" onclick={() => openMainWindow()}>
-      <span class="lab">Open window</span><span class="lab">⌥⌘N</span>
+      <span class="lab">Open window</span>{#if !windowRefused}<span class="lab">{windowKeys}</span>{/if}
     </button>
   </div>
 {:else}
@@ -170,12 +210,29 @@
       <span class="lab">ULT</span>
       <Boxes options={ULT} value={null} status="Unavailable" width="190px" onpick={noop} />
     </div>
+    {@render modeRow()}
     <div class="row hint">
       <span>Turn the headphones on, or reconnect from the Bluetooth menu. Controls return the moment they link.</span>
     </div>
     <div class="btnrow"><button class="btn fill" onclick={() => connect()}>Connect</button></div>
   </div>
 {/if}
+
+{#snippet modeRow()}
+  {#if boxes.shown.length > 0}
+    <div class="row mode">
+      <span class="lab">Mode</span>
+      <Boxes
+        options={modeOptions}
+        value={$mode.want ?? $scenes.active}
+        attempted={$mode.refused?.value ?? null}
+        status={modeStatus}
+        width="190px"
+        onpick={pickMode}
+      />
+    </div>
+  {/if}
+{/snippet}
 
 <style>
   .pop {
@@ -184,6 +241,15 @@
     border: 1px solid var(--hair);
     border-radius: 10px;
     padding: 14px 16px;
+  }
+
+  .mode :global(.boxes) {
+    grid-auto-columns: minmax(0, 1fr);
+  }
+
+  .mode :global(.boxes button) {
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .name {
@@ -211,12 +277,5 @@
     padding-top: 12px;
     font-size: 12px;
     color: var(--muted);
-  }
-
-  .btnrow {
-    display: flex;
-    gap: 6px;
-    justify-content: flex-end;
-    margin-top: 8px;
   }
 </style>

@@ -112,3 +112,40 @@ fn phase2_setters_are_gated() {
         Status::Unavailable
     ));
 }
+
+#[test]
+fn eq_setters_without_the_eq_capability_are_unavailable() {
+    let mut s = connected_session_with_caps(&[0x20]);
+    let refused = Err(SessionError::Unavailable(0x53));
+    assert_eq!(s.set_ult(mdr_proto::UltLevel::Ult2), refused);
+    assert_eq!(s.set_eq_preset(0x10), refused);
+    assert_eq!(s.set_eq_preset_ult(0x10, mdr_proto::UltLevel::Off), refused);
+    assert_eq!(s.set_eq_bands(vec![10; 6]), refused);
+    assert!(matches!(s.state().eq_ult.status, Status::Unavailable));
+    assert!(drain(&mut s, 10_000).is_empty());
+}
+
+#[test]
+fn preset_and_ult_go_in_one_request() {
+    let mut s = connected_session();
+    assert!(drain(&mut s, 10_000).is_empty());
+    s.set_eq_preset_ult(0x16, mdr_proto::UltLevel::Ult2)
+        .unwrap();
+    let out = drain(&mut s, 10_001);
+    assert_eq!(out.len(), 1);
+    assert_eq!(
+        decode_payload(&out[0]),
+        [0x58, 0x03, 0x16, 0x02, 0x06, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A, 0x0A]
+    );
+}
+
+#[test]
+fn eq_setters_before_the_handshake_are_not_connected() {
+    let mut s = Session::new(0);
+    assert_eq!(
+        s.set_ult(mdr_proto::UltLevel::Ult2),
+        Err(SessionError::NotConnected)
+    );
+    assert_eq!(s.set_eq_preset(0x10), Err(SessionError::NotConnected));
+    assert!(matches!(s.state().eq_ult.status, Status::Unavailable));
+}

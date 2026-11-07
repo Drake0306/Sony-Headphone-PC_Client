@@ -20,6 +20,7 @@
     setVoiceGuideVolume,
     setWearPause,
   } from "../lib/ipc";
+  import { hotkeyList, scenes } from "../lib/scenes";
   import { settings } from "../lib/settings";
   import { AUTO_POWER_OFF, type AppSettings, type DeviceState, type Status, type Theme } from "../lib/state";
 
@@ -46,6 +47,8 @@
   const PENDING: Status = { Pending: { since_ms: 0 } };
   const hex = (id: number) => `0x${id.toString(16).toUpperCase().padStart(2, "0")}`;
   const noop = () => {};
+  const mac = typeof navigator !== "undefined" && navigator.userAgent.includes("Mac");
+  const hotkeys = $derived(hotkeyList($scenes.scenes, mac, $scenes.hotkey_errors));
 
   const autoOff = control<number>(() => st.auto_power_off);
   const wear = control<boolean>(() => st.wear_pause);
@@ -196,7 +199,17 @@
             onpick={(on) => dock.request(on, () => save("hide_dock_icon", on))}
           />
         </Row>
-        <Row label="Hotkeys" note="Phase 4" unavailable />
+        <Row label="Hotkeys" note="Set per scene in Scenes">
+          <div class="hotkeys">
+            {#each hotkeys as h, i (i)}
+              <div>
+                <span class="keys" class:refused={h.error !== null} title={h.error ?? undefined}
+                  >{#each h.keys as k, j (j)}<span>{k}</span>{/each}</span
+                >{h.label}{#if h.error}<small class="refusal">{h.error}</small>{/if}
+              </div>
+            {/each}
+          </div>
+        </Row>
         <Row label="Battery history" note="Phase 4">
           <Toggle on={null} status="Unavailable" label="Battery history" onpick={noop} />
         </Row>
@@ -234,5 +247,22 @@
 
   .fit :global(.boxes button) {
     padding: 6px 7px;
+  }
+
+  .hotkeys {
+    display: grid;
+    gap: 6px;
+  }
+
+  .hotkeys div {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  /* Why a scene's hotkey was refused: orange, like the refused chips. */
+  .refusal {
+    color: var(--ult);
+    font-size: 11px;
   }
 </style>

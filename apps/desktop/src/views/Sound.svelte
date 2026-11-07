@@ -168,13 +168,6 @@
     border-color: var(--hair);
   }
 
-  .btnrow {
-    display: flex;
-    justify-content: flex-end;
-    gap: 6px;
-    margin-top: 8px;
-  }
-
   .block .note {
     font-size: 12px;
   }

@@ -148,7 +148,7 @@
   }
 
   .eq {
-    height: 196px;
+    height: 216px;
     padding-top: 6px;
   }
 

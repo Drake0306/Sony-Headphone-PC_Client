@@ -63,6 +63,7 @@ Support function bytes (T1 FunctionType) relevant to us: `12` CODEC_INDICATOR, `
 - SET `58 03 <presetId> <ult> 06 <b1..b6>` → ACK then NTFY `59 03 …`. Always read-modify-write: echo preset and bands from the last RET and change only what the user touched. **Disputed:** whether type `03` honours the preset/band bytes (owaiskaifi: ULT-only; Z-ULT-Connect: presets must go through `58 03`). Phase 1 hardware step: try both `58 03` and `58 00` (PRESET_EQ) and record which changes the preset.
 - Preset ids: `00` OFF, `10` BRIGHT, `11` EXCITED, `12` MELLOW, `13` RELAXED, `14` VOCAL, `15` TREBLE, `16` BASS, `17` SPEECH, `A0` CUSTOM (manual), `A1..A5` USER_SETTING1-5 (**verify** that `A0`/`A1`/`A2` correspond to Manual / Custom 1 / Custom 2 in the capability name list).
 - Extended `5A 00` → `5B 00 <n> (<infoType> <freq>)×n` gives band centre frequencies (**verify** on this unit; expected Clear Bass + 400/1k/2.5k/6.3k/16k).
+- The Advanced equalizer's ten-band curve is app-side only (`eq_curve.json`); the only EQ write is the six-band `58 03` above, so "Send best fit" adds nothing to the wire.
 - A malformed SET (`58 00 00 00 06` with no bands) corrupted the custom slot on a real unit. Validate lengths before sending.
 
 ## Codec, DSEE, connection mode

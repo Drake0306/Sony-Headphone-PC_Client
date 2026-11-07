@@ -110,7 +110,7 @@ pub fn apply(app: &AppHandle, scenes: &[Scene]) -> HashMap<String, String> {
         }
     }
     eprintln!(
-        "hairline: hotkeys registered ({registered} scene, {} refused)",
+        "hairline: hotkeys registered ({registered} scene, {} refused or invalid)",
         errors.len()
     );
     if let Some(state) = app.try_state::<HotkeyErrors>() {

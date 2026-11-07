@@ -5,6 +5,7 @@ import {
   hotkeyChips,
   hotkeyError,
   hotkeyList,
+  WINDOW_SHORTCUT,
   modeBoxes,
   moveScene,
   newScene,
@@ -248,11 +249,27 @@ describe("hotkeys", () => {
       scene("c"),
       scene("d", { name: "Walk", hotkey: "Ctrl+F5" }),
     ];
-    expect(hotkeyList(list, true)).toEqual([
-      { label: "Open window", keys: ["⌥", "⌘", "N"] },
-      { label: "Desk", keys: ["⌥", "⌘", "1"] },
-      { label: "Walk", keys: ["⌃", "F5"] },
+    expect(hotkeyList(list, true, {})).toEqual([
+      { label: "Open window", keys: ["⌥", "⌘", "N"], error: null },
+      { label: "Desk", keys: ["⌥", "⌘", "1"], error: null },
+      { label: "Walk", keys: ["⌃", "F5"], error: null },
     ]);
-    expect(hotkeyList([scene("c")], true)).toEqual([{ label: "Open window", keys: ["⌥", "⌘", "N"] }]);
+    expect(hotkeyList([scene("c")], true, undefined)).toEqual([
+      { label: "Open window", keys: ["⌥", "⌘", "N"], error: null },
+    ]);
+  });
+
+  it("hotkey_list_marks_a_refused_scene_hotkey", () => {
+    const list = [scene("a", { name: "Desk", hotkey: "Alt+Super+1" }), scene("d", { name: "Walk", hotkey: "Alt+Super+1" })];
+    expect(hotkeyList(list, true, { d: 'already used by scene "Desk"' })).toEqual([
+      { label: "Open window", keys: ["⌥", "⌘", "N"], error: null },
+      { label: "Desk", keys: ["⌥", "⌘", "1"], error: null },
+      { label: "Walk", keys: ["⌥", "⌘", "1"], error: 'already used by scene "Desk"' },
+    ]);
+  });
+
+  it("window_shortcut_matches_hotkeys_rs", () => {
+    // hotkeys.rs WINDOW_SHORTCUT is asserted to the same literal in tests/hotkeys.rs.
+    expect(WINDOW_SHORTCUT).toBe("Alt+Super+N");
   });
 });

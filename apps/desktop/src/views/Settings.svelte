@@ -48,7 +48,7 @@
   const hex = (id: number) => `0x${id.toString(16).toUpperCase().padStart(2, "0")}`;
   const noop = () => {};
   const mac = typeof navigator !== "undefined" && navigator.userAgent.includes("Mac");
-  const hotkeys = $derived(hotkeyList($scenes.scenes, mac));
+  const hotkeys = $derived(hotkeyList($scenes.scenes, mac, $scenes.hotkey_errors));
 
   const autoOff = control<number>(() => st.auto_power_off);
   const wear = control<boolean>(() => st.wear_pause);
@@ -202,7 +202,11 @@
         <Row label="Hotkeys" note="Set per scene in Scenes">
           <div class="hotkeys">
             {#each hotkeys as h, i (i)}
-              <div><span class="keys">{#each h.keys as k, j (j)}<span>{k}</span>{/each}</span>{h.label}</div>
+              <div>
+                <span class="keys" class:refused={h.error !== null} title={h.error ?? undefined}
+                  >{#each h.keys as k, j (j)}<span>{k}</span>{/each}</span
+                >{h.label}{#if h.error}<small class="refusal">{h.error}</small>{/if}
+              </div>
             {/each}
           </div>
         </Row>
@@ -254,5 +258,11 @@
     display: flex;
     align-items: center;
     gap: 10px;
+  }
+
+  /* Why a scene's hotkey was refused: orange, like the refused chips. */
+  .refusal {
+    color: var(--ult);
+    font-size: 11px;
   }
 </style>

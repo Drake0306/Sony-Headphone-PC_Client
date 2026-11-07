@@ -250,13 +250,20 @@ export const hotkeyError = (v: ScenesView, id: string): string | null => v.hotke
 /** The fixed shortcut that opens the main window (hotkeys.rs `WINDOW_SHORTCUT`). */
 export const WINDOW_SHORTCUT = "Alt+Super+N";
 
-/** Settings' Hotkeys list: the window shortcut, then each enabled scene with a hotkey. */
-export function hotkeyList(list: Scene[], mac: boolean): { label: string; keys: string[] }[] {
+/** One Settings Hotkeys line; `error` is why a scene's hotkey was not registered. */
+export interface HotkeyLine {
+  label: string;
+  keys: string[];
+  error: string | null;
+}
+
+/** Settings' Hotkeys list: the window shortcut, then each enabled scene with a hotkey and its refusal, if any. */
+export function hotkeyList(list: Scene[], mac: boolean, errors: Record<string, string> | undefined): HotkeyLine[] {
   return [
-    { label: "Open window", keys: hotkeyChips(WINDOW_SHORTCUT, mac) },
+    { label: "Open window", keys: hotkeyChips(WINDOW_SHORTCUT, mac), error: null },
     ...list
       .filter((s) => s.enabled && s.hotkey && s.hotkey.trim() !== "")
-      .map((s) => ({ label: s.name, keys: hotkeyChips(s.hotkey, mac) })),
+      .map((s) => ({ label: s.name, keys: hotkeyChips(s.hotkey, mac), error: errors?.[s.id] ?? null })),
   ];
 }
 

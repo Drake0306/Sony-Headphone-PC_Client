@@ -7,7 +7,7 @@
   import { connect, getRuntimeInfo, openMainWindow, openMainWindowOn, setUlt, watchState } from "../lib/ipc";
   import * as noise from "../lib/noise";
   import { displayStatus, pending, shownValue } from "../lib/pending";
-  import { applyScene, modeBoxes, scenes } from "../lib/scenes";
+  import { applyScene, hotkeyChips, modeBoxes, scenes, WINDOW_SHORTCUT } from "../lib/scenes";
   import {
     codecLabel,
     colourway,
@@ -38,6 +38,9 @@
     { label: "OFF", value: false },
   ];
   const noop = () => {};
+  const mac = typeof navigator !== "undefined" && navigator.userAgent.includes("Mac");
+  // ⌥⌘N on a Mac, Alt+Super+N elsewhere (hotkeys.rs registers it).
+  const windowKeys = hotkeyChips(WINDOW_SHORTCUT, mac).join(mac ? "" : "+");
   const MORE = "more";
   const PENDING: Status = { Pending: { since_ms: 0 } };
 
@@ -185,7 +188,7 @@
       <div class="devices"><LinkList items={devices} /></div>
     {/if}
     <button class="row footer" onclick={() => openMainWindow()}>
-      <span class="lab">Open window</span><span class="lab">⌥⌘N</span>
+      <span class="lab">Open window</span><span class="lab">{windowKeys}</span>
     </button>
   </div>
 {:else}

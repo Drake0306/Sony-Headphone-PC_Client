@@ -102,15 +102,18 @@ pub fn toggle(app: &AppHandle) {
     }
 }
 
-/// Where the popover opens: under the menu-bar icon on macOS, above the
-/// notification-area icon at the bottom right on Windows.
-#[cfg(target_os = "windows")]
-const POSITION: Position = Position::TrayBottomRight;
-#[cfg(not(target_os = "windows"))]
-const POSITION: Position = Position::TrayCenter;
+/// Places the popover by the tray icon: centred under the menu-bar icon on
+/// macOS. On Windows `TrayBottomRight` puts its corner at the icon, which with
+/// a bottom taskbar runs past the screen edge, so it is kept on screen.
+fn place(window: &WebviewWindow) {
+    #[cfg(target_os = "windows")]
+    let _ = window.move_window_constrained(Position::TrayBottomRight);
+    #[cfg(not(target_os = "windows"))]
+    let _ = window.move_window(Position::TrayCenter);
+}
 
 fn show(app: &AppHandle, window: &WebviewWindow) {
-    let _ = window.move_window(POSITION);
+    place(window);
     #[cfg(target_os = "macos")]
     {
         use tauri_nspanel::ManagerExt;

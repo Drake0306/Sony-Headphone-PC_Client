@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 
 use hairline_lib::broker::{raw_command, run_broker_logged, BrokerCmd, BrokerContext};
 use hairline_lib::frame_ring::{FrameDir, FrameEntry, FrameTap, Recorder};
+use hairline_lib::settings::{raw_allowed, AppSettings};
 use mdr_proto::Table;
 use mdr_session::DeviceState;
 use mdr_transport::FakeDevice;
@@ -17,6 +18,22 @@ const BATTERY_GET: [u8; 2] = [0x22, 0x00];
 #[test]
 fn raw_set_needs_confirmation() {
     let refused = Err("type SEND to send a SET".to_string());
+    // Every T1 SET in the role table, and T2 voice guidance SET.
+    let t1_sets = [
+        0x18, 0x24, 0x28, 0x58, 0x68, 0x98, 0xA4, 0xA8, 0xC4, 0xD8, 0xE8, 0xF4, 0xF8, 0xFC,
+    ];
+    let cases = t1_sets
+        .iter()
+        .map(|op| ("t1", format!("{op:02X} 01 00")))
+        .chain(std::iter::once(("t2", "48 20 01".to_string())));
+    for (table, hex) in cases {
+        let result = raw_command(table, &hex, "");
+        assert!(result.is_err(), "{table} {hex} went through: {result:?}");
+        if !result.as_ref().unwrap_err().starts_with("never sent") {
+            assert_eq!(result, refused, "{table} {hex}");
+            assert!(raw_command(table, &hex, "SEND").is_ok(), "{table} {hex}");
+        }
+    }
     assert_eq!(raw_command("t1", "A8 20 0F", ""), refused);
     assert_eq!(raw_command("t1", "A8 20 0F", "send"), refused);
     assert_eq!(raw_command("t2", "48 20 01", "yes"), refused);
@@ -60,6 +77,17 @@ fn raw_set_needs_confirmation() {
     });
     rig.frames_until(|f| sent(f, &VOLUME_SET));
     rig.stop();
+}
+
+#[test]
+fn raw_needs_the_advanced_panel() {
+    let mut s = AppSettings::default();
+    assert_eq!(
+        raw_allowed(&s),
+        Err("enable the Advanced panel in Settings first".to_string())
+    );
+    s.show_advanced = true;
+    assert_eq!(raw_allowed(&s), Ok(()));
 }
 
 #[test]

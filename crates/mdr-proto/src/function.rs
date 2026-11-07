@@ -102,23 +102,20 @@ fn t1_role(op: u8) -> Role {
     }
 }
 
-/// T2: `06/07` support functions, and the peripheral (`30..`), voice
-/// guidance (`40..`) and safe listening (`50..`) groups, whose low nibble
-/// follows the libmdr group layout (`0` get capability, `1` ret, `2` get
-/// status, `3` ret, `4` set status, `5` notify, `6` get param, `7` ret,
-/// `8` set param, `9` notify). Their extended opcodes (`xA..xD`) and every
-/// other group stay `Unknown`.
+/// T2: exactly the opcodes libmdr's `ProtocolV2T2.hpp` `Command` enum
+/// defines (branch `v1-compat`); every other byte, including the undefined
+/// safe-listening `50..52`, is `Unknown`.
 fn t2_role(op: u8) -> Role {
     match op {
-        0x06 => Role::Get,
-        0x07 => Role::Ret,
-        0x30..=0x5F => match op & 0x0F {
-            0x0 | 0x2 | 0x6 => Role::Get,
-            0x1 | 0x3 | 0x7 => Role::Ret,
-            0x4 | 0x8 => Role::Set,
-            0x5 | 0x9 => Role::Notify,
-            _ => Role::Unknown,
-        },
+        // CONNECT, POWER, PERI, VOICE_GUIDANCE, SAFE_LISTENING, LEA, PARTY, SYSTEM
+        0x06 | 0x20 | 0x22 | 0x26 | 0x30 | 0x32 | 0x36 | 0x40 | 0x42 | 0x46 | 0x56 | 0x5A
+        | 0x60 | 0x62 | 0x66 | 0x70 | 0x72 | 0x76 | 0xF0 | 0xF2 | 0xF6 | 0xFA => Role::Get,
+        0x07 | 0x21 | 0x23 | 0x27 | 0x31 | 0x33 | 0x37 | 0x41 | 0x43 | 0x47 | 0x53 | 0x57
+        | 0x5B | 0x61 | 0x63 | 0x67 | 0x71 | 0x73 | 0x77 | 0xF1 | 0xF3 | 0xF7 | 0xFB => Role::Ret,
+        0x24 | 0x28 | 0x34 | 0x38 | 0x3C | 0x44 | 0x48 | 0x54 | 0x58 | 0x68 | 0x74 | 0x78
+        | 0x7C | 0xF4 | 0xF8 | 0xFC => Role::Set,
+        0x25 | 0x29 | 0x35 | 0x39 | 0x3D | 0x45 | 0x55 | 0x59 | 0x65 | 0x69 | 0x75 | 0x79
+        | 0xF5 | 0xF9 | 0xFD => Role::Notify,
         _ => Role::Unknown,
     }
 }
@@ -148,27 +145,40 @@ mod tests {
         assert_eq!(name(Table::T2, 0x12), None);
     }
 
+    /// T1 GET and SET opcodes in the `docs/protocol-notes.md` table (plus `98`).
+    const T1_GETS: [u8; 27] = [
+        0x00, 0x02, 0x04, 0x06, 0x10, 0x12, 0x20, 0x22, 0x26, 0x50, 0x56, 0x5A, 0x60, 0x66, 0xA0,
+        0xA2, 0xA6, 0xD0, 0xD2, 0xD6, 0xE0, 0xE2, 0xE6, 0xF0, 0xF2, 0xF6, 0xFA,
+    ];
+    const T1_SETS: [u8; 14] = [
+        0x18, 0x24, 0x28, 0x58, 0x68, 0x98, 0xA4, 0xA8, 0xC4, 0xD8, 0xE8, 0xF4, 0xF8, 0xFC,
+    ];
+
     #[test]
     fn opcode_roles_follow_the_tables() {
-        for op in [
-            0x00, 0x06, 0x12, 0x22, 0x56, 0x66, 0xA6, 0xD6, 0xE6, 0xF6, 0xFA,
-        ] {
+        for op in T1_GETS {
             assert_eq!(opcode_role(Table::T1, op), Role::Get, "T1 {op:#04X}");
         }
-        for op in [
-            0x18, 0x24, 0x28, 0x58, 0x68, 0x98, 0xA8, 0xC4, 0xD8, 0xE8, 0xF8, 0xFC,
-        ] {
+        for op in T1_SETS {
             assert_eq!(opcode_role(Table::T1, op), Role::Set, "T1 {op:#04X}");
         }
         assert_eq!(opcode_role(Table::T1, 0x57), Role::Ret);
         assert_eq!(opcode_role(Table::T1, 0x69), Role::Notify);
         assert_eq!(opcode_role(Table::T1, 0x0F), Role::Unknown);
         assert_eq!(opcode_role(Table::T1, 0x30), Role::Unknown);
+    }
+
+    #[test]
+    fn t2_roles_are_only_what_libmdr_defines() {
         assert_eq!(opcode_role(Table::T2, 0x06), Role::Get);
         assert_eq!(opcode_role(Table::T2, 0x46), Role::Get);
         assert_eq!(opcode_role(Table::T2, 0x48), Role::Set);
-        assert_eq!(opcode_role(Table::T2, 0x36), Role::Get);
-        assert_eq!(opcode_role(Table::T2, 0x3C), Role::Unknown);
-        assert_eq!(opcode_role(Table::T2, 0x26), Role::Unknown);
+        assert_eq!(opcode_role(Table::T2, 0x3C), Role::Set);
+        assert_eq!(opcode_role(Table::T2, 0x47), Role::Ret);
+        assert_eq!(opcode_role(Table::T2, 0x59), Role::Notify);
+        // Not defined by libmdr: unknown, so they need confirmation.
+        for op in [0x50, 0x51, 0x52, 0x49, 0x3A, 0x64, 0x12] {
+            assert_eq!(opcode_role(Table::T2, op), Role::Unknown, "T2 {op:#04X}");
+        }
     }
 }

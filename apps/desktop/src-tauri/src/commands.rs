@@ -291,14 +291,21 @@ pub fn record_frames(
 
 /// Sends a hand-written request from the Advanced panel (`table` is `"t1"`
 /// or `"t2"`, `hex` the payload). Anything but a GET needs `confirm` to be
-/// `SEND`; the session's deny-list still applies.
+/// `SEND`; the session's deny-list still applies. Refused unless the
+/// Advanced panel is enabled in Settings.
 #[tauri::command]
 pub fn send_raw(
     broker: State<'_, Broker>,
+    settings: State<'_, Mutex<settings::AppSettings>>,
     table: String,
     hex: String,
     confirm: String,
 ) -> Result<(), String> {
+    let current = settings
+        .lock()
+        .map(|s| s.clone())
+        .map_err(|_| "settings unavailable".to_string())?;
+    settings::raw_allowed(&current)?;
     broker.send(raw_command(&table, &hex, &confirm)?)
 }
 

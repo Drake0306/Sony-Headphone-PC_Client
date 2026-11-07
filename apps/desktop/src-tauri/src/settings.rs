@@ -42,6 +42,15 @@ impl Default for AppSettings {
     }
 }
 
+/// Raw commands are allowed only while the Advanced panel is enabled.
+pub fn raw_allowed(s: &AppSettings) -> Result<(), String> {
+    if s.show_advanced {
+        Ok(())
+    } else {
+        Err("enable the Advanced panel in Settings first".into())
+    }
+}
+
 fn path_in(dir: &Path) -> PathBuf {
     dir.join(FILE_NAME)
 }

@@ -25,6 +25,7 @@ fn device_record_round_trip() {
     assert_eq!(load(&dir, UNIT_A), DeviceRecord::default());
     let rec = DeviceRecord {
         proven: vec![(Table::T1, 0x50), (Table::T2, 0x46)],
+        rfcomm_channel: None,
     };
     save(&dir, UNIT_A, &rec).unwrap();
     assert_eq!(load(&dir, UNIT_A), rec);
@@ -90,6 +91,7 @@ fn proven_list_is_per_address() {
     let dir = temp_dir("per-address");
     let rec = DeviceRecord {
         proven: vec![(Table::T1, 0x50)],
+        rfcomm_channel: Some(18),
     };
     save(&dir, UNIT_A, &rec).unwrap();
     assert_eq!(load(&dir, UNIT_B), DeviceRecord::default());
@@ -98,6 +100,63 @@ fn proven_list_is_per_address() {
     // Loaded into the session on connect, for that unit only.
     assert_eq!(connect_as(&dir, UNIT_A).proven, vec![(Table::T1, 0x50)]);
     assert!(connect_as(&dir, UNIT_B).proven.is_empty());
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn recorded_channel_round_trip() {
+    let dir = temp_dir("channel");
+    let rec = DeviceRecord {
+        proven: vec![(Table::T1, 0x50)],
+        rfcomm_channel: Some(18),
+    };
+    save(&dir, UNIT_A, &rec).unwrap();
+    assert_eq!(load(&dir, UNIT_A), rec);
+    let file = dir.join("devices").join("ac800a112233.json");
+    let text = std::fs::read_to_string(&file).unwrap();
+    assert!(text.contains("\"rfcomm_channel\": 18"), "{text}");
+
+    // A record written before the field existed still loads, without a channel.
+    std::fs::write(
+        &file,
+        r#"{ "proven": [{ "table": "T1", "function": 80 }] }"#,
+    )
+    .unwrap();
+    assert_eq!(
+        load(&dir, UNIT_A),
+        DeviceRecord {
+            proven: vec![(Table::T1, 0x50)],
+            rfcomm_channel: None,
+        }
+    );
+    // No channel is not written at all.
+    save(&dir, UNIT_B, &DeviceRecord::default()).unwrap();
+    let text = std::fs::read_to_string(dir.join("devices").join("ac800a445566.json")).unwrap();
+    assert!(!text.contains("rfcomm_channel"), "{text}");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn connect_records_the_transport_channel() {
+    let dir = temp_dir("records-channel");
+    // An existing proven list survives the channel being added.
+    let rec = DeviceRecord {
+        proven: vec![(Table::T1, 0x50)],
+        rfcomm_channel: None,
+    };
+    save(&dir, UNIT_A, &rec).unwrap();
+    // The fake reports channel 18.
+    connect_as(&dir, UNIT_A);
+    assert_eq!(
+        load(&dir, UNIT_A),
+        DeviceRecord {
+            proven: vec![(Table::T1, 0x50)],
+            rfcomm_channel: Some(18),
+        }
+    );
+    // A unit without a record gets one holding just the channel.
+    connect_as(&dir, UNIT_B);
+    assert_eq!(load(&dir, UNIT_B).rfcomm_channel, Some(18));
     std::fs::remove_dir_all(&dir).unwrap();
 }
 

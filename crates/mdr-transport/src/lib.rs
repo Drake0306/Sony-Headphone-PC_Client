@@ -3,6 +3,8 @@
 
 mod discover;
 mod fake;
+#[cfg(any(target_os = "linux", test))]
+mod linux;
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(any(windows, test))]
@@ -11,7 +13,7 @@ mod windows;
 use std::io;
 use std::time::Duration;
 
-pub use discover::{connect, discover};
+pub use discover::{connect, connect_with_hint, discover};
 pub use fake::{FakeDevice, ReceivedLog};
 
 /// SDP service UUID of the Sony MDR v2 protocol.

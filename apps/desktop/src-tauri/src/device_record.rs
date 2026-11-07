@@ -1,5 +1,6 @@
 //! Per-unit device records: `devices/<normalised address>.json` beside
-//! `settings.json`, holding the functions proven to work on that unit.
+//! `settings.json`, holding the functions proven to work on that unit and the
+//! RFCOMM channel its v2 link last ran on.
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -15,13 +16,20 @@ const DIR_NAME: &str = "devices";
 pub struct DeviceRecord {
     /// Functions this unit answers without declaring them.
     pub proven: Vec<(Table, u8)>,
+    /// RFCOMM channel of the last successful connect. Linux tries it before
+    /// scanning (BlueZ has no SDP browsing over D-Bus); elsewhere it is kept
+    /// for information only.
+    pub rfcomm_channel: Option<u8>,
 }
 
-/// The file layout: `{ "proven": [{ "table": "T1", "function": 80 }] }`.
+/// The file layout:
+/// `{ "proven": [{ "table": "T1", "function": 80 }], "rfcomm_channel": 18 }`.
 #[derive(Serialize, Deserialize)]
 struct RecordFile {
     #[serde(default)]
     proven: Vec<ProvenEntry>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rfcomm_channel: Option<u8>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -38,6 +46,7 @@ impl From<RecordFile> for DeviceRecord {
                 .into_iter()
                 .map(|e| (e.table, e.function))
                 .collect(),
+            rfcomm_channel: f.rfcomm_channel,
         }
     }
 }
@@ -50,6 +59,7 @@ impl From<DeviceRecord> for RecordFile {
                 .into_iter()
                 .map(|(table, function)| ProvenEntry { table, function })
                 .collect(),
+            rfcomm_channel: r.rfcomm_channel,
         }
     }
 }
@@ -90,6 +100,20 @@ pub fn save(dir: &Path, address: &str, record: &DeviceRecord) -> io::Result<()> 
     let tmp = path.with_extension("json.tmp");
     std::fs::write(&tmp, text)?;
     std::fs::rename(&tmp, &path)
+}
+
+/// Records the channel the link runs on when it differs from the stored one,
+/// keeping the rest of the record. Returns whether the file was written.
+pub fn remember_channel(dir: &Path, address: &str, channel: Option<u8>) -> io::Result<bool> {
+    let Some(channel) = channel else {
+        return Ok(false);
+    };
+    let mut record = load(dir, address);
+    if record.rfcomm_channel == Some(channel) {
+        return Ok(false);
+    }
+    record.rfcomm_channel = Some(channel);
+    save(dir, address, &record).map(|()| true)
 }
 
 /// One row of the Advanced screen's capability list.

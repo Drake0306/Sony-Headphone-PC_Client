@@ -11,13 +11,17 @@
   one EQ write of that preset and the fitted bands, ULT kept, with the EQ
   group's status (`eq_ult`): pending, then "Sent" once the device reports the
   fitted bands, or the refusal. Takes the whole content area, sized so nothing
-  scrolls at 880×560; "‹ Sound" goes back.
+  scrolls at 880×560; "‹ Sound" goes back. Share and Paste a code, at the
+  right of the top row: Share shows the curve as a code and QR; Paste takes one (an Advanced code replaces and saves the
+  curve; a Sound code goes to the headphones only after its confirmation).
 -->
 <script lang="ts">
   import { onMount } from "svelte";
   import Fader, { faderText } from "../lib/controls/Fader.svelte";
   import Confirm from "../lib/controls/Confirm.svelte";
   import FaderScale from "../lib/controls/FaderScale.svelte";
+  import PasteCode from "../lib/controls/PasteCode.svelte";
+  import ShareCode from "../lib/controls/ShareCode.svelte";
   import { control } from "../lib/control.svelte";
   import {
     ADVANCED_BAND_LABELS,
@@ -38,6 +42,7 @@
     type TargetPreset,
   } from "../lib/eqCurve";
   import { getBestFitPreview, getEqCurve, sendBestFit, setEqCurve } from "../lib/ipc";
+  import { encodeAdvanced } from "../lib/presetCode";
   import { isPending, PRESET_LOCK_NOTES, presetLock, type DeviceState } from "../lib/state";
 
   let { st, onback }: { st: DeviceState; onback: () => void } = $props();
@@ -161,6 +166,45 @@
     persist();
   }
 
+  let sharing = $state<string | null>(null);
+  let pasting = $state(false);
+
+  function share() {
+    if (curve !== null) sharing = encodeAdvanced(curve);
+  }
+
+  /**
+   * A pasted curve: saved first, then drawn with its fit, as an edit would
+   * be. A failed save leaves the drawn curve alone, sets the note and rejects
+   * (the paste panel then says it was not saved).
+   */
+  function adopt(bands: number[]): Promise<void> {
+    const next = [...bands];
+    return saver.save(next).then(
+      () => {
+        curve = next;
+        sentRaw = null;
+        edits++;
+        fit = bestFitPreview(next);
+        problem = null;
+        const mine = edits;
+        getBestFitPreview().then(
+          (stored) => {
+            if (mine === edits && Array.isArray(stored)) fit = stored;
+          },
+          (e) => {
+            problem = "Saved; preview unavailable";
+            console.error(e);
+          },
+        );
+      },
+      (e) => {
+        problem = `Not saved: ${e}`;
+        throw e;
+      },
+    );
+  }
+
   function go(step: number) {
     page = Math.min(PAGE_COUNT - 1, Math.max(0, page + step));
   }
@@ -196,6 +240,16 @@
     <button class="btn" onclick={onback}>‹ Sound</button>
     <h3>Advanced equalizer</h3>
     <span class="lab range">Bands {visible[0] + 1}–{visible[visible.length - 1] + 1} of {BAND_COUNT}</span>
+    <div class="codes">
+      <button
+        class="btn"
+        class:unavailable={curve === null}
+        aria-disabled={curve === null}
+        tabindex={curve === null ? -1 : 0}
+        onclick={share}>Share</button
+      >
+      <button class="btn" onclick={() => (pasting = true)}>Paste a code</button>
+    </div>
   </div>
 
   <div class="faders" class:pending={busy} class:unavailable={curve === null}>
@@ -268,6 +322,7 @@
           tabindex={resetOff ? -1 : 0}
           onclick={reset}>Reset</button
         >
+
         <button
           class="btn fill"
           class:unavailable={sendOff}
@@ -291,9 +346,17 @@
   />
 {/if}
 
+{#if sharing}
+  <ShareCode title="Share this curve" code={sharing} onclose={() => (sharing = null)} />
+{/if}
+{#if pasting}
+  <PasteCode {st} savecurve={adopt} onclose={() => (pasting = false)} />
+{/if}
+
 <style>
   /* Height at 880×560 (no scroll): 20 + top ≈26 + 8 + faders (the rest,
-     ≈385) + 8 + strip 17 + 8 + bottom ≈60–73 + 16. Each rail takes the
+     ≈385) + 8 + strip 17 + 8 + bottom ≈60–73 + 16 (Share and Paste a code
+     sit in the top row, so the bottom stays one row). Each rail takes the
      faders' height less the 58 px foot and 8 px gap: ≈320. */
   .adv {
     display: flex;
@@ -314,6 +377,17 @@
 
   .top .range {
     margin-left: auto;
+  }
+
+  /* Share and Paste a code, at the right of the top row (the bottom row has no room). */
+  .codes {
+    display: flex;
+    gap: 6px;
+    align-self: center;
+  }
+
+  .codes .btn {
+    padding: 2px 8px;
   }
 
   /* The faders take every free pixel; each rail fills its column. */

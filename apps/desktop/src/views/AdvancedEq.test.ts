@@ -43,6 +43,7 @@ vi.mock("@tauri-apps/api/event", () => ({
 import { FADER_SIZES } from "../lib/controls/Fader.svelte";
 import faderSrc from "../lib/controls/Fader.svelte?raw";
 import { bestFitPreview, toRaw } from "../lib/eqCurve";
+import { encodeAdvanced, encodeSound } from "../lib/presetCode";
 import { emptyState, type DeviceState, type Status } from "../lib/state";
 import AdvancedEq from "./AdvancedEq.svelte";
 import advSrc from "./AdvancedEq.svelte?raw";
@@ -460,5 +461,88 @@ describe("Advanced equalizer", () => {
     await new Promise((done) => setTimeout(done, 10));
     expect(deviceWrites()).toHaveLength(0);
     r.unmount();
+  });
+});
+
+describe("Advanced share codes", () => {
+  beforeEach(() => {
+    backend.curve = [6, 3, 0, -2, 0, 0, 0, 0, 0, -10];
+    backend.hang = false;
+    backend.previewFails = false;
+    backend.saveFails = false;
+    backend.calls = [];
+  });
+  const writes = () =>
+    backend.calls.filter((c) => ["send_best_fit", "set_eq_bands", "set_eq_preset_bands", "set_eq_preset_ult_bands"].includes(c.cmd));
+
+  it("share_from_advanced_encodes_the_stored_curve", async () => {
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn(async () => {}) }, configurable: true });
+    const r = render(AdvancedEq, { st: connected(), onback: () => {} });
+    await r.findByRole("slider", { name: "31 Hz" });
+    await fireEvent.click(r.getByRole("button", { name: "Share" }));
+    const dialog = r.getByRole("dialog");
+    expect(within(dialog).getByText("Share this curve")).toBeTruthy();
+    expect(within(dialog).getByText(encodeAdvanced([6, 3, 0, -2, 0, 0, 0, 0, 0, -10]))).toBeTruthy();
+    r.unmount();
+  });
+
+  it("share waits for the curve", async () => {
+    backend.hang = true;
+    const r = render(AdvancedEq, { st: connected(), onback: () => {} });
+    expect(r.getByRole("button", { name: "Share" }).getAttribute("aria-disabled")).toBe("true");
+    r.unmount();
+  });
+
+  it("pasted_advanced_code_saves_only", async () => {
+    const r = render(AdvancedEq, { st: connected(), onback: () => {} });
+    await r.findByRole("slider", { name: "31 Hz" });
+    await fireEvent.click(r.getByRole("button", { name: "Paste a code" }));
+    const bands = [-4, -4, -4, -4, 5, -9, 1, 7, -3, 8];
+    await fireEvent.input(r.getByRole("textbox"), { target: { value: encodeAdvanced(bands) } });
+    await fireEvent.click(within(r.getByRole("dialog")).getByRole("button", { name: "Apply" }));
+    await waitFor(() => expect(r.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(backend.curve).toEqual(bands));
+    expect([...r.container.querySelectorAll(".fader .val")].map((n) => n.textContent)).toEqual(["−4", "−4", "−4", "−4"]);
+    await waitFor(() => expect(fitTexts(r.container)).toEqual(bestFitPreview(bands).map(levelText)));
+    expect(writes()).toEqual([]);
+    r.unmount();
+  });
+
+  it("a Sound code pasted here goes through the same dialog", async () => {
+    const r = render(AdvancedEq, { st: connected(), onback: () => {} });
+    await r.findByRole("slider", { name: "31 Hz" });
+    await fireEvent.click(r.getByRole("button", { name: "Paste a code" }));
+    const bands = [15, 11, 8, 11, 13, 16];
+    await fireEvent.input(r.getByRole("textbox"), { target: { value: encodeSound({ bands, ult: 0, slot: 0 }) } });
+    await fireEvent.click(within(r.getByRole("dialog", { name: "Paste a code" })).getByRole("button", { name: "Apply" }));
+    const confirm = r.getByRole("dialog", { name: "Apply this preset to the headphones?" });
+    expect(writes()).toEqual([]);
+    await fireEvent.click(within(confirm).getByRole("button", { name: "Apply" }));
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0]).toEqual({ cmd: "set_eq_preset_ult_bands", args: { preset: MANUAL, ult: 0, bands } });
+    // The stored curve is untouched by a Sound code.
+    expect(calls("set_eq_curve")).toEqual([]);
+    r.unmount();
+  });
+
+  it("a pasted curve that cannot be saved is not drawn", async () => {
+    const r = render(AdvancedEq, { st: connected(), onback: () => {} });
+    await r.findByRole("slider", { name: "31 Hz" });
+    backend.saveFails = true;
+    await fireEvent.click(r.getByRole("button", { name: "Paste a code" }));
+    await fireEvent.input(r.getByRole("textbox"), { target: { value: encodeAdvanced([-4, -4, -4, -4, 5, -9, 1, 7, -3, 8]) } });
+    await fireEvent.click(within(r.getByRole("dialog")).getByRole("button", { name: "Apply" }));
+    expect(await within(r.getByRole("dialog")).findByText("Not saved: disk full")).toBeTruthy();
+    expect([...r.container.querySelectorAll(".fader .val")].map((n) => n.textContent)).toEqual(["+6", "+3", "0", "−2"]);
+    expect(r.container.querySelector(".act .note.err")?.textContent).toBe("Not saved: disk full");
+    r.unmount();
+  });
+
+  it("share and paste sit in the top row; the bottom row is one line", () => {
+    const top = advSrc.slice(advSrc.indexOf('<div class="top">'), advSrc.indexOf('<div class="faders"'));
+    expect(top).toMatch(/>Share<\/button/);
+    expect(top).toMatch(/>Paste a code<\/button>/);
+    const bottom = advSrc.slice(advSrc.indexOf('<div class="bottom">'), advSrc.indexOf("{#if sharing}"));
+    expect(bottom).not.toMatch(/Share|Paste a code/);
   });
 });

@@ -131,6 +131,10 @@ Run with the real headphones connected.
 - [ ] Back on the Sound screen, the fader knobs snap to the 21 segments and the +10, 0 and −10 labels are not clipped in the real window.
 - [ ] Restart Hairline; the Advanced curve is still there (`eq_curve.json` in the config directory).
 
+- [ ] Share codes (Phase 5c): on Custom 1 with a visible curve and ULT 1, press Share on the Sound screen. "Share this preset" shows a QR and a code starting with `S`; Copy says "Copied" and the clipboard holds the dashed code. Scanning the QR with a phone camera reads the same text. On Bright, Off, or disconnected, Share is unavailable. In the Ink theme the QR is still dark modules on a light square and scans.
+- [ ] Change the curve and ULT, then (on another run, after a restart) press "Paste a code" and paste the copied code in lower case without dashes. The six values, "ULT 1" and "Custom 1" appear under the field; changing one character shows "That code has a typo (check failed).". Press Apply: the dialog "Apply this preset to the headphones?" opens and nothing has gone out yet (frame log). Cancel sends nothing. Apply again and confirm: exactly one `58 03 A1 01 06 <six bands>` goes out and the NTFY `59 03 A1 01 …` brings the Sound faders back to the shared values.
+- [ ] In Advanced, Share a curve and paste its code back after a Reset: the ten bands return, `eq_curve.json` holds them, and no `58 03` goes out. A Sound code pasted in Advanced opens the same confirmation dialog. At 880×560 the Advanced view still does not scroll: Share and Paste a code sit at the right of the top row, the faders keep about 300 px of travel, and the bottom row (values, note, Reset, Send) is on one line.
+
 ## 10. Windows app (Phase 7a, to do with a Windows machine)
 
 The app builds and its tests pass on Windows CI; it has not been started on a Windows machine or run against the headphones on Windows. Nothing below is verified. Do section 7 (the transport) first.

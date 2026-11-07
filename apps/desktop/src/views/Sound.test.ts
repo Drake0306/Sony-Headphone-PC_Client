@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render } from "@testing-library/svelte";
+import { fireEvent, render, within } from "@testing-library/svelte";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => null) }));
 vi.mock("@tauri-apps/api/event", () => ({
@@ -10,6 +10,7 @@ vi.mock("@tauri-apps/api/event", () => ({
 import { invoke } from "@tauri-apps/api/core";
 import scaleSrc from "../lib/controls/FaderScale.svelte?raw";
 import fadersSrc from "../lib/controls/Faders.svelte?raw";
+import { encodeAdvanced, encodeSound } from "../lib/presetCode";
 import { emptyState, type DeviceState } from "../lib/state";
 import Sound from "./Sound.svelte";
 
@@ -123,5 +124,76 @@ describe("Sound equalizer", () => {
     expect(head(0x10)).toBe("Equalizer · Bright");
     expect(head(0x00)).toBe("Equalizer · Off");
     expect(head(0xa0)).toBe("Equalizer · Manual · drag a handle");
+  });
+});
+
+describe("Sound share codes", () => {
+  const DEVICE_WRITES = ["set_eq_preset_ult_bands", "set_eq_preset_bands", "set_eq_bands", "send_best_fit", "set_eq_preset", "set_ult"];
+  const writes = () => vi.mocked(invoke).mock.calls.filter(([cmd]) => DEVICE_WRITES.includes(cmd));
+  const custom1 = (): DeviceState => {
+    const st = withEq(0xa1);
+    st.eq_ult = { value: { preset: 0xa1, ult: "Ult1", bands: [10, 12, 8, 10, 10, 20] }, status: "Confirmed" };
+    return st;
+  };
+
+  it("share_from_sound_encodes_device_bands_ult_and_slot", async () => {
+    Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn(async () => {}) }, configurable: true });
+    vi.mocked(invoke).mockClear();
+    const r = render(Sound, { st: custom1() });
+    await fireEvent.click(r.getByRole("button", { name: "Share" }));
+    const dialog = r.getByRole("dialog");
+    expect(within(dialog).getByText("Share this preset")).toBeTruthy();
+    const code = encodeSound({ bands: [10, 12, 8, 10, 10, 20], ult: 1, slot: 1 });
+    expect(within(dialog).getByText(code)).toBeTruthy();
+    expect(dialog.querySelector("svg.qr")).not.toBeNull();
+    await fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    expect(r.queryByRole("dialog")).toBeNull();
+    expect(writes()).toEqual([]);
+    r.unmount();
+  });
+
+  it("share is unavailable on a fixed preset, Off or disconnected", async () => {
+    const otherShape = { ...custom1(), eq_capability: { bands: 10, steps: 21, ult2_additional_step: 0, presets: [] } };
+    const pending = { ...custom1(), eq_ult: { ...custom1().eq_ult, status: { Pending: { since_ms: 0 } } } } as DeviceState;
+    for (const st of [withEq(0x10), withEq(0x00), { ...custom1(), connected: false }, otherShape, pending]) {
+      const r = render(Sound, { st });
+      const share = r.getByRole("button", { name: "Share" });
+      expect(share.getAttribute("aria-disabled")).toBe("true");
+      await fireEvent.click(share);
+      expect(r.queryByRole("dialog")).toBeNull();
+      r.unmount();
+    }
+  });
+
+  it("pasted_code_waits_for_confirmation", async () => {
+    vi.mocked(invoke).mockClear();
+    const r = render(Sound, { st: custom1() });
+    await fireEvent.click(r.getByRole("button", { name: "Paste a code" }));
+    const bands = [0, 20, 10, 10, 5, 15];
+    await fireEvent.input(r.getByRole("textbox"), { target: { value: encodeSound({ bands, ult: 2, slot: 3 }) } });
+    await fireEvent.click(within(r.getByRole("dialog", { name: "Paste a code" })).getByRole("button", { name: "Apply" }));
+    const confirm = r.getByRole("dialog", { name: "Apply this preset to the headphones?" });
+    expect(within(confirm).getByText("Hairline writes these six bands and ULT 2 into Custom 1.")).toBeTruthy();
+    await new Promise((done) => setTimeout(done, 50));
+    expect(writes()).toEqual([]);
+    await fireEvent.click(within(confirm).getByRole("button", { name: "Apply" }));
+    await vi.waitFor(() => expect(r.queryByRole("dialog")).toBeNull());
+    expect(writes()).toEqual([["set_eq_preset_ult_bands", { preset: 0xa1, ult: 2, bands }]]);
+    r.unmount();
+  });
+
+  it("pasted_advanced_code_saves_only", async () => {
+    vi.mocked(invoke).mockClear();
+    const onadvanced = vi.fn();
+    const r = render(Sound, { st: withEq(0x10), onadvanced });
+    await fireEvent.click(r.getByRole("button", { name: "Paste a code" }));
+    const bands = [1, 2, 3, 4, 5, -5, -4, -3, -2, -1];
+    await fireEvent.input(r.getByRole("textbox"), { target: { value: encodeAdvanced(bands) } });
+    await fireEvent.click(within(r.getByRole("dialog")).getByRole("button", { name: "Apply" }));
+    await vi.waitFor(() => expect(onadvanced).toHaveBeenCalled());
+    expect(vi.mocked(invoke).mock.calls.filter(([c]) => c === "set_eq_curve")).toEqual([["set_eq_curve", { bands }]]);
+    expect(writes()).toEqual([]);
+    expect(r.queryByRole("dialog")).toBeNull();
+    r.unmount();
   });
 });

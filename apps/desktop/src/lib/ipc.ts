@@ -48,6 +48,14 @@ export const getBestFitPreview = () => invoke<number[]>("best_fit_preview");
 export const sendBestFit = (bands: number[], preset: number) =>
   invoke<number[]>("send_best_fit", { bands, preset });
 
+/**
+ * Writes a pasted Sound share code: six raw bands (0..=20) and ULT 0..=2 into
+ * `preset` (Manual, Custom 1 or Custom 2) in one EQ write. Only called after
+ * the confirmation dialog.
+ */
+export const setEqPresetUltBands = (preset: number, ult: 0 | 1 | 2, bands: number[]) =>
+  invoke<void>("set_eq_preset_ult_bands", { preset, ult, bands });
+
 /** Volume 0..=30. */
 export const setVolume = (volume: number) => invoke<void>("set_volume", { volume });
 

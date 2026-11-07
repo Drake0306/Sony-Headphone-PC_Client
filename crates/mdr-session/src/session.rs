@@ -238,6 +238,23 @@ impl Session {
         self.request(request::eq_ult_set(&eq))
     }
 
+    /// Changes the EQ preset, the ULT level and the band levels in one request
+    /// (a pasted share code). The band count must match the device's EQ
+    /// capability (6 if unknown).
+    pub fn set_eq_preset_ult_bands(
+        &mut self,
+        preset: u8,
+        ult: UltLevel,
+        bands: Vec<u8>,
+    ) -> Result<(), SessionError> {
+        self.check_band_count(&bands)?;
+        let mut eq = self.current_eq()?;
+        eq.preset = preset;
+        eq.ult = ult;
+        eq.bands = bands;
+        self.request(request::eq_ult_set(&eq))
+    }
+
     fn check_band_count(&self, bands: &[u8]) -> Result<(), SessionError> {
         let expected = self
             .state

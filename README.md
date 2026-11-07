@@ -84,6 +84,29 @@ Which preset: if the headphones are on Manual, Custom 1 or Custom 2, the fit is 
 
 Reset, beside Send, puts all ten bands back to 0 and saves that curve. It does not touch the headphones.
 
+## Sharing a preset
+
+An equalizer setting can be passed to someone else as a 15-character code, shown as `XXXXX-XXXXX-XXXXX`, with a QR of the same text.
+
+**Share.** On the Sound screen, "Share" (in the Presets block) is available on Manual, Custom 1 and Custom 2 while the headphones are connected; it encodes the six bands the headphones report, the ULT level and which of the three presets it came from. It is unavailable on a fixed Sony preset or Off (Sony does not report a fixed preset's bands), with no headphones, while an EQ change is still pending, and on headphones whose equalizer is not six bands of 21 steps. In the Advanced equalizer, "Share" and "Paste a code" sit at the right of the top row; "Share" encodes the ten-band curve. Either opens "Share this preset" / "Share this curve" with the QR, the code and Copy.
+
+**Paste.** "Paste a code" (on the Sound screen and in the Advanced equalizer) opens a field. The code is checked as you type, with or without dashes (any kind of dash), in any case; the values it carries are shown under it, or "That code is not a Hairline preset." / "That code has a typo (check failed).". Apply then:
+
+- a Sound code goes to the headphones only after the dialog "Apply this preset to the headphones?", which names the target preset and the ULT level and lists the six values. The target is the preset the code came from (Manual, Custom 1 or Custom 2); a code without one follows the Send best fit rule (the current preset if it is Manual, Custom 1 or Custom 2, otherwise Custom 1). The write is the same single `58 03 <preset> <ULT> 06 <six bands>` frame the app already uses; Cancel or Escape sends nothing.
+- an Advanced code is saved as the ten-band curve (drawn once the save succeeds) and opens the Advanced equalizer. Nothing is sent to the headphones.
+
+**The code.** The alphabet is Crockford base32, `0123456789ABCDEFGHJKMNPQRSTVWXYZ` (no I, L, O or U). When reading, whitespace and any dash (hyphen, en or em dash) are dropped, letters are upper-cased, I and L read as 1 and O as 0. Each symbol is 5 bits, 75 bits in all, most significant bit first:
+
+| Symbols | Bits | Content |
+| --- | --- | --- |
+| 1 | 5 | Kind, as the symbol's value: `S` (25) Sound, `A` (10) Advanced. Any other kind is rejected. |
+| 2–13 | 60 | Sound: six raw bands 0..20 (10 is flat; Clear Bass, 400 Hz, 1 kHz, 2.5 kHz, 6.3 kHz, 16 kHz), 5 bits each; ULT 0..2 in 2 bits; slot in 2 bits (0 Manual, 1 Custom 1, 2 Custom 2, 3 none); then 26 zero bits. Advanced: ten bands −10..+10 stored as level + 10 (31 Hz .. 16 kHz), 5 bits each; then 10 zero bits. |
+| 14–15 | 10 | CRC-10 over the 65 bits of symbols 1–13: polynomial 0x233, initial value 0, no reflection, no final xor. |
+
+The dashes go after symbols 5 and 10. A band above 20, ULT 3, or padding that is not zero is "not a Hairline preset". A ten-bit CRC catches every error within ten consecutive bits, so any single wrong symbol and any swapped neighbouring pair fail the check. For example, Custom 1 with bands 15 11 8 11 13 16 and ULT 1 is `SFB8B-DGA00-000W7`, and the curve 8 6 4 2 0 −2 0 2 4 −10 is `AJGEC-A8ACE-000ND`. The codec is `apps/desktop/src/lib/presetCode.ts`.
+
+The QR holds just the code text (no URL), at error-correction level M, drawn with qrcode-generator (MIT, see `THIRD_PARTY.md`).
+
 ## Advanced panel
 
 Settings has an "Advanced panel" switch; turning it on adds the Advanced screen. It is off by default and has three parts:

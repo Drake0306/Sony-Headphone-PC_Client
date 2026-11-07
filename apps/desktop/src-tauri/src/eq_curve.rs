@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use mdr_proto::eq::{best_fit, to_raw, DEVICE_BANDS, LEVEL_MAX, LEVEL_MIN};
-use mdr_proto::{preset_name, EqUltCapability};
+use mdr_proto::{preset_name, EqUltCapability, UltLevel};
 use mdr_session::DeviceState;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
@@ -155,6 +155,39 @@ pub fn prepare_send(
     };
     let (fitted, cmd) = fit_command(&curve, preset);
     Ok((curve, fitted, cmd))
+}
+
+/// The broker command that writes a pasted Sound share code: `preset` must be
+/// Manual, Custom 1 or Custom 2 (and listed by the headphones when they list
+/// presets), `ult` 0..=2, and `bands` exactly the headphones' band count
+/// (6 if unknown), each at most steps − 1 (20 if unknown). One EQ frame.
+pub fn prepare_preset_ult_bands(
+    cap: Option<&EqUltCapability>,
+    preset: u8,
+    ult: u8,
+    bands: &[u8],
+) -> Result<BrokerCmd, String> {
+    if !FIT_TARGETS.contains(&preset) {
+        return Err(
+            "a preset code can only be written into Manual, Custom 1 or Custom 2".to_string(),
+        );
+    }
+    check_listed(cap, preset)?;
+    let ult = match ult {
+        0 => UltLevel::Off,
+        1 => UltLevel::Ult1,
+        2 => UltLevel::Ult2,
+        other => return Err(format!("unknown ULT level {other}")),
+    };
+    let count = cap.map_or(DEVICE_BANDS.len(), |c| usize::from(c.bands));
+    let top = cap.map_or((LEVEL_MAX - LEVEL_MIN) as u8, |c| c.steps.saturating_sub(1));
+    if bands.len() != count {
+        return Err(format!("expected {count} bands, got {}", bands.len()));
+    }
+    if let Some(b) = bands.iter().find(|&&b| b > top) {
+        return Err(format!("band level {b} is outside 0..={top}"));
+    }
+    Ok(BrokerCmd::SetEqPresetUltBands(preset, ult, bands.to_vec()))
 }
 
 /// Saves `curve` in the settings dir and keeps it, holding the lock across

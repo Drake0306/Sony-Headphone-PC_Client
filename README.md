@@ -42,7 +42,9 @@ Phase 5: the Advanced equalizer, described below, and a redesigned Sound fader (
 
 Phase 7a: the app builds and its tests pass on Windows CI. The tray popover is a plain window there; audio 'playing' and the microphone trigger are blank until Windows modules exist. Not run against the headphones on Windows. The checklist for a Windows machine is section 10 of `docs/hardware-validation.md`.
 
-Next: running the Windows app on a Windows machine, then Linux. The in-app audio engine (Phase 6) is undecided; see [the equalizer research](<docs/research/reports/Advanced equalizer research.html>).
+Phase 8a: the Linux transport and the app build and pass tests on Linux CI; not run against the headphones on Linux. The tray needs libayatana-appindicator; audio 'playing' and the microphone trigger are blank until Linux modules exist. The checklist for a Linux machine is section 11 of `docs/hardware-validation.md`.
+
+Next: running the Windows and Linux apps on real machines. The in-app audio engine (Phase 6) is undecided; see [the equalizer research](<docs/research/reports/Advanced equalizer research.html>).
 
 The popover is validated on a real WH-ULT900N (firmware 2.1.4) on macOS 27.2; see `docs/hardware-validation.md`. The Phase 2 screens are verified against the fake device and still need a session with the real headphones. Use `--fake-device` (below) to run without headphones; a fake run says `FAKE` in the popover and the window so it is never mistaken for the real thing.
 
@@ -126,6 +128,15 @@ HAIRLINE_FAKE=1 pnpm tauri dev
 ```
 
 `--fake-device` runs the app against a simulated headphone instead of a real Bluetooth connection, so you can try the popover without the hardware.
+
+Linux: install the build libraries first (Debian and Ubuntu names):
+
+```
+sudo apt-get install libdbus-1-dev pkg-config libwebkit2gtk-4.1-dev \
+  libayatana-appindicator3-dev librsvg2-dev patchelf libgtk-3-dev libxdo-dev libssl-dev
+```
+
+The tray icon needs a desktop with StatusNotifierItem support (on GNOME, the AppIndicator extension). Linux trays report no clicks, so the popover opens from the tray menu's "Show Hairline". BlueZ does not expose SDP over D-Bus, so the transport finds the MDR v2 RFCOMM channel itself: `HAIRLINE_RFCOMM_CHANNEL=18` names it; otherwise it tries the channel recorded at the last connect, then scans channels 1 to 30, sending each only the protocol-info GET (`00 00`) and keeping the first that answers as v2. The channel used is printed (`hairline: RFCOMM channel 18 (channel scan)`) and recorded in `devices/<address>.json`.
 
 ## Tests
 

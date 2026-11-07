@@ -24,7 +24,8 @@ use crate::frame_ring::{FrameEntry, FrameTap, Recorder};
 use crate::probe::{ProbeEvent, ProbeHost, ProbeRunner};
 use crate::scenes::engine::{apply_actions, Engine};
 use crate::scenes::model::{Actions, Inputs, Scene};
-// macOS reads its sensors; other non-Windows systems get the stubs in the same module.
+// macOS reads its sensors; other non-Windows systems (Linux) get the stubs in
+// the same module.
 #[cfg(not(target_os = "windows"))]
 use crate::sensors_macos::{frontmost_app_name, mic_in_use};
 #[cfg(target_os = "windows")]
@@ -606,7 +607,8 @@ fn paired_devices(device_name: Option<&str>) -> Vec<PairedDevice> {
     crate::audio_windows::paired_devices(device_name)
 }
 
-/// The host's own entry in the Link list.
+/// The host's own entry in the Link list: none on Linux until its audio
+/// module exists.
 #[cfg(not(target_os = "windows"))]
 fn paired_devices(device_name: Option<&str>) -> Vec<PairedDevice> {
     if !cfg!(target_os = "macos") {

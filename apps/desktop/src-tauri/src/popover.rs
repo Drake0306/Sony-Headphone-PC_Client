@@ -107,12 +107,22 @@ pub fn toggle(app: &AppHandle) {
 /// bottom at the icon's top; the positioner moves it below the icon only when
 /// that would put it above the screen (y < 0), and `move_window_constrained`
 /// then clamps it inside the monitor's bounds (so with a side taskbar it can
-/// overlap the icon).
+/// overlap the icon). Linux trays report no icon position, so there it goes
+/// to the top-right corner of the screen, where most panels keep the tray.
 fn place(window: &WebviewWindow) {
     #[cfg(target_os = "windows")]
     let _ = window.move_window_constrained(Position::TrayCenter);
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
     let _ = window.move_window(Position::TrayCenter);
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let _ = window.move_window(Position::TopRight);
+}
+
+/// Shows the popover (the Linux tray menu's "Show Hairline").
+pub fn show_popover(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window(LABEL) {
+        show(app, &window);
+    }
 }
 
 fn show(app: &AppHandle, window: &WebviewWindow) {

@@ -142,3 +142,22 @@ The app builds and its tests pass on Windows CI; it has not been started on a Wi
 - [ ] Scenes: an "App in front" trigger with an executable name (for example `Zoom` for `Zoom.exe`) applies when that app is in front. A "Microphone in use" trigger never fires on Windows yet.
 - [ ] Launch at login: turning it on in Settings starts Hairline after signing in again.
 - [ ] Record the Windows version and the headphones' firmware with the results.
+
+## 11. Linux (Phase 8a, to do with a Linux machine)
+
+The transport and the app build and their tests pass on Linux CI (`ubuntu-latest`); nothing has been started on a Linux machine or run against the headphones on Linux. Nothing below is verified.
+
+- [ ] Install the libraries from the README's Linux paragraph; `pnpm tauri dev` builds.
+- [ ] `HAIRLINE_FAKE=1`: the app starts and the tray icon appears (GNOME needs the AppIndicator extension; KDE shows it in the system tray). The icon is readable on the panel.
+- [ ] The tray menu shows "Show Hairline" and "Quit Hairline". "Show Hairline" opens the popover at the top-right of the screen with the `FAKE` label; it has no title bar, stays on top, and is not in the task list. Clicking outside hides it. Quit ends the app.
+- [ ] The popover footer opens the main window; closing it leaves the tray icon running.
+- [ ] Pair and connect the headphones with BlueZ (`bluetoothctl connect <address>` or the desktop's Bluetooth settings), then start Hairline without the fake. Note the `hairline: RFCOMM channel N (...)` line on stderr: which channel was chosen, and whether it came from the channel scan, the recorded channel or `HAIRLINE_RFCOMM_CHANNEL`. Expected: channel 18 on Roy's unit, from the scan on the first connect.
+- [ ] If the scan ran: note how long the connect took, and that the headphones kept playing audio while the other channels were opened, sent the one GET and closed.
+- [ ] `devices/<address>.json` in the config directory (`~/.config/com.drake0306.hairline/`) now holds `"rfcomm_channel": 18`. Quit and start again: the line says "recorded channel" and no scan runs.
+- [ ] `HAIRLINE_RFCOMM_CHANNEL=18` is used first; a wrong value (for example 3) falls back to the recorded channel and the scan.
+- [ ] With the headphones paired but not connected, Hairline logs "no connected device exposes the v2 service" and opens no socket; connecting them later is picked up by the retry.
+- [ ] With the headphones connected, the popover shows battery, noise control and ULT, and a change from the popover takes effect on the headphones.
+- [ ] Devices: the Link list shows no host entry and no "playing" (the Linux audio module does not exist yet). Scenes: a "Microphone in use" or "App in front" trigger never fires on Linux yet.
+- [ ] `cargo install --path crates/mdr-cli`, then `hairlinectl state`, `hairlinectl nc ambient --level 12` and `hairlinectl battery` work against the running app.
+- [ ] Launch at login: turning it on in Settings starts Hairline after signing in again.
+- [ ] Record the distribution, desktop, BlueZ version (`bluetoothctl --version`) and the headphones' firmware with the results.

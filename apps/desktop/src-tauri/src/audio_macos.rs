@@ -1,4 +1,9 @@
 //! Name of the host's default audio output device (CoreAudio on macOS).
+//!
+//! Linux reports none yet, so the Link list stays empty there rather than
+//! showing a guessed "playing". The route for later is PipeWire (or the
+//! PulseAudio compatibility API): the default sink's description, compared
+//! with the headphones' name as on macOS.
 
 /// The default output device's name, or `None` when unknown or not on macOS.
 #[cfg(target_os = "macos")]

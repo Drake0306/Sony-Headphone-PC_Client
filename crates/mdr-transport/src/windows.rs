@@ -18,6 +18,8 @@ pub(crate) const SOCKET_ERROR: i32 = -1;
 pub(crate) const WSAETIMEDOUT: i32 = 10060;
 pub(crate) const WSAECONNRESET: i32 = 10054;
 pub(crate) const WSAENOTCONN: i32 = 10057;
+/// `GetLastError` after `BluetoothFindFirstDevice` when no device matched.
+pub(crate) const ERROR_NO_MORE_ITEMS: u32 = 259;
 
 /// A Windows `GUID` in its native field layout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -107,6 +109,18 @@ pub(crate) fn candidate_from(name: &str, address: u64, connected: bool) -> Candi
     }
 }
 
+/// Interprets `GetLastError` after `BluetoothFindFirstDevice` returned NULL:
+/// no matching device is an empty list, anything else means no usable radio.
+pub(crate) fn find_first_outcome(err: u32) -> io::Result<()> {
+    if err == ERROR_NO_MORE_ITEMS {
+        Ok(())
+    } else {
+        Err(io::Error::other(format!(
+            "Bluetooth is unavailable (error {err})"
+        )))
+    }
+}
+
 /// Refuses a device that is paired but has no connection to this computer.
 pub(crate) fn check_connected(candidate: &Candidate) -> io::Result<()> {
     if candidate.connected_audio {
@@ -134,13 +148,14 @@ mod platform {
         BluetoothFindDeviceClose, BluetoothFindFirstDevice, BluetoothFindNextDevice, AF_BTH,
         BLUETOOTH_DEVICE_INFO, BLUETOOTH_DEVICE_SEARCH_PARAMS, BTHPROTO_RFCOMM, SOCKADDR_BTH,
     };
+    use windows_sys::Win32::Foundation::GetLastError;
     use windows_sys::Win32::Networking::WinSock::{
         closesocket, connect as ws_connect, getpeername, recv, send, setsockopt, shutdown, socket,
         WSAGetLastError, WSAStartup, INVALID_SOCKET, SD_BOTH, SOCKADDR, SOCKET, SOCK_STREAM,
         SOL_SOCKET, SO_RCVTIMEO, WSADATA,
     };
 
-    use super::{bth_addr, candidate_from, check_connected, map_recv, v2_guid};
+    use super::{bth_addr, candidate_from, check_connected, find_first_outcome, map_recv, v2_guid};
     use crate::{is_ult_wear_name, Candidate, Transport};
 
     /// Size of the buffer each `recv` call reads into.
@@ -152,6 +167,7 @@ mod platform {
         assert!(super::WSAETIMEDOUT == ws::WSAETIMEDOUT);
         assert!(super::WSAECONNRESET == ws::WSAECONNRESET);
         assert!(super::WSAENOTCONN == ws::WSAENOTCONN);
+        assert!(super::ERROR_NO_MORE_ITEMS == windows_sys::Win32::Foundation::ERROR_NO_MORE_ITEMS);
     };
 
     fn last_error(what: &str) -> io::Error {
@@ -200,8 +216,8 @@ mod platform {
     }
 
     /// Every paired (authenticated, remembered or connected) device, without
-    /// issuing an inquiry.
-    fn paired() -> Vec<Candidate> {
+    /// issuing an inquiry. Fails when there is no usable Bluetooth radio.
+    fn paired() -> io::Result<Vec<Candidate>> {
         // SAFETY: plain data; zero means "all radios" for `hRadio`.
         let mut params: BLUETOOTH_DEVICE_SEARCH_PARAMS = unsafe { mem::zeroed() };
         params.dwSize = mem::size_of::<BLUETOOTH_DEVICE_SEARCH_PARAMS>() as u32;
@@ -216,7 +232,9 @@ mod platform {
         // SAFETY: both pointers are valid and dwSize is set.
         let find = unsafe { BluetoothFindFirstDevice(&params, &mut info) };
         if find.is_null() {
-            return devices;
+            // SAFETY: no preconditions; read straight after the failing call.
+            find_first_outcome(unsafe { GetLastError() })?;
+            return Ok(devices);
         }
         loop {
             // SAFETY: `Address` is a union over the same 8 bytes; `ullLong` is
@@ -235,11 +253,11 @@ mod platform {
         }
         // SAFETY: `find` is a live handle, closed once.
         unsafe { BluetoothFindDeviceClose(find) };
-        devices
+        Ok(devices)
     }
 
     pub(crate) fn discover() -> io::Result<Vec<Candidate>> {
-        Ok(paired()
+        Ok(paired()?
             .into_iter()
             .filter(|c| is_ult_wear_name(&c.name))
             .collect())
@@ -252,7 +270,7 @@ mod platform {
                 format!("not a Bluetooth address: {address}"),
             )
         })?;
-        let candidate = paired()
+        let candidate = paired()?
             .into_iter()
             .find(|c| bth_addr(&c.address) == Some(bt_addr))
             .ok_or_else(|| {
@@ -399,6 +417,7 @@ mod platform {
 mod tests {
     use super::*;
     use crate::normalise_address;
+    use std::io;
 
     #[test]
     fn bth_addr_parses_any_notation() {
@@ -461,6 +480,14 @@ mod tests {
         assert_eq!(err.kind(), io::ErrorKind::NotConnected);
         let connected = candidate_from("ULT WEAR", bth_addr("A8:E6:E8:FE:D6:54").unwrap(), true);
         assert!(check_connected(&connected).is_ok());
+    }
+
+    #[test]
+    fn find_first_outcome_separates_no_devices_from_no_radio() {
+        assert!(find_first_outcome(ERROR_NO_MORE_ITEMS).is_ok());
+        let err = find_first_outcome(1168).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::Other);
+        assert_eq!(err.to_string(), "Bluetooth is unavailable (error 1168)");
     }
 
     #[cfg(windows)]

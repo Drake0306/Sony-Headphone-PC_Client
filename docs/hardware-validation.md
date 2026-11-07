@@ -98,4 +98,5 @@ The Windows transport compiles and passes unit tests on Windows CI; it has not y
 - [ ] Connect while connected opens the v2 channel (stack resolves it from SDP); record the channel `getpeername` reports, or that it reports none.
 - [ ] Handshake completes read-only (the section 2 sequence) over the Winsock link.
 - [ ] `recv_timeout` returns `None` on a quiet link and an error when the headphones are switched off.
+- [ ] After many quiet-link timeouts (several minutes idle), notifications still arrive. If not, switch `recv_timeout` from `SO_RCVTIMEO` to `select()` before `recv`.
 - [ ] Phone contention: behaviour when the phone holds the v2 channel.

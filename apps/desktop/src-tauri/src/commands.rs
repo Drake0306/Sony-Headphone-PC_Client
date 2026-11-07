@@ -9,6 +9,7 @@ use serde::Serialize;
 use tauri::{AppHandle, State};
 
 use crate::broker::{parse_raw, BrokerCmd};
+use crate::hotkeys::{lacks_modifier, WINDOW_ERROR_KEY};
 use crate::popover;
 use crate::scenes::eval::parse_hhmm;
 use crate::scenes::model::{Scene, Trigger};
@@ -253,6 +254,9 @@ fn check_scenes(scenes: &[Scene]) -> Result<(), String> {
         if !ids.insert(s.id.as_str()) {
             return bad("id", format!("{:?} is used twice", s.id));
         }
+        if s.id == WINDOW_ERROR_KEY {
+            return bad("id", format!("{:?} is reserved", s.id));
+        }
         if s.name.trim().is_empty() {
             return bad("name", "is empty".into());
         }
@@ -281,6 +285,9 @@ fn check_scenes(scenes: &[Scene]) -> Result<(), String> {
         }
         if let Some(v) = a.volume.filter(|&v| v > VOLUME_MAX) {
             return bad("volume", format!("{v} is outside 0..={VOLUME_MAX}"));
+        }
+        if let Some(accel) = s.hotkey.as_deref().filter(|a| lacks_modifier(a)) {
+            return bad("hotkey", format!("{accel:?} needs Ctrl, Alt or Super"));
         }
     }
     Ok(())
@@ -390,6 +397,30 @@ mod tests {
             scene("a", Trigger::MicInUse, Actions::default()),
         ];
         assert!(err_of(&twice).contains("used twice"));
+        let reserved = scene("__window", Trigger::Manual, Actions::default());
+        assert_eq!(
+            err_of(&[reserved]),
+            "scene \"__window\": id \"__window\" is reserved"
+        );
+    }
+
+    #[test]
+    fn scene_hotkeys_need_a_modifier_or_a_function_key() {
+        let with = |hotkey: &str| {
+            let mut s = scene("a", Trigger::Manual, Actions::default());
+            s.name = "X".into();
+            s.hotkey = Some(hotkey.into());
+            [s]
+        };
+        for hotkey in ["1", "Shift+A", "Space"] {
+            assert_eq!(
+                err_of(&with(hotkey)),
+                format!("scene \"X\": hotkey {hotkey:?} needs Ctrl, Alt or Super")
+            );
+        }
+        for hotkey in ["Alt+1", "F5", "Ctrl+Shift+A", "Super+Space", "F24"] {
+            assert_eq!(check_scenes(&with(hotkey)), Ok(()), "{hotkey}");
+        }
     }
 
     #[test]

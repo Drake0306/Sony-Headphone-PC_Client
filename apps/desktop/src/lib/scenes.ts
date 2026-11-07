@@ -44,7 +44,7 @@ export interface Scene {
 export interface ScenesEvent {
   scenes: Scene[];
   active: string | null;
-  /** Refused or failed hotkeys by scene id; empty when none. */
+  /** Refused or failed hotkeys by scene id (`__window` for the window shortcut); empty when none. */
   hotkey_errors?: Record<string, string>;
 }
 
@@ -147,6 +147,7 @@ const hex = (v: number) => `0x${v.toString(16).toUpperCase().padStart(2, "0")}`;
 /** `check_scenes` (commands.rs) for one scene: the backend's message, or null. */
 export function validateScene(s: Scene): string | null {
   const bad = (field: string, why: string) => `scene ${JSON.stringify(s.name)}: ${field} ${why}`;
+  if (s.id === WINDOW_ERROR_KEY) return bad("id", `${JSON.stringify(s.id)} is reserved`);
   if (s.name.trim() === "") return bad("name", "is empty");
   const t = s.trigger;
   if (t.kind === "time_range") {
@@ -166,6 +167,8 @@ export function validateScene(s: Scene): string | null {
     return bad("eq_preset", `${hex(a.eq_preset)} is not a known preset`);
   if (a.volume !== null && !inRange(a.volume, 0, VOLUME_MAX))
     return bad("volume", `${a.volume} is outside 0..=${VOLUME_MAX}`);
+  if (s.hotkey !== null && lacksModifier(s.hotkey))
+    return bad("hotkey", `${JSON.stringify(s.hotkey)} needs Ctrl, Alt or Super`);
   return null;
 }
 
@@ -220,14 +223,45 @@ export interface KeyPress {
 }
 
 const MODIFIER_CODES = /^(Shift|Control|Alt|Meta|OS)(Left|Right)?$/;
+const FUNCTION_KEY = /^F([1-9]|1\d|2[0-4])$/i;
+// What global-hotkey reads as Ctrl, Alt or Super (hotkey.rs `parse_hotkey`).
+const TYPING_SAFE_MODS = new Set([
+  "CTRL",
+  "CONTROL",
+  "ALT",
+  "OPTION",
+  "SUPER",
+  "CMD",
+  "COMMAND",
+  "COMMANDORCONTROL",
+  "COMMANDORCTRL",
+  "CMDORCTRL",
+  "CMDORCONTROL",
+]);
+
+/** A press of Shift, Ctrl, Alt or Meta alone (or no key at all). */
+export const isModifierPress = (e: KeyPress): boolean => e.code === "" || MODIFIER_CODES.test(e.code);
+
+/**
+ * hotkeys.rs `lacks_modifier`: none of Ctrl, Alt, Super and not an F1–F24
+ * key, so the hotkey would take over ordinary typing.
+ */
+export function lacksModifier(hotkey: string): boolean {
+  const parts = hotkey.split("+").map((p) => p.trim());
+  const key = parts[parts.length - 1] ?? "";
+  if (hotkey.trim() === "" || FUNCTION_KEY.test(key)) return false;
+  return !parts.slice(0, -1).some((m) => TYPING_SAFE_MODS.has(m.toUpperCase()));
+}
 
 /**
  * Tauri's accelerator string for a key press: `Ctrl`, `Alt`, `Shift`, `Super`
  * in that order, then the key (`KeyA` → `A`, `Digit1` → `1`, others by their
- * code). A bare modifier press gives null.
+ * code). A bare modifier press gives null, and so does a key without Ctrl,
+ * Alt or Super unless it is F1–F24 (it would hijack typing).
  */
 export function accelerator(e: KeyPress): string | null {
-  if (MODIFIER_CODES.test(e.code) || e.code === "") return null;
+  if (isModifierPress(e)) return null;
+  if (!e.ctrlKey && !e.altKey && !e.metaKey && !FUNCTION_KEY.test(e.code)) return null;
   const key = e.code.replace(/^Key(?=[A-Z]$)/, "").replace(/^Digit(?=\d$)/, "");
   const mods = [e.ctrlKey && "Ctrl", e.altKey && "Alt", e.shiftKey && "Shift", e.metaKey && "Super"].filter(
     (m): m is string => typeof m === "string",
@@ -250,6 +284,9 @@ export const hotkeyError = (v: ScenesView, id: string): string | null => v.hotke
 /** The fixed shortcut that opens the main window (hotkeys.rs `WINDOW_SHORTCUT`). */
 export const WINDOW_SHORTCUT = "Alt+Super+N";
 
+/** Where `hotkey_errors` holds a failed window shortcut (hotkeys.rs `WINDOW_ERROR_KEY`). */
+export const WINDOW_ERROR_KEY = "__window";
+
 /** One Settings Hotkeys line; `error` is why a scene's hotkey was not registered. */
 export interface HotkeyLine {
   label: string;
@@ -257,10 +294,10 @@ export interface HotkeyLine {
   error: string | null;
 }
 
-/** Settings' Hotkeys list: the window shortcut, then each enabled scene with a hotkey and its refusal, if any. */
+/** Settings' Hotkeys list: the window shortcut, then each enabled scene with a hotkey, each with its refusal, if any. */
 export function hotkeyList(list: Scene[], mac: boolean, errors: Record<string, string> | undefined): HotkeyLine[] {
   return [
-    { label: "Open window", keys: hotkeyChips(WINDOW_SHORTCUT, mac), error: null },
+    { label: "Open window", keys: hotkeyChips(WINDOW_SHORTCUT, mac), error: errors?.[WINDOW_ERROR_KEY] ?? null },
     ...list
       .filter((s) => s.enabled && s.hotkey && s.hotkey.trim() !== "")
       .map((s) => ({ label: s.name, keys: hotkeyChips(s.hotkey, mac), error: errors?.[s.id] ?? null })),

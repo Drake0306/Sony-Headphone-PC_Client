@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use tauri::{AppHandle, Manager};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 use crate::broker::BrokerCmd;
 use crate::commands::Broker;
@@ -16,13 +16,37 @@ use crate::scenes::model::Scene;
 /// Opens or focuses the main window (⌥⌘N on a Mac).
 pub const WINDOW_SHORTCUT: &str = "Alt+Super+N";
 
-/// The latest registration errors by scene id, sent with the `"scenes"` event.
+/// The key under which `HotkeyErrors` holds a failed window shortcut; no
+/// scene may use it as its id.
+pub const WINDOW_ERROR_KEY: &str = "__window";
+
+/// The latest registration errors by scene id (and `WINDOW_ERROR_KEY`), sent
+/// with the `"scenes"` event.
 #[derive(Default)]
 pub struct HotkeyErrors(pub Mutex<HashMap<String, String>>);
 
 /// Parses a Tauri accelerator string (modifiers in any order and case).
 pub fn parse(accelerator: &str) -> Result<Shortcut, String> {
     accelerator.parse::<Shortcut>().map_err(|e| e.to_string())
+}
+
+/// True when an accelerator that parses holds none of Ctrl, Alt, Super and is
+/// not an F1–F24 key, so it would take over ordinary typing. One that does not
+/// parse gives false; registration reports it.
+pub fn lacks_modifier(accelerator: &str) -> bool {
+    let Ok(shortcut) = parse(accelerator.trim()) else {
+        return false;
+    };
+    let function_key = shortcut
+        .key
+        .to_string()
+        .strip_prefix('F')
+        .and_then(|n| n.parse::<u8>().ok())
+        .is_some_and(|n| (1..=24).contains(&n));
+    !function_key
+        && !shortcut
+            .mods
+            .intersects(Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER)
 }
 
 /// Identity of an accelerator for duplicate checks: the parsed shortcut when
@@ -72,7 +96,8 @@ pub fn conflicts(scenes: &[Scene]) -> Vec<(String, String)> {
 }
 
 /// Unregisters our shortcuts, registers the window shortcut and the plan, and
-/// stores and returns the errors by scene id (parse and OS failures, conflicts).
+/// stores and returns the errors by scene id (parse and OS failures, conflicts),
+/// with a failed window shortcut under `WINDOW_ERROR_KEY`.
 pub fn apply(app: &AppHandle, scenes: &[Scene]) -> HashMap<String, String> {
     let gs = app.global_shortcut();
     if let Err(e) = gs.unregister_all() {
@@ -83,11 +108,12 @@ pub fn apply(app: &AppHandle, scenes: &[Scene]) -> HashMap<String, String> {
             let _ = popover::open_main_window(app);
         }
     });
-    if let Err(e) = window {
-        eprintln!("hairline: window hotkey {WINDOW_SHORTCUT} not registered: {e}");
-    }
     let (register, refused) = plan(scenes);
     let mut errors: HashMap<String, String> = refused.into_iter().collect();
+    if let Err(e) = window {
+        eprintln!("hairline: window hotkey {WINDOW_SHORTCUT} not registered: {e}");
+        errors.insert(WINDOW_ERROR_KEY.into(), e.to_string());
+    }
     let mut registered = 0;
     for (id, accel) in register {
         let result = parse(&accel).and_then(|shortcut| {

@@ -5,6 +5,8 @@ import {
   hotkeyChips,
   hotkeyError,
   hotkeyList,
+  lacksModifier,
+  WINDOW_ERROR_KEY,
   WINDOW_SHORTCUT,
   modeBoxes,
   moveScene,
@@ -139,6 +141,21 @@ describe("validateScene", () => {
     );
   });
 
+  it("validate_scene_needs_a_modifier_on_the_hotkey", () => {
+    for (const hotkey of ["1", "Shift+A", "Space"]) {
+      expect(validateScene(scene("X", { hotkey }))).toBe(`scene "X": hotkey ${JSON.stringify(hotkey)} needs Ctrl, Alt or Super`);
+      expect(lacksModifier(hotkey)).toBe(true);
+    }
+    for (const hotkey of ["Alt+1", "F5", "Ctrl+Shift+A", "super+space", "CmdOrCtrl+K"]) {
+      expect(validateScene(scene("X", { hotkey }))).toBeNull();
+      expect(lacksModifier(hotkey)).toBe(false);
+    }
+  });
+
+  it("validate_scene_rejects_the_reserved_window_id", () => {
+    expect(validateScene(scene(WINDOW_ERROR_KEY, { name: "X" }))).toBe('scene "X": id "__window" is reserved');
+  });
+
   it("validate_scenes_rejects_a_repeated_id", () => {
     expect(validateScenes([scene("a"), scene("b")])).toBeNull();
     expect(validateScenes([scene("a"), scene("a", { name: "X" })])).toBe('scene "X": id "a" is used twice');
@@ -193,6 +210,16 @@ describe("accelerator", () => {
     );
     expect(accelerator(key("F5"))).toBe("F5");
     expect(accelerator(key("ArrowUp", { ctrlKey: true }))).toBe("Ctrl+ArrowUp");
+  });
+
+  it("accelerator_waits_for_ctrl_alt_or_super_unless_a_function_key", () => {
+    expect(accelerator(key("Digit1"))).toBeNull();
+    expect(accelerator(key("KeyA", { shiftKey: true }))).toBeNull();
+    expect(accelerator(key("Space"))).toBeNull();
+    expect(accelerator(key("Digit1", { altKey: true }))).toBe("Alt+1");
+    expect(accelerator(key("F5"))).toBe("F5");
+    expect(accelerator(key("F24", { shiftKey: true }))).toBe("Shift+F24");
+    expect(accelerator(key("KeyA", { ctrlKey: true, shiftKey: true }))).toBe("Ctrl+Shift+A");
   });
 
   it("accelerator_ignores_a_bare_modifier", () => {
@@ -265,6 +292,14 @@ describe("hotkeys", () => {
       { label: "Open window", keys: ["⌥", "⌘", "N"], error: null },
       { label: "Desk", keys: ["⌥", "⌘", "1"], error: null },
       { label: "Walk", keys: ["⌥", "⌘", "1"], error: 'already used by scene "Desk"' },
+    ]);
+  });
+
+  it("hotkey_list_marks_a_refused_window_shortcut", () => {
+    const list = [scene("a", { name: "Desk", hotkey: "Alt+Super+1" })];
+    expect(hotkeyList(list, true, { [WINDOW_ERROR_KEY]: "HotKey already registered" })).toEqual([
+      { label: "Open window", keys: ["⌥", "⌘", "N"], error: "HotKey already registered" },
+      { label: "Desk", keys: ["⌥", "⌘", "1"], error: null },
     ]);
   });
 

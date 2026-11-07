@@ -7,9 +7,11 @@ const backend = vi.hoisted(() => ({
   active: null as string | null,
   reject: null as string | null,
   emitOnApply: true,
+  hotkeyErrors: {} as Record<string, string>,
   handler: null as ((e: { payload: unknown }) => void) | null,
 }));
-const emit = () => backend.handler?.({ payload: { scenes: backend.list, active: backend.active } });
+const emit = () =>
+  backend.handler?.({ payload: { scenes: backend.list, active: backend.active, hotkey_errors: backend.hotkeyErrors } });
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(async (cmd: string, args: { id?: string }) => {
@@ -57,6 +59,7 @@ describe("Popover mode row", () => {
     backend.active = null;
     backend.reject = null;
     backend.emitOnApply = true;
+    backend.hotkeyErrors = {};
     vi.mocked(invoke).mockClear();
   });
 
@@ -107,5 +110,17 @@ describe("Popover mode row", () => {
     await waitFor(() => expect(r.getByText("B")).toHaveClass("refused"));
     expect(r.getByText("B")).toHaveAttribute("title", 'no scene "b"');
     expect(r.getByText("A")).not.toHaveClass("refused");
+  });
+
+  it("window_hint_hidden_when_the_shortcut_was_refused", async () => {
+    backend.list = [scene("a")];
+    const r = render(Popover);
+    await waitFor(() => expect(r.getByText("Battery")).toBeInTheDocument());
+    await tick();
+    expect(r.getByText("Alt+Super+N")).toBeInTheDocument();
+    backend.hotkeyErrors = { __window: "HotKey already registered" };
+    emit();
+    await waitFor(() => expect(r.queryByText("Alt+Super+N")).toBeNull());
+    expect(r.getByText("Open window")).toBeInTheDocument();
   });
 });

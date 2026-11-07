@@ -54,7 +54,7 @@ Every 2 seconds the broker thread checks the enabled scenes in list order, and t
 
 Actions use the existing controls only: noise control, ambient level and voice focus (sent as one request), ULT and an EQ preset (also one request), volume, and DSEE auto or off. "Keep" leaves a setting as it is. A setting the headphones refuse shows on the normal controls like any other refusal. Scenes send nothing new on the wire.
 
-Hotkeys are recorded in the scene editor as Tauri accelerators and registered with the global-shortcut plugin only while Hairline runs. If one conflicts or the OS refuses it, it shows as refused, with the reason, in the editor and in Settings. `⌥⌘N` always opens the window.
+Hotkeys are recorded in the scene editor as Tauri accelerators and registered with the global-shortcut plugin only while Hairline runs. If one conflicts or the OS refuses it, it shows as refused, with the reason, in the editor and in Settings. A scene hotkey needs Ctrl, Alt or Super (or is a lone F1–F24 key), so it cannot take over typing. `⌥⌘N` opens the window when macOS allows the shortcut; Settings shows it refused otherwise.
 
 ## Run it
 

@@ -25,6 +25,20 @@ describe("SceneEditor", () => {
     expect(onSave.mock.calls[0][0].hotkey).toBe("Alt+Super+1");
   });
 
+  it("scene_editor_waits_for_a_modifier_and_says_so", async () => {
+    const { getByText, getByLabelText, queryByText, queryByLabelText } = setup();
+    await fireEvent.click(getByText("Record"));
+    expect(queryByText("Add Ctrl, Alt or Super")).toBeNull();
+    await fireEvent.keyDown(window, { code: "KeyA", key: "A", shiftKey: true });
+    expect(getByText("Press keys")).toBeInTheDocument();
+    expect(getByText("Add Ctrl, Alt or Super")).toBeInTheDocument();
+    expect(queryByLabelText("Hotkey")).toBeNull();
+    await fireEvent.keyDown(window, { code: "F5", key: "F5" });
+    expect(getByText("Record")).toBeInTheDocument();
+    expect(queryByText("Add Ctrl, Alt or Super")).toBeNull();
+    expect(getByLabelText("Hotkey")).toBeInTheDocument();
+  });
+
   it("scene_editor_escape_and_blur_stop_recording", async () => {
     const { getByText, queryByLabelText } = setup();
     await fireEvent.click(getByText("Record"));

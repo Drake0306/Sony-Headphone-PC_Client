@@ -13,6 +13,7 @@
     AMBIENT_MAX,
     EQ_PRESETS,
     hotkeyChips,
+    isModifierPress,
     triggerSentence,
     VOLUME_MAX,
     type Actions,
@@ -85,6 +86,8 @@
   // svelte-ignore state_referenced_locally
   let picking = $state(isNew);
   let recording = $state(false);
+  // The last press while recording had no Ctrl, Alt or Super (and was not F1–F24).
+  let needsModifier = $state(false);
 
   const hotkeyParts = $derived(hotkeyChips(draft.hotkey, mac));
   // The error is about the saved hotkey; a newly recorded one has not been tried yet.
@@ -114,6 +117,7 @@
 
   // A clicked button is not focused in macOS WebKit, so the recorder listens on the window.
   $effect(() => {
+    needsModifier = false;
     if (!recording) return;
     const onKey = (e: KeyboardEvent) => {
       e.preventDefault();
@@ -123,7 +127,10 @@
         return;
       }
       const hotkey = accelerator(e);
-      if (hotkey === null) return;
+      if (hotkey === null) {
+        if (!isModifierPress(e)) needsModifier = true;
+        return;
+      }
       draft.hotkey = hotkey;
       recording = false;
     };
@@ -306,6 +313,7 @@
       >
     </div>
   </Row>
+  {#if recording && needsModifier}<p class="note">{mac ? "Add ⌃, ⌥ or ⌘" : "Add Ctrl, Alt or Super"}</p>{/if}
   {#if refused}<p class="note live">{refused}</p>{/if}
   <div class="btnrow">
     <button class="btn" class:unavailable={busy} aria-disabled={busy} onclick={() => busy || onDelete()}>Delete</button>

@@ -6,13 +6,14 @@
 //! on each connect. The file keeps the newest `CAP` samples.
 //!
 //! Time left is a least-squares line through the current discharge segment:
-//! the trailing samples that are not charging with no gap over 30 min between
-//! neighbours (nor between the last one and now). It is shown only when that
+//! the trailing samples that are not charging with no gap over 2 h between
+//! neighbours (nor between the last one and now). Samples are written only on
+//! a change, so a level may sit unchanged for a while inside a drain. It is shown only when that
 //! segment spans at least 30 min and drops at least 2 %, and the line falls;
 //! otherwise it is blank, never invented.
 
 use std::fs::OpenOptions;
-use std::io::{self, Write};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -23,8 +24,12 @@ use serde::{Deserialize, Serialize};
 const FILE_NAME: &str = "battery.jsonl";
 /// The most samples the file keeps; older ones are rewritten away.
 pub const CAP: usize = 5000;
-/// A longer silence between samples ends a discharge segment.
-const MAX_GAP_S: u64 = 30 * 60;
+/// A longer silence between samples (or since the last one) ends a
+/// discharge segment.
+const MAX_GAP_S: u64 = 2 * 60 * 60;
+/// How often, in broker milliseconds, the estimate is re-emitted while
+/// connected, so it goes blank once the data turns stale.
+pub const REFRESH_MS: u64 = 60_000;
 /// The shortest segment an estimate is drawn from.
 const MIN_SPAN_S: u64 = 30 * 60;
 /// The smallest drop, in percent, an estimate is drawn from.
@@ -92,9 +97,23 @@ fn write(dir: &Path, mut samples: Vec<Sample>, sample: Sample) -> io::Result<()>
     if samples.len() < CAP {
         let mut file = OpenOptions::new()
             .create(true)
+            .read(true)
             .append(true)
             .open(path(dir))?;
-        return writeln!(file, "{}", line(&sample)?);
+        // A partial last line (a crash mid-write) gets its own line ended
+        // first, so the new sample is not glued to it.
+        let mut text = String::new();
+        if file.seek(SeekFrom::End(0))? > 0 {
+            let mut lastbyte = [0u8];
+            file.seek(SeekFrom::End(-1))?;
+            file.read_exact(&mut lastbyte)?;
+            if lastbyte[0] != b'\n' {
+                text.push('\n');
+            }
+        }
+        text.push_str(&line(&sample)?);
+        text.push('\n');
+        return file.write_all(text.as_bytes());
     }
     samples.push(sample);
     let keep = &samples[samples.len() - CAP..];
@@ -183,6 +202,9 @@ pub struct BatteryHost<'a> {
     emit: Box<dyn Fn(&BatteryEstimate) + 'a>,
     /// The last value seen on this link; `None` until the first one.
     last: Option<(u8, bool)>,
+    /// Broker time of the last timed re-emit (or of the first tick after a
+    /// write); `None` right after a write.
+    refreshed_at: Option<u64>,
 }
 
 impl<'a> BatteryHost<'a> {
@@ -196,12 +218,31 @@ impl<'a> BatteryHost<'a> {
             wall,
             emit,
             last: None,
+            refreshed_at: None,
         }
     }
 
-    /// A new connection: its first battery value is written whatever it is.
+    /// A new connection (or a cleared history): the next battery value is
+    /// written whatever it is.
     pub fn new_link(&mut self) {
         self.last = None;
+        self.refreshed_at = None;
+    }
+
+    /// Called on every broker pass with the broker clock: re-emits the
+    /// estimate every `REFRESH_MS` while connected with a sample taken.
+    pub fn tick(&mut self, now_ms: u64, connected: bool) {
+        if !connected || self.last.is_none() {
+            return;
+        }
+        match self.refreshed_at {
+            None => self.refreshed_at = Some(now_ms),
+            Some(t) if now_ms >= t + REFRESH_MS => {
+                self.refreshed_at = Some(now_ms);
+                self.emit_current();
+            }
+            Some(_) => {}
+        }
     }
 
     /// Looks at the state after a broker pass; writes and emits on a change.
@@ -231,7 +272,10 @@ impl<'a> BatteryHost<'a> {
             append(&self.dir, sample)
         };
         match written {
-            Ok(true) => self.emit_current(),
+            Ok(true) => {
+                self.refreshed_at = None;
+                self.emit_current();
+            }
             Ok(false) => {}
             Err(e) => eprintln!("hairline: battery sample not saved: {e}"),
         }

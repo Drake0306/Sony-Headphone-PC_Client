@@ -40,4 +40,12 @@ describe("Overview time left", () => {
     await waitFor(() => expect(r.getByText("about 5 h 20 m left")).toBeInTheDocument());
     r.unmount();
   });
+
+  it("hides the estimate while disconnected", async () => {
+    backend.estimate = { minutes_left: 320, samples: 30, since: 1_000 };
+    const r = render(Overview, { st: { ...withBattery(), connected: false } });
+    await new Promise((done) => setTimeout(done, 20));
+    expect(r.container.querySelector(".left")).toBeNull();
+    r.unmount();
+  });
 });

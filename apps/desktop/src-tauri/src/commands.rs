@@ -348,13 +348,14 @@ pub fn battery_estimate(app: AppHandle) -> BatteryEstimate {
         .unwrap_or_default()
 }
 
-/// Deletes `battery.jsonl` and emits the empty estimate.
+/// Deletes `battery.jsonl` and emits the empty estimate; the broker then
+/// takes a fresh sample if the headphones are connected.
 #[tauri::command]
-pub fn clear_battery_history(app: AppHandle) -> Result<(), String> {
+pub fn clear_battery_history(app: AppHandle, broker: State<'_, Broker>) -> Result<(), String> {
     let dir = settings::dir(&app).map_err(|e| e.to_string())?;
     battery_history::clear(&dir).map_err(|e| format!("battery history not cleared: {e}"))?;
     let _ = app.emit("battery", BatteryEstimate::default());
-    Ok(())
+    broker.send(BrokerCmd::BatteryHistoryCleared)
 }
 
 #[cfg(test)]

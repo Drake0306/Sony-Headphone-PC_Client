@@ -75,6 +75,8 @@ pub enum BrokerCmd {
     ProbeStart,
     /// Stops the probe, keeping the results so far.
     ProbeStop,
+    /// `battery.jsonl` was deleted: take a fresh sample if connected.
+    BatteryHistoryCleared,
 }
 
 /// The word the Advanced panel asks for before a raw SET.
@@ -388,6 +390,12 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
                     }
                 }
                 Ok(BrokerCmd::ProbeStop) => changed |= end_probe(&mut probe, &mut session),
+                Ok(BrokerCmd::BatteryHistoryCleared) => {
+                    if let Some(host) = battery.as_deref_mut() {
+                        host.new_link();
+                        host.observe(session.state());
+                    }
+                }
                 Ok(BrokerCmd::RecordFrames(on)) => {
                     if let Some(tap) = frames.as_deref_mut() {
                         tap.record(on);
@@ -449,6 +457,9 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
                 host.observe(session.state());
             }
         }
+        if let Some(host) = battery.as_deref_mut() {
+            host.tick(clock(), session.state().connected);
+        }
         if let Some(tap) = frames.as_deref_mut() {
             tap.flush();
         }
@@ -499,7 +510,8 @@ fn apply(session: &mut Session, cmd: BrokerCmd) -> Result<(), SessionError> {
         | BrokerCmd::WatchFrames(_)
         | BrokerCmd::RecordFrames(_)
         | BrokerCmd::ProbeStart
-        | BrokerCmd::ProbeStop => Ok(()),
+        | BrokerCmd::ProbeStop
+        | BrokerCmd::BatteryHistoryCleared => Ok(()),
     }
 }
 

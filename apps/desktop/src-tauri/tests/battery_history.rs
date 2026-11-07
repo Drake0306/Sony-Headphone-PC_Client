@@ -1,6 +1,7 @@
 //! Battery history (`battery.jsonl`) and the time-left estimate.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{channel, Receiver};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -53,11 +54,11 @@ fn time_left_blank_cases() {
     charging.push(s(end + 60, 90, true));
     assert_eq!(estimate(&charging, end + 60).minutes_left, None);
 
-    // A gap over 30 min cuts the segment to the samples after it.
+    // A gap over 2 h cuts the segment to the samples after it.
     let mut gap = base.clone();
-    gap.push(s(end + 31 * 60, 89, false));
-    gap.push(s(end + 40 * 60, 88, false));
-    assert_eq!(estimate(&gap, end + 40 * 60).minutes_left, None);
+    gap.push(s(end + 121 * 60, 89, false));
+    gap.push(s(end + 130 * 60, 88, false));
+    assert_eq!(estimate(&gap, end + 130 * 60).minutes_left, None);
 
     // Less than 30 min of data.
     let short = drain(1_000_000, 100, 90, 29);
@@ -83,8 +84,8 @@ fn time_left_blank_cases() {
         None
     );
 
-    // Nothing recorded for over 30 min.
-    assert_eq!(estimate(&base, end + 31 * 60).minutes_left, None);
+    // Nothing recorded for over 2 h.
+    assert_eq!(estimate(&base, end + 121 * 60).minutes_left, None);
 
     // No samples at all.
     assert_eq!(
@@ -95,6 +96,33 @@ fn time_left_blank_cases() {
             since: None
         }
     );
+}
+
+#[test]
+fn a_plateau_inside_a_drain_keeps_the_estimate() {
+    // 100 -> 95 over 30 min, 45 min flat at 95, then 95 -> 90 over 30 min.
+    let mut samples = drain(1_000_000, 100, 95, 30);
+    let flat_end = samples.last().unwrap().t + 45 * 60;
+    samples.extend(drain(flat_end, 94, 90, 24));
+    let now = samples.last().unwrap().t;
+    let est = estimate(&samples, now);
+    assert!(est.minutes_left.is_some(), "{est:?}");
+    // Flat for 45 min since the last sample: still within the gap rule.
+    assert!(estimate(&samples, now + 45 * 60).minutes_left.is_some());
+}
+
+#[test]
+fn appending_after_a_partial_line_starts_a_new_one() {
+    let dir = temp_dir("partial");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("battery.jsonl"),
+        "{\"t\":10,\"level\":80,\"charging\":false}\n{\"t\":20,\"lev",
+    )
+    .unwrap();
+    assert!(append(&dir, s(30, 79, false)).unwrap());
+    assert_eq!(load(&dir), [s(10, 80, false), s(30, 79, false)]);
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[test]
@@ -220,5 +248,88 @@ fn battery_notify_appends_and_emits() {
     tx.send(BrokerCmd::Disconnect).unwrap();
     assert!(handle.join().unwrap().is_ok());
     drop(srx);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Runs the broker on the fake with a battery host; the broker's clock is
+/// `monotonic_ms` plus `skew_ms`, the wall clock is `wall` (unix seconds).
+fn spawn_with_battery(
+    dir: PathBuf,
+    wall: Arc<AtomicU64>,
+    skew_ms: Arc<AtomicU64>,
+) -> (
+    std::sync::mpsc::Sender<BrokerCmd>,
+    Receiver<BatteryEstimate>,
+    std::thread::JoinHandle<std::io::Result<()>>,
+) {
+    let (tx, rx) = channel();
+    let (btx, brx) = channel();
+    let handle = std::thread::spawn(move || {
+        let mut host = BatteryHost::new(
+            dir,
+            Box::new(move || wall.load(Ordering::SeqCst)),
+            Box::new(move |e: &BatteryEstimate| {
+                let _ = btx.send(e.clone());
+            }),
+        );
+        run_broker_logged(
+            Box::new(FakeDevice::ult_wear()),
+            rx,
+            |_: &DeviceState| {},
+            move || monotonic_ms() + skew_ms.load(Ordering::SeqCst),
+            BrokerContext {
+                battery: Some(&mut host),
+                ..BrokerContext::default()
+            },
+        )
+    });
+    (tx, brx, handle)
+}
+
+#[test]
+fn the_estimate_is_re_emitted_and_goes_blank_when_stale() {
+    let dir = temp_dir("stale");
+    const W: u64 = 2_000_000;
+    // 77 -> 68 over the hour before connecting; the handshake reports 67 %.
+    for sample in drain(W - 3600, 77, 68, 59) {
+        push(&dir, sample).unwrap();
+    }
+    let wall = Arc::new(AtomicU64::new(W));
+    let skew = Arc::new(AtomicU64::new(0));
+    let (tx, brx, handle) = spawn_with_battery(dir.clone(), Arc::clone(&wall), Arc::clone(&skew));
+    let first = next_estimate(&brx);
+    assert_eq!(first.samples, 11);
+    assert!(first.minutes_left.is_some(), "{first:?}");
+
+    // Flat at 67 % for over 2 h: the next timed re-emit is blank.
+    wall.store(W + 121 * 60, Ordering::SeqCst);
+    skew.store(61_000, Ordering::SeqCst);
+    let later = next_estimate(&brx);
+    assert_eq!(later.minutes_left, None);
+    assert_eq!(later.samples, 11);
+
+    tx.send(BrokerCmd::Disconnect).unwrap();
+    assert!(handle.join().unwrap().is_ok());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn clearing_takes_a_fresh_sample_while_connected() {
+    let dir = temp_dir("cleared");
+    let wall = Arc::new(AtomicU64::new(3_000));
+    let skew = Arc::new(AtomicU64::new(0));
+    let (tx, brx, handle) = spawn_with_battery(dir.clone(), Arc::clone(&wall), skew);
+    assert_eq!(next_estimate(&brx).samples, 1);
+
+    clear(&dir).unwrap();
+    wall.store(3_100, Ordering::SeqCst);
+    tx.send(BrokerCmd::BatteryHistoryCleared).unwrap();
+    let after = next_estimate(&brx);
+    assert_eq!(after.samples, 1);
+    assert_eq!(after.since, Some(3_100));
+    assert_eq!(load(&dir), [s(3_100, 67, false)]);
+
+    tx.send(BrokerCmd::Disconnect).unwrap();
+    assert!(handle.join().unwrap().is_ok());
     let _ = std::fs::remove_dir_all(&dir);
 }

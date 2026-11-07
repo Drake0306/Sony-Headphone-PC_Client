@@ -45,7 +45,7 @@
 
   const ncShown = $derived(nc.shown);
   const battery = $derived(st.battery.value);
-  const left = $derived(battery ? timeLeft($estimate.minutes_left) : "");
+  const left = $derived(st.connected && battery ? timeLeft($estimate.minutes_left) : "");
   const eq = $derived(st.eq_ult.value);
   const top = $derived(Math.max(1, (st.eq_capability?.steps ?? 21) - 1));
   const onOff = (v: boolean | null) => (v === null ? "--" : v ? "On" : "Off");

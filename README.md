@@ -24,7 +24,7 @@ The Hairline design: off-white paper, one-pixel rules, dot-matrix numerals, boxe
   </tr>
 </table>
 
-The popover shipped in Phase 1 and is validated on real hardware; the window screens shipped in Phase 2, built from these mockups (`docs/research/reports/Hairline design screens.html`). Scenes is still a placeholder until the modes module lands.
+The popover shipped in Phase 1 and is validated on real hardware; the window screens shipped in Phase 2, built from these mockups (`docs/research/reports/Hairline design screens.html`). The Scenes screen shipped in Phase 2b (the modes module, below); it is verified against the fake device only.
 
 ## Status
 
@@ -32,9 +32,29 @@ Phase 1: a macOS menu-bar popover for the WH-ULT900N with battery level, noise c
 
 Phase 2: the full window, opened from the popover footer (it loads the app with `?view=main`). It has five screens: Overview, Sound (a draggable six-band equalizer, presets, ULT, codec and DSEE), Noise, Devices and Settings. It also adds Paper, Ink and System themes and launch at login. By default Hairline shows a Dock icon only while the window is open (Settings can keep it there).
 
-Next: the modes module (Scenes). Windows and Linux come after that.
+Phase 2b: Modes (Scenes), described below. It is verified against the fake device and still needs a session with the real headphones.
+
+Next: Windows, then Linux.
 
 The popover is validated on a real WH-ULT900N (firmware 2.1.4) on macOS 27.2; see `docs/hardware-validation.md`. The Phase 2 screens are verified against the fake device and still need a session with the real headphones. Use `--fake-device` (below) to run without headphones; a fake run says `FAKE` in the popover and the window so it is never mistaken for the real thing.
+
+## Modes (Scenes)
+
+A scene is a named set of settings plus a trigger. Scenes live in `scenes.json`, next to `settings.json`. Four ship disabled: "At the desk", "On a call", "Late" and "Walking". The Scenes screen edits them; the popover MODE row shows up to four enabled scenes, and a "…" opens the Scenes screen when there are more.
+
+Triggers on macOS:
+
+- By hand: only when you apply the scene.
+- Headphones connect.
+- Time range: from and to, and it can wrap midnight.
+- App in front: the frontmost app's name, compared case-insensitively.
+- Microphone in use: the default input device is running (a call, a recording).
+
+Every 2 seconds the broker thread checks the enabled scenes in list order, and the first one that matches wins. List order is the priority; the Up and Down buttons move a scene. A scene applied by hand stays active until another one matches. When a trigger stops matching, nothing is reverted. If the headphones are not connected, the active scene is tracked and applied on connect, after a fresh check.
+
+Actions use the existing controls only: noise control, ambient level and voice focus (sent as one request), ULT and an EQ preset (also one request), volume, and DSEE auto or off. "Keep" leaves a setting as it is. A setting the headphones refuse shows on the normal controls like any other refusal. Scenes send nothing new on the wire.
+
+Hotkeys are recorded in the scene editor as Tauri accelerators and registered with the global-shortcut plugin only while Hairline runs. If one conflicts or the OS refuses it, it shows as refused, with the reason, in the editor and in Settings. `⌥⌘N` always opens the window.
 
 ## Run it
 

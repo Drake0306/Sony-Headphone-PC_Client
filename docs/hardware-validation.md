@@ -75,3 +75,17 @@ Menu bar: the owner reports the tray icon and popover look right ("looks good").
 - EQ-type experiment (`58 03` vs `58 00` for changing the preset); waits for the owner's go-ahead. Current preset 0xA2 with bands `0A 0D 0A 0E 14 0C` is recorded above for restoration.
 - Phone-contention test (requires the phone).
 - Hide-on-focus-loss and popover placement in dark mode: to be confirmed by the owner.
+
+## 6. Scenes (Phase 2b, to do on the owner's next session)
+
+Run with `HAIRLINE_FRAME_LOG=1` and check each result in the log under `captures/local/`.
+
+- [ ] Apply a scene by hand from the Scenes screen, then another from the popover MODE row. The controls update and the headphones confirm.
+- [ ] HeadphonesConnected: enable "At the desk", reconnect the headphones. Expect Ambient 14 with voice focus on, and nothing else changed.
+- [ ] MicInUse: enable "On a call", start a FaceTime or Zoom test call. Expect noise cancelling. In the frame log, confirm the scene is not re-sent every 2 s.
+- [ ] TimeRange: set a range that includes now and one that does not; the scene applies only inside it.
+- [ ] FrontmostApp: use a real app name (try different capitalisation); the scene applies when that app is in front.
+- [ ] Hotkey: record one on a scene and press it. Press `⌥⌘N` and confirm the window opens.
+- [ ] Hotkey conflict: record one that another app or the OS already uses. It shows as refused with the reason, in the editor and in Settings.
+- [ ] Keep: a scene with a Keep field leaves that setting untouched (frame log shows no SET for it).
+

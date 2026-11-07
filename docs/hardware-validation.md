@@ -130,7 +130,7 @@ Run with the real headphones connected.
 
 The app builds and its tests pass on Windows CI; it has not been started on a Windows machine or run against the headphones on Windows. Nothing below is verified. Do section 7 (the transport) first.
 
-- [ ] `HAIRLINE_FAKE=1`: the app starts, the tray icon appears in the notification area, and a left click opens the popover above the icon at the bottom right with the `FAKE` label.
+- [ ] `HAIRLINE_FAKE=1`: the app starts, the tray icon appears in the notification area, and a left click opens the popover centred above the icon with the `FAKE` label.
 - [ ] The popover has no title bar, stays on top, and does not appear in the taskbar.
 - [ ] Clicking outside the popover hides it. Clicking the tray icon while it is open hides it and does not reopen it at once; the next click opens it.
 - [ ] Right click on the tray icon shows Quit, and Quit ends the app.

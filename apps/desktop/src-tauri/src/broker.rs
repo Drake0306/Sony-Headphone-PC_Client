@@ -458,7 +458,7 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
                 Ok(BrokerCmd::BatteryHistoryCleared) => {
                     if let Some(host) = battery.as_deref_mut() {
                         host.new_link();
-                        host.observe(session.state());
+                        host.observe(session.state(), clock());
                     }
                 }
                 Ok(BrokerCmd::RecordFrames(on)) => {
@@ -525,7 +525,7 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
         if changed {
             emit(session.state());
             if let Some(host) = battery.as_deref_mut() {
-                host.observe(session.state());
+                host.observe(session.state(), clock());
             }
         }
         if let Some(host) = battery.as_deref_mut() {

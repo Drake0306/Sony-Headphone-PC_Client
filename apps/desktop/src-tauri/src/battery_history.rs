@@ -202,8 +202,8 @@ pub struct BatteryHost<'a> {
     emit: Box<dyn Fn(&BatteryEstimate) + 'a>,
     /// The last value seen on this link; `None` until the first one.
     last: Option<(u8, bool)>,
-    /// Broker time of the last timed re-emit (or of the first tick after a
-    /// write); `None` right after a write.
+    /// Broker time of the last emit (a write or a timed re-emit); `None`
+    /// after a new link until then.
     refreshed_at: Option<u64>,
 }
 
@@ -246,7 +246,9 @@ impl<'a> BatteryHost<'a> {
     }
 
     /// Looks at the state after a broker pass; writes and emits on a change.
-    pub fn observe(&mut self, state: &DeviceState) {
+    /// `now_ms` is the broker clock read before the emit, so the next timed
+    /// re-emit is due `REFRESH_MS` after it.
+    pub fn observe(&mut self, state: &DeviceState, now_ms: u64) {
         if !state.connected || state.battery.status != Status::Confirmed {
             return;
         }
@@ -273,7 +275,7 @@ impl<'a> BatteryHost<'a> {
         };
         match written {
             Ok(true) => {
-                self.refreshed_at = None;
+                self.refreshed_at = Some(now_ms);
                 self.emit_current();
             }
             Ok(false) => {}

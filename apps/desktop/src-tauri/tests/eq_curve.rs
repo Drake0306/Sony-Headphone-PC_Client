@@ -6,10 +6,12 @@ use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use hairline_lib::broker::{run_broker, BrokerCmd};
-use hairline_lib::eq_curve::{check_curve, fit_command, load, save, EqCurve};
+use hairline_lib::eq_curve::{
+    check_curve, check_shape, fit_command, load, prepare_send, save, EqCurve,
+};
 use mdr_frame::FrameType;
 use mdr_proto::eq::{best_fit, to_raw};
-use mdr_proto::UltLevel;
+use mdr_proto::{EqUltCapability, UltLevel};
 use mdr_session::{DeviceState, Status};
 use mdr_transport::FakeDevice;
 
@@ -72,6 +74,54 @@ fn corrupt_file_gives_default_and_is_kept() {
 }
 
 #[test]
+fn unreadable_file_is_left_alone() {
+    // A directory where the file should be: reading fails with something
+    // other than NotFound or a parse error.
+    let dir = temp_dir("unreadable");
+    std::fs::create_dir_all(dir.join("eq_curve.json")).unwrap();
+    assert_eq!(load(&dir), EqCurve::default());
+    assert!(dir.join("eq_curve.json").is_dir(), "left in place");
+    assert!(!dir.join("eq_curve.json.bad").exists(), "not renamed");
+    std::fs::remove_dir_all(&dir).unwrap();
+}
+
+fn cap(bands: u8, steps: u8) -> EqUltCapability {
+    EqUltCapability {
+        bands,
+        steps,
+        ult2_additional_step: 0,
+        presets: vec![],
+    }
+}
+
+#[test]
+fn send_best_fit_needs_six_bands_of_21_steps() {
+    assert_eq!(check_shape(None), Ok(()));
+    assert_eq!(check_shape(Some(&cap(6, 21))), Ok(()));
+    assert_eq!(
+        check_shape(Some(&cap(5, 21))),
+        Err(
+            "this headphone's equalizer has 5 bands / 21 steps; best fit needs 6 and 21"
+                .to_string()
+        )
+    );
+    assert_eq!(
+        check_shape(Some(&cap(6, 11))),
+        Err(
+            "this headphone's equalizer has 6 bands / 11 steps; best fit needs 6 and 21"
+                .to_string()
+        )
+    );
+    let curve = [8, 6, 4, 2, 0, -2, 0, 2, 4, 6];
+    assert!(prepare_send(Some(&cap(10, 21)), &curve).is_err());
+    assert!(prepare_send(None, &[0; 9]).is_err());
+    let (saved, fitted, cmd) = prepare_send(Some(&cap(6, 21)), &curve).unwrap();
+    assert_eq!(saved.bands, curve);
+    assert_eq!(fitted, [5, 1, -2, 1, 3, 6]);
+    assert_eq!(cmd, BrokerCmd::SetEqBands(vec![15, 11, 8, 11, 13, 16]));
+}
+
+#[test]
 fn rejects_out_of_range() {
     assert_eq!(
         check_curve(&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]),
@@ -115,7 +165,7 @@ fn send_best_fit_uses_set_eq_bands() {
             && matches!(s.eq_ult.status, Status::Confirmed)
     });
     tx.send(BrokerCmd::SetUlt(UltLevel::Ult2)).unwrap();
-    wait_for(&erx, |s| {
+    let ready = wait_for(&erx, |s| {
         s.eq_ult.value.as_ref().map(|e| (e.preset, e.ult)) == Some((0x16, UltLevel::Ult2))
             && matches!(s.eq_ult.status, Status::Confirmed)
     });
@@ -123,7 +173,13 @@ fn send_best_fit_uses_set_eq_bands() {
     let curve = EqCurve {
         bands: [8, 6, 4, 2, 0, -2, 0, 2, 4, 6],
     };
+    assert_eq!(
+        ready.eq_capability.as_ref().map(|c| (c.bands, c.steps)),
+        Some((6, 21))
+    );
+    let (_, sent_fit, sent_cmd) = prepare_send(ready.eq_capability.as_ref(), &curve.bands).unwrap();
     let (fitted, cmd) = fit_command(&curve);
+    assert_eq!((sent_fit, &sent_cmd), (fitted, &cmd));
     assert_eq!(fitted, best_fit(&curve.bands));
     assert_eq!(fitted, [5, 1, -2, 1, 3, 6]);
     let raw: Vec<u8> = fitted.iter().map(|&v| to_raw(v)).collect();

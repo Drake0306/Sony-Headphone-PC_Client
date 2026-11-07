@@ -6,7 +6,6 @@ import {
   DEVICE_BAND_LABELS,
   fromRaw,
   PAGE_COUNT,
-  pageOf,
   toRaw,
   visibleBands,
 } from "./eqCurve";
@@ -22,11 +21,9 @@ describe("eqCurve helpers", () => {
     expect(visibleBands(-1)).toEqual([0, 1, 2, 3]);
     expect(visibleBands(9)).toEqual([6, 7, 8, 9]);
     for (let p = -2; p < 6; p++) expect(visibleBands(p)).toHaveLength(4);
-    expect([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(pageOf)).toEqual([0, 0, 0, 0, 1, 1, 1, 1, 2, 2]);
-    expect(pageOf(-3)).toBe(0);
-    expect(pageOf(42)).toBe(2);
-    // Every band is visible on its own page.
-    for (let i = 0; i < 10; i++) expect(visibleBands(pageOf(i))).toContain(i);
+    // Every band is on some page.
+    const seen = new Set(Array.from({ length: PAGE_COUNT }, (_, p) => visibleBands(p)).flat());
+    expect([...seen].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });
 
   it("labels", () => {

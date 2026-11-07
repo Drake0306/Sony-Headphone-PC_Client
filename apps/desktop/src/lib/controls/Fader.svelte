@@ -6,7 +6,8 @@
   reports a snapped step through `onchange` while the user moves it and
   `oncommit` when they finish (pointer release, or 150 ms after the last key).
   Pointer positions snap to the nearest step; ↑/↓ step by one, Shift by five,
-  Home/End go to the ends. Pending, unavailable or disabled: inert.
+  Home/End go to the ends. Pending, unavailable or disabled: inert. Unmounting
+  commits a key step that has not settled yet.
 -->
 <script module lang="ts">
   /** A raw step as dB text: "+5", "0", "−5" (a real minus sign), "--" for none. */
@@ -69,14 +70,21 @@
   let keyTimer: ReturnType<typeof setTimeout> | undefined;
   /** The last step reported, so a release commits what was drawn. */
   let last: number | null = null;
+  /** The key step waiting for its commit timer. */
+  let keyStep: number | null = null;
 
   /** Where step k's centre sits, measured from the rail's bottom. */
   const at = (k: number) => `calc(${KNOB / 2}px + ${k / max} * (100% - ${KNOB}px))`;
   const span = (n: number) => `calc(${n / max} * (100% - ${KNOB}px))`;
   const snap = (v: number) => Math.min(max, Math.max(0, Math.round(v)));
 
-  // Leaving the screen drops an unsent key step.
-  $effect(() => () => clearTimeout(keyTimer));
+  // Leaving the screen commits an unsent key step at once rather than drop it.
+  $effect(() => () => {
+    if (keyTimer === undefined) return;
+    clearTimeout(keyTimer);
+    keyTimer = undefined;
+    if (keyStep !== null) oncommit(keyStep);
+  });
 
   function change(v: number) {
     last = snap(v);
@@ -143,10 +151,12 @@
     if (next === null) return;
     e.preventDefault();
     change(next);
+    keyStep = last ?? snap(next);
     clearTimeout(keyTimer);
     keyTimer = setTimeout(() => {
       keyTimer = undefined;
-      oncommit(last ?? snap(next));
+      if (keyStep !== null) oncommit(keyStep);
+      keyStep = null;
     }, KEY_COMMIT_MS);
   }
 </script>
@@ -168,7 +178,6 @@
     {#if value !== null && value !== centre}
       <div
         class="fill"
-        class:neg={value < centre}
         style:bottom={at(Math.min(value, centre))}
         style:height={span(Math.abs(value - centre))}
       ></div>

@@ -17,6 +17,18 @@ export const DEVICE_BAND_LABELS: readonly string[] = ["Clear Bass", "400 Hz", "1
 export const LEVEL_MIN = -10;
 export const LEVEL_MAX = 10;
 
+/**
+ * Why best fit cannot be sent to headphones with this EQ shape (it writes six
+ * values of 21 steps), or null; an unknown capability is allowed. Same text
+ * as `eq_curve::check_shape`.
+ */
+export function shapeProblem(cap: { bands: number; steps: number } | null | undefined): string | null {
+  const steps = LEVEL_MAX - LEVEL_MIN + 1;
+  const bands = DEVICE_BAND_LABELS.length;
+  if (!cap || (cap.bands === bands && cap.steps === steps)) return null;
+  return `this headphone's equalizer has ${cap.bands} bands / ${cap.steps} steps; best fit needs ${bands} and ${steps}`;
+}
+
 export const BAND_COUNT = ADVANCED_BANDS_HZ.length;
 export const PAGE_SIZE = 4;
 /** Pages of four; the last one is right-aligned (bands 7–10), never short. */
@@ -29,11 +41,6 @@ export function visibleBands(page: number): number[] {
   const p = clampInt(page, 0, PAGE_COUNT - 1);
   const start = Math.min(p * PAGE_SIZE, BAND_COUNT - PAGE_SIZE);
   return Array.from({ length: PAGE_SIZE }, (_, k) => start + k);
-}
-
-/** The page that shows band `index` (clamped to the bands there are). */
-export function pageOf(index: number): number {
-  return Math.min(PAGE_COUNT - 1, Math.floor(clampInt(index, 0, BAND_COUNT - 1) / PAGE_SIZE));
 }
 
 /** A level as the device's raw 0..=20 scale (10 is flat), clamped. */

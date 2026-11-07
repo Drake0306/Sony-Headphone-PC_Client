@@ -39,8 +39,12 @@ export const setEqCurve = (bands: number[]) => invoke<void>("set_eq_curve", { ba
 /** The six device levels (−10..=10, wire order) fitted to the saved curve. */
 export const getBestFitPreview = () => invoke<number[]>("best_fit_preview");
 
-/** Sends the saved curve's best fit through the Sound screen's band write; returns the six levels. */
-export const sendBestFit = () => invoke<number[]>("send_best_fit");
+/**
+ * Saves these ten bands, then sends their best fit through the Sound screen's
+ * band write; returns the six levels. Rejects when the headphones' EQ is not
+ * six bands of 21 steps.
+ */
+export const sendBestFit = (bands: number[]) => invoke<number[]>("send_best_fit", { bands });
 
 /** Volume 0..=30. */
 export const setVolume = (volume: number) => invoke<void>("set_volume", { volume });

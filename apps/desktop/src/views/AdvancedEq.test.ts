@@ -28,7 +28,10 @@ vi.mock("@tauri-apps/api/core", () => ({
       return bestFitPreview(backend.curve);
     }
     if (cmd === "never") return bestFitPreview(backend.curve);
-    if (cmd === "send_best_fit") return bestFitPreview(backend.curve);
+    if (cmd === "send_best_fit") {
+      backend.curve = [...(args!.bands as number[])];
+      return bestFitPreview(backend.curve);
+    }
     return null;
   }),
 }));
@@ -149,12 +152,19 @@ describe("Advanced equalizer", () => {
     expect(send.getAttribute("aria-disabled")).toBe("false");
     await fireEvent.click(send);
     await waitFor(() => expect(calls("send_best_fit")).toHaveLength(1));
+    expect(calls("send_best_fit")[0].args).toEqual({ bands: [6, 3, 0, -2, 0, 0, 0, 0, 0, 0] });
     expect(calls("set_eq_bands")).toHaveLength(0);
 
     // The device answers with the fitted bands: "Sent".
     const fit = bestFitPreview(backend.curve).map(toRaw);
     await r.rerender({ st: connected({ Pending: { since_ms: 1 } }), onback: () => {} });
     expect(r.getByRole("button", { name: /Send best fit/ }).getAttribute("aria-disabled")).toBe("true");
+    // While the send is pending the faders are inert and faded.
+    const low = r.getByRole("slider", { name: "31 Hz" });
+    expect(low.getAttribute("aria-disabled")).toBe("true");
+    expect(r.container.querySelector(".faders")!.classList.contains("pending")).toBe(true);
+    await fireEvent.keyDown(low, { key: "ArrowUp" });
+    expect(low.getAttribute("aria-valuenow")).toBe(String(toRaw(6)));
     await r.rerender({ st: connected("Confirmed", fit), onback: () => {} });
     await waitFor(() => expect(r.getByText("Sent")).toBeTruthy());
     r.unmount();
@@ -203,12 +213,34 @@ describe("Advanced equalizer", () => {
     const low = await r.findByRole("slider", { name: "31 Hz" });
     await fireEvent.keyDown(low, { key: "ArrowUp" });
     await waitFor(() => expect(r.getByText("Saved; preview unavailable")).toBeTruthy());
+    expect(r.getByText("Saved; preview unavailable").classList.contains("live")).toBe(false);
     expect(r.queryByText(/Not saved/)).toBeNull();
     backend.previewFails = false;
     backend.saveFails = true;
     await fireEvent.keyDown(low, { key: "ArrowUp" });
     await waitFor(() => expect(r.getByText(/^Not saved/)).toBeTruthy());
     backend.saveFails = false;
+    r.unmount();
+  });
+
+  it("send needs six bands of 21 steps", async () => {
+    const st = connected();
+    const r = render(AdvancedEq, {
+      st: { ...st, eq_capability: { bands: 5, steps: 21, ult2_additional_step: 0, presets: [] } },
+      onback: () => {},
+    });
+    await r.findByRole("slider", { name: "31 Hz" });
+    const note = r.getByText("this headphone's equalizer has 5 bands / 21 steps; best fit needs 6 and 21");
+    expect(note.classList.contains("live")).toBe(false);
+    const send = r.getByRole("button", { name: "Send best fit to headphones" });
+    expect(send.getAttribute("aria-disabled")).toBe("true");
+    await fireEvent.click(send);
+    await new Promise((done) => setTimeout(done, 10));
+    expect(calls("send_best_fit")).toHaveLength(0);
+    // Unknown capability is allowed.
+    await r.rerender({ st: { ...st, eq_capability: null }, onback: () => {} });
+    expect(send.getAttribute("aria-disabled")).toBe("false");
+    expect(r.queryByText(/best fit needs/)).toBeNull();
     r.unmount();
   });
 

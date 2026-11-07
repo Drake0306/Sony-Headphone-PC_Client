@@ -94,6 +94,21 @@ describe("Fader", () => {
     expect(p.oncommit).not.toHaveBeenCalled();
   });
 
+  it("fader_flushes_a_key_step_on_unmount", async () => {
+    vi.useFakeTimers();
+    const p = props({ value: 10 });
+    const { getByRole, unmount } = render(Fader, p);
+    await fireEvent.keyDown(getByRole("slider"), { key: "ArrowUp" });
+    vi.advanceTimersByTime(50);
+    expect(p.oncommit).not.toHaveBeenCalled();
+    unmount();
+    expect(p.oncommit).toHaveBeenCalledTimes(1);
+    expect(p.oncommit).toHaveBeenLastCalledWith(11);
+    // Nothing more fires once the timer would have run.
+    vi.advanceTimersByTime(500);
+    expect(p.oncommit).toHaveBeenCalledTimes(1);
+  });
+
   it("fader_renders_21_segments_and_zero_line", async () => {
     const { container, getByRole, rerender } = render(Fader, props({ value: 15 }));
     const segs = container.querySelectorAll(".seg");
@@ -102,8 +117,9 @@ describe("Fader", () => {
     expect(zero).toHaveLength(1);
     expect(segs[10]).toBe(zero[0]);
     // Fill runs from zero up to the knob; the value in Doto sits above the label.
-    const fill = container.querySelector(".fill")!;
-    expect(fill).not.toHaveClass("neg");
+    // Above zero the fill starts at the zero step (10 of 20).
+    const bottom = (el: Element) => (el as HTMLElement).style.bottom;
+    expect(bottom(container.querySelector(".fill")!)).toBe(bottom(segs[10]));
     expect(container.querySelector(".fader .val")).toHaveTextContent("+5");
     expect(container.querySelector(".fader .val")).toHaveClass("dot");
     const foot = [...container.querySelector(".fader .foot")!.children].map((e) => e.className.split(" ")[0]);
@@ -114,7 +130,9 @@ describe("Fader", () => {
     expect(slider).toHaveAttribute("aria-valuemax", "20");
     expect(slider).toHaveAttribute("aria-valuenow", "15");
     await rerender({ value: 6 });
-    expect(container.querySelector(".fill")).toHaveClass("neg");
+    // Below zero it starts at the knob (step 6 of 20).
+    expect(bottom(container.querySelector(".fill")!)).toBe(bottom(container.querySelectorAll(".seg")[6]));
+    expect(bottom(segs[6])).not.toBe(bottom(segs[10]));
     // A real minus sign, not a hyphen.
     expect(container.querySelector(".fader .val")!.textContent).toBe("−4");
     await rerender({ value: 10 });

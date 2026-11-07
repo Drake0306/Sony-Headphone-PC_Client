@@ -7,7 +7,9 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use mdr_proto::eq::{best_fit, to_raw, LEVEL_MAX, LEVEL_MIN};
+use mdr_proto::eq::{best_fit, to_raw, DEVICE_BANDS, LEVEL_MAX, LEVEL_MIN};
+use mdr_proto::EqUltCapability;
+use mdr_session::DeviceState;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
@@ -48,22 +50,28 @@ pub fn check_curve(bands: &[i8]) -> Result<[i8; CURVE_BANDS], String> {
     Ok(bands)
 }
 
-/// The curve in `dir`. A missing file gives the flat curve. An unreadable,
-/// corrupt or out-of-range one is renamed to `eq_curve.json.bad` and gives
-/// the flat curve.
+/// The curve in `dir`. A missing file gives the flat curve. A corrupt or
+/// out-of-range one is renamed to `eq_curve.json.bad` and gives the flat
+/// curve. Any other read error (permissions, a directory in its place) is
+/// logged and gives the flat curve, leaving the file alone.
 pub fn load(dir: &Path) -> EqCurve {
     let path = path_in(dir);
-    let parsed = std::fs::read_to_string(&path).and_then(|text| {
-        let curve: EqCurve = serde_json::from_str(&text).map_err(io::Error::other)?;
-        check_curve(&curve.bands).map_err(io::Error::other)?;
-        Ok(curve)
-    });
+    let text = match std::fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return EqCurve::default(),
+        Err(e) => {
+            eprintln!("hairline: could not read eq_curve.json ({e}); using a flat curve");
+            return EqCurve::default();
+        }
+    };
+    let parsed = serde_json::from_str::<EqCurve>(&text)
+        .map_err(|e| e.to_string())
+        .and_then(|curve| check_curve(&curve.bands).map(|_| curve));
     match parsed {
         Ok(curve) => curve,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => EqCurve::default(),
         Err(e) => {
             eprintln!(
-                "hairline: eq_curve.json unreadable ({e}); kept as eq_curve.json.bad, using a flat curve"
+                "hairline: eq_curve.json is not a valid curve ({e}); kept as eq_curve.json.bad, using a flat curve"
             );
             if let Err(e) = std::fs::rename(&path, dir.join(BAD_NAME)) {
                 eprintln!("hairline: could not rename eq_curve.json: {e}");
@@ -91,6 +99,47 @@ pub fn fit_command(curve: &EqCurve) -> ([i8; 6], BrokerCmd) {
     (fitted, BrokerCmd::SetEqBands(raw))
 }
 
+/// Best fit writes six values of 21 steps; refuses a headphone that reports
+/// another EQ shape. An unknown capability (not reported yet) is allowed.
+pub fn check_shape(cap: Option<&EqUltCapability>) -> Result<(), String> {
+    const STEPS: u8 = (LEVEL_MAX - LEVEL_MIN + 1) as u8;
+    match cap {
+        Some(c) if usize::from(c.bands) != DEVICE_BANDS.len() || c.steps != STEPS => Err(format!(
+            "this headphone's equalizer has {} bands / {} steps; best fit needs {} and {STEPS}",
+            c.bands,
+            c.steps,
+            DEVICE_BANDS.len()
+        )),
+        _ => Ok(()),
+    }
+}
+
+/// Checks the device's EQ shape and the ten bands, then gives the curve to
+/// save, the six fitted levels and the command that writes them.
+pub fn prepare_send(
+    cap: Option<&EqUltCapability>,
+    bands: &[i8],
+) -> Result<(EqCurve, [i8; 6], BrokerCmd), String> {
+    check_shape(cap)?;
+    let curve = EqCurve {
+        bands: check_curve(bands)?,
+    };
+    let (fitted, cmd) = fit_command(&curve);
+    Ok((curve, fitted, cmd))
+}
+
+/// Saves `curve` in the settings dir and keeps it, holding the lock across
+/// both so concurrent saves cannot interleave.
+fn store(app: &AppHandle, state: &State<'_, Mutex<EqCurve>>, curve: EqCurve) -> Result<(), String> {
+    let dir = settings::dir(app).map_err(|e| e.to_string())?;
+    let mut held = state
+        .lock()
+        .map_err(|_| "the curve is unavailable".to_string())?;
+    save(&dir, &curve).map_err(|e| format!("could not save the curve: {e}"))?;
+    *held = curve;
+    Ok(())
+}
+
 fn current(state: &State<'_, Mutex<EqCurve>>) -> Result<EqCurve, String> {
     state
         .lock()
@@ -113,14 +162,7 @@ pub fn set_eq_curve(
     let curve = EqCurve {
         bands: check_curve(&bands)?,
     };
-    let dir = settings::dir(&app).map_err(|e| e.to_string())?;
-    // Held across save and update so concurrent saves cannot interleave.
-    let mut held = state
-        .lock()
-        .map_err(|_| "the curve is unavailable".to_string())?;
-    save(&dir, &curve).map_err(|e| format!("could not save the curve: {e}"))?;
-    *held = curve;
-    Ok(())
+    store(&app, &state, curve)
 }
 
 /// The six levels `send_best_fit` would write, without sending them.
@@ -129,14 +171,24 @@ pub fn best_fit_preview(state: State<'_, Mutex<EqCurve>>) -> [i8; 6] {
     best_fit(&current(&state).unwrap_or_default().bands)
 }
 
-/// Writes the best fit of the stored curve to the headphones' six EQ values
-/// (preset and ULT are kept) and returns the six fitted levels.
+/// Saves the ten `bands` given, then writes their best fit to the headphones'
+/// six EQ values (preset and ULT are kept) and returns the six fitted levels.
+/// Refused when the headphones report an EQ that is not six bands of 21 steps.
 #[tauri::command]
 pub fn send_best_fit(
+    app: AppHandle,
     broker: State<'_, Broker>,
     state: State<'_, Mutex<EqCurve>>,
+    device: State<'_, Mutex<DeviceState>>,
+    bands: Vec<i8>,
 ) -> Result<[i8; 6], String> {
-    let (fitted, cmd) = fit_command(&current(&state)?);
+    let cap = device
+        .lock()
+        .map_err(|_| "the device state is unavailable".to_string())?
+        .eq_capability
+        .clone();
+    let (curve, fitted, cmd) = prepare_send(cap.as_ref(), &bands)?;
+    store(&app, &state, curve)?;
     broker.send(cmd)?;
     Ok(fitted)
 }

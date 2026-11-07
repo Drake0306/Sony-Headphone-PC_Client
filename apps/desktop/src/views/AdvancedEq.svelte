@@ -25,6 +25,7 @@
     LEVEL_MAX,
     LEVEL_MIN,
     PAGE_COUNT,
+    shapeProblem,
     toRaw,
     visibleBands,
   } from "../lib/eqCurve";
@@ -55,8 +56,15 @@
 
   const visible = $derived(visibleBands(page));
   const busy = $derived(isPending(eq.status));
+  /** Best fit writes six values of 21 steps; other headphones cannot take it. */
+  const shape = $derived(shapeProblem(st.eq_capability));
   const sendOff = $derived(
-    !st.connected || st.eq_ult.status === "Unavailable" || st.eq_ult.value === null || curve === null || busy,
+    !st.connected ||
+      st.eq_ult.status === "Unavailable" ||
+      st.eq_ult.value === null ||
+      curve === null ||
+      busy ||
+      shape !== null,
   );
   const same = (a: readonly number[] | null | undefined, b: readonly number[] | null) =>
     !!a && !!b && a.length === b.length && a.every((v, i) => v === b[i]);
@@ -122,13 +130,15 @@
 
   function send() {
     if (sendOff || curve === null) return;
+    // The drawn curve goes with the request (saved, fitted and sent by the
+    // command), so the fit sent is the fit shown even if a key step has not
+    // settled. The saver gets it too, so a save still queued cannot end on an
+    // older curve. The faders stay inert while the send is pending.
     const bands = [...curve];
     sentRaw = bestFitPreview(bands).map(toRaw);
-    // Save what is drawn first (a key step may not have settled yet), so the
-    // fit sent is the fit shown.
+    saver.save(bands).catch((e) => console.error(e));
     eq.request(sentRaw, async () => {
-      await saver.save(bands);
-      const levels = await sendBestFit();
+      const levels = await sendBestFit(bands);
       if (Array.isArray(levels)) sentRaw = levels.map(toRaw);
       return levels;
     });
@@ -142,13 +152,13 @@
     <span class="lab range">Bands {visible[0] + 1}–{visible[visible.length - 1] + 1} of {BAND_COUNT}</span>
   </div>
 
-  <div class="faders" class:unavailable={curve === null}>
+  <div class="faders" class:pending={busy} class:unavailable={curve === null}>
     <FaderScale max={SPAN} size="lg" />
     {#each visible as i (i)}
       <Fader
         value={curve === null ? null : toRaw(curve[i])}
         label={ADVANCED_BAND_LABELS[i]}
-        status="Confirmed"
+        status={busy ? eq.status : "Confirmed"}
         max={SPAN}
         size="lg"
         onchange={(v) => change(i, v)}
@@ -200,7 +210,8 @@
     </div>
     <div class="act">
       <p class="note live">{NOTE}</p>
-      {#if problem}<p class="note live">{problem}</p>{/if}
+      {#if shape}<p class="note err">{shape}</p>{/if}
+      {#if problem}<p class="note err">{problem}</p>{/if}
       <div class="send">
         {#if sendNote}<span class="lab" class:live={eq.refused !== null}>{sendNote}</span>{/if}
         <button
@@ -242,6 +253,10 @@
     gap: 24px;
     align-items: stretch;
     min-height: 0;
+  }
+
+  .faders.pending {
+    opacity: 0.6;
   }
 
   .faders.unavailable {
@@ -331,6 +346,11 @@
     margin: 0;
     font-size: 12px;
     text-align: right;
+  }
+
+  /* Problems read as muted text; orange is kept for the note and refusals. */
+  .act .note.err {
+    color: var(--muted);
   }
 
   .send {

@@ -5,3 +5,4 @@ pub mod engine;
 pub mod eval;
 pub mod model;
 pub mod store;
+pub mod validate;

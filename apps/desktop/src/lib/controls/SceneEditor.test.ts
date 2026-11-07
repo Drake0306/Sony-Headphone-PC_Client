@@ -39,6 +39,15 @@ describe("SceneEditor", () => {
     expect(getByLabelText("Hotkey")).toBeInTheDocument();
   });
 
+  it("scene_editor_notes_that_headphones_connect_holds", async () => {
+    const { getByText, queryByText } = setup();
+    const note = "Holds for as long as they stay connected, so put it below more specific scenes.";
+    await fireEvent.click(getByText("Change"));
+    expect(queryByText(note)).toBeNull();
+    await fireEvent.click(getByText("Headphones connect"));
+    expect(getByText(note)).toHaveClass("note");
+  });
+
   it("scene_editor_escape_and_blur_stop_recording", async () => {
     const { getByText, queryByLabelText } = setup();
     await fireEvent.click(getByText("Record"));

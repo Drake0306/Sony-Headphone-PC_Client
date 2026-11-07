@@ -169,7 +169,9 @@
       <div class="grid3">
         <Boxes options={TRIGGERS} value={draft.trigger.kind} status="Confirmed" onpick={setKind} />
       </div>
-      {#if draft.trigger.kind === "time_range"}
+      {#if draft.trigger.kind === "headphones_connected"}
+        <p class="note">Holds for as long as they stay connected, so put it below more specific scenes.</p>
+      {:else if draft.trigger.kind === "time_range"}
         <div class="fields">
           <span class="lab">From</span>
           <input

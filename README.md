@@ -40,7 +40,7 @@ The popover is validated on a real WH-ULT900N (firmware 2.1.4) on macOS 27.2; se
 
 ## Modes (Scenes)
 
-A scene is a named set of settings plus a trigger. Scenes live in `scenes.json`, next to `settings.json`. Four ship disabled: "At the desk", "On a call", "Late" and "Walking". The Scenes screen edits them; the popover MODE row shows up to four enabled scenes, and a "…" opens the Scenes screen when there are more.
+A scene is a named set of settings plus a trigger. Scenes live in `scenes.json`, next to `settings.json`. Four ship disabled, the more specific triggers first: "On a call", "Late", "At the desk" and "Walking". The Scenes screen edits them; the popover MODE row shows up to four enabled scenes, and a "…" opens the Scenes screen when there are more.
 
 Triggers on macOS:
 

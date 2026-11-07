@@ -9,11 +9,10 @@ use serde::Serialize;
 use tauri::{AppHandle, State};
 
 use crate::broker::{parse_raw, BrokerCmd};
-use crate::hotkeys::{lacks_modifier, WINDOW_ERROR_KEY};
 use crate::popover;
-use crate::scenes::eval::parse_hhmm;
-use crate::scenes::model::{Scene, Trigger};
+use crate::scenes::model::Scene;
 use crate::scenes::store;
+use crate::scenes::validate::check_scenes;
 use crate::settings;
 
 /// The broker's command channel, held in Tauri state.
@@ -93,12 +92,12 @@ pub fn set_multipoint(broker: State<'_, Broker>, on: bool) -> Result<(), String>
 }
 
 /// EQ preset ids the device offers (Off, the eight named presets, Manual, Custom 1/2).
-const EQ_PRESETS: [u8; 12] = [
+pub const EQ_PRESETS: [u8; 12] = [
     0x00, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0xA0, 0xA1, 0xA2,
 ];
 const EQ_BANDS: usize = 6;
 const EQ_BAND_MAX: u8 = 20;
-const VOLUME_MAX: u8 = 30;
+pub const VOLUME_MAX: u8 = 30;
 /// Auto power-off: 5, 15, 30, 60, 180 min, when removed from ears, disabled.
 const AUTO_POWER_OFF_VALUES: [u8; 7] = [0x00, 0x04, 0x01, 0x02, 0x03, 0x10, 0x11];
 /// Voice assistant: phone default, Google, Alexa, Sony, none.
@@ -246,53 +245,6 @@ pub fn apply_scene(
     broker.send(BrokerCmd::ApplyScene(id))
 }
 
-/// The first problem in a scene list, naming the scene and the field.
-fn check_scenes(scenes: &[Scene]) -> Result<(), String> {
-    let mut ids = std::collections::HashSet::new();
-    for s in scenes {
-        let bad = |field: &str, why: String| Err(format!("scene {:?}: {field} {why}", s.name));
-        if !ids.insert(s.id.as_str()) {
-            return bad("id", format!("{:?} is used twice", s.id));
-        }
-        if s.id == WINDOW_ERROR_KEY {
-            return bad("id", format!("{:?} is reserved", s.id));
-        }
-        if s.name.trim().is_empty() {
-            return bad("name", "is empty".into());
-        }
-        match &s.trigger {
-            Trigger::TimeRange { from, to } => {
-                for (field, value) in [("from", from), ("to", to)] {
-                    if parse_hhmm(value).is_none() {
-                        return bad(field, format!("{value:?} is not HH:MM"));
-                    }
-                }
-            }
-            Trigger::FrontmostApp { name } if name.trim().is_empty() => {
-                return bad("app name", "is empty".into());
-            }
-            _ => {}
-        }
-        let a = &s.actions;
-        if let Some(v) = a.ambient_level.filter(|v| !(1..=20).contains(v)) {
-            return bad("ambient_level", format!("{v} is outside 1..=20"));
-        }
-        if let Some(v) = a.ult.filter(|&v| v > 2) {
-            return bad("ult", format!("{v} is outside 0..=2"));
-        }
-        if let Some(v) = a.eq_preset.filter(|v| !EQ_PRESETS.contains(v)) {
-            return bad("eq_preset", format!("{v:#04X} is not a known preset"));
-        }
-        if let Some(v) = a.volume.filter(|&v| v > VOLUME_MAX) {
-            return bad("volume", format!("{v} is outside 0..={VOLUME_MAX}"));
-        }
-        if let Some(accel) = s.hotkey.as_deref().filter(|a| lacks_modifier(a)) {
-            return bad("hotkey", format!("{accel:?} needs Ctrl, Alt or Super"));
-        }
-    }
-    Ok(())
-}
-
 #[tauri::command]
 pub fn connect(broker: State<'_, Broker>) -> Result<(), String> {
     broker.send(BrokerCmd::Connect)
@@ -312,116 +264,7 @@ pub fn debug_raw(broker: State<'_, Broker>, table: String, hex: String) -> Resul
 
 #[cfg(test)]
 mod tests {
-    use super::{check_bands, check_scenes};
-    use crate::scenes::model::{Actions, Scene, Trigger};
-    use crate::scenes::store::seed_scenes;
-
-    fn scene(id: &str, trigger: Trigger, actions: Actions) -> Scene {
-        Scene {
-            id: id.into(),
-            name: id.into(),
-            enabled: true,
-            trigger,
-            actions,
-            hotkey: None,
-        }
-    }
-
-    fn err_of(scenes: &[Scene]) -> String {
-        check_scenes(scenes).unwrap_err()
-    }
-
-    #[test]
-    fn seed_scenes_are_valid() {
-        assert_eq!(check_scenes(&seed_scenes()), Ok(()));
-    }
-
-    #[test]
-    fn scene_checks_name_the_bad_field() {
-        let with = |actions: Actions| [scene("a", Trigger::Manual, actions)];
-        let e = err_of(&with(Actions {
-            ambient_level: Some(0),
-            ..Actions::default()
-        }));
-        assert!(e.contains("ambient_level"), "{e}");
-        let e = err_of(&with(Actions {
-            ambient_level: Some(21),
-            ..Actions::default()
-        }));
-        assert!(e.contains("ambient_level"), "{e}");
-        let e = err_of(&with(Actions {
-            ult: Some(3),
-            ..Actions::default()
-        }));
-        assert!(e.contains("ult"), "{e}");
-        let e = err_of(&with(Actions {
-            volume: Some(31),
-            ..Actions::default()
-        }));
-        assert!(e.contains("volume"), "{e}");
-        let e = err_of(&with(Actions {
-            eq_preset: Some(0x42),
-            ..Actions::default()
-        }));
-        assert!(e.contains("eq_preset"), "{e}");
-        assert_eq!(
-            check_scenes(&with(Actions {
-                ambient_level: Some(20),
-                ult: Some(2),
-                volume: Some(30),
-                eq_preset: Some(0xA2),
-                ..Actions::default()
-            })),
-            Ok(())
-        );
-    }
-
-    #[test]
-    fn scene_checks_triggers_names_and_ids() {
-        let range = |from: &str, to: &str| Trigger::TimeRange {
-            from: from.into(),
-            to: to.into(),
-        };
-        let e = err_of(&[scene("a", range("25:00", "07:00"), Actions::default())]);
-        assert!(e.contains("from"), "{e}");
-        let e = err_of(&[scene("a", range("22:00", "7"), Actions::default())]);
-        assert!(e.contains("to"), "{e}");
-        let app = Trigger::FrontmostApp { name: "  ".into() };
-        let e = err_of(&[scene("a", app, Actions::default())]);
-        assert!(e.contains("app name"), "{e}");
-        let mut unnamed = scene("a", Trigger::Manual, Actions::default());
-        unnamed.name = " ".into();
-        assert!(err_of(&[unnamed]).contains("name"));
-        let twice = [
-            scene("a", Trigger::Manual, Actions::default()),
-            scene("a", Trigger::MicInUse, Actions::default()),
-        ];
-        assert!(err_of(&twice).contains("used twice"));
-        let reserved = scene("__window", Trigger::Manual, Actions::default());
-        assert_eq!(
-            err_of(&[reserved]),
-            "scene \"__window\": id \"__window\" is reserved"
-        );
-    }
-
-    #[test]
-    fn scene_hotkeys_need_a_modifier_or_a_function_key() {
-        let with = |hotkey: &str| {
-            let mut s = scene("a", Trigger::Manual, Actions::default());
-            s.name = "X".into();
-            s.hotkey = Some(hotkey.into());
-            [s]
-        };
-        for hotkey in ["1", "Shift+A", "Space"] {
-            assert_eq!(
-                err_of(&with(hotkey)),
-                format!("scene \"X\": hotkey {hotkey:?} needs Ctrl, Alt or Super")
-            );
-        }
-        for hotkey in ["Alt+1", "F5", "Ctrl+Shift+A", "Super+Space", "F24"] {
-            assert_eq!(check_scenes(&with(hotkey)), Ok(()), "{hotkey}");
-        }
-    }
+    use super::check_bands;
 
     #[test]
     fn bands_need_six_levels_within_range() {

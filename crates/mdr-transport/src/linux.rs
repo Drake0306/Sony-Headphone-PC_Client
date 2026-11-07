@@ -181,10 +181,12 @@ pub(crate) fn map_recv(result: isize, errno: i32) -> io::Result<Option<usize>> {
     }
 }
 
-/// Whether a failed RFCOMM `connect` means "nothing listens on this channel"
-/// (try the next one) rather than a fault that ends the scan.
+/// Whether a failed RFCOMM `connect` means "this channel is not usable" (try
+/// the next one) rather than a fault that ends the scan: refused (the device
+/// answered DM, nothing listens there), reset, or timed out (a DLC that never
+/// answers). Anything else, such as the device being unreachable, ends it.
 pub(crate) fn connect_refused(errno: i32) -> bool {
-    errno == ECONNREFUSED
+    matches!(errno, ECONNREFUSED | ECONNRESET | ETIMEDOUT)
 }
 
 /// A discovered device, its address rendered `aa:bb:cc:dd:ee:ff`.
@@ -399,7 +401,7 @@ mod platform {
     }
 
     /// Opens an RFCOMM socket to the channel: `Ok(None)` when the channel
-    /// refuses the connection.
+    /// refuses the connection (see `connect_refused`).
     fn open_channel(bdaddr: [u8; 6], channel: u8) -> io::Result<Option<LinuxTransport>> {
         // SAFETY: plain socket creation.
         let fd = unsafe {
@@ -784,7 +786,11 @@ mod tests {
         assert!(map_recv(-1, 113).is_err());
 
         assert!(connect_refused(ECONNREFUSED));
-        assert!(!connect_refused(ETIMEDOUT));
+        assert!(connect_refused(ECONNRESET));
+        assert!(connect_refused(ETIMEDOUT));
+        // EHOSTDOWN: the device is gone, so the scan stops.
+        assert!(!connect_refused(112));
+        assert!(!connect_refused(EAGAIN));
         assert_eq!(
             map_errno(ECONNREFUSED, "connect").kind(),
             io::ErrorKind::ConnectionRefused

@@ -352,7 +352,7 @@ pub type EmitProbe<'a> = Box<dyn Fn(&ProbeEvent) + 'a>;
 /// The runner plus where its results go. Outlives each connection.
 pub struct ProbeHost<'a> {
     runner: ProbeRunner,
-    /// Where `probe-<unix secs>.json` is written (`captures/local`).
+    /// Where `probe-<unix secs>.json` is written (the capture directory).
     out_dir: PathBuf,
     emit: EmitProbe<'a>,
     /// The last run's results file.

@@ -1,6 +1,7 @@
 //! Frame recording: every frame and session log line, appended to
-//! `captures/local/<YYYY-MM-DD-HHMMSS>.log`. Started from the Advanced panel
-//! (`record_frames`), or at launch with `HAIRLINE_FRAME_LOG=1`.
+//! `<capture dir>/<YYYY-MM-DD-HHMMSS>.log`, where the capture dir is
+//! `captures` in the app's log directory (`capture_dir`). Started from the
+//! Advanced panel (`record_frames`), or at launch with `HAIRLINE_FRAME_LOG=1`.
 //!
 //! Lines are `t_ms dir data`: `>` frames we sent, `<` bytes the device sent
 //! (as received, so a chunk can hold part of a frame or several), both as
@@ -9,6 +10,8 @@
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+
+use tauri::{AppHandle, Manager};
 
 pub struct FrameLog {
     file: File,
@@ -82,12 +85,25 @@ impl FrameLog {
     }
 }
 
-/// `captures/local` at the repository root in debug builds (`tauri dev`),
-/// else under the current directory.
-pub fn default_dir() -> PathBuf {
-    if cfg!(debug_assertions) {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../captures/local")
-    } else {
-        PathBuf::from("captures/local")
-    }
+/// The capture directory's name inside the app's log directory.
+pub const CAPTURES: &str = "captures";
+
+/// Where frame logs and probe results go: `captures` in the log directory,
+/// else in the config directory, else in the system temp directory.
+pub fn capture_dir(log_dir: Option<PathBuf>, config_dir: Option<PathBuf>) -> PathBuf {
+    log_dir
+        .or(config_dir)
+        .unwrap_or_else(|| std::env::temp_dir().join("hairline"))
+        .join(CAPTURES)
 }
+
+/// `capture_dir` for the running app (on macOS
+/// `~/Library/Logs/com.drake0306.hairline/captures`).
+pub fn app_capture_dir(app: &AppHandle) -> PathBuf {
+    let path = app.path();
+    capture_dir(path.app_log_dir().ok(), path.app_config_dir().ok())
+}
+
+/// The capture directory, held in Tauri state for `record_frames`; the
+/// broker's frame tap and probe use the same one.
+pub struct CaptureDir(pub PathBuf);

@@ -12,7 +12,7 @@ use tauri::{AppHandle, Emitter, State};
 use crate::battery_history::{self, BatteryEstimate};
 use crate::broker::{raw_command, BrokerCmd, RecordingEvent};
 use crate::device_record::{capability_rows, CapabilityRow};
-use crate::frame_log;
+use crate::frame_log::CaptureDir;
 use crate::frame_ring::Recorder;
 use crate::popover;
 use crate::scenes::model::Scene;
@@ -422,16 +422,17 @@ pub fn watch_frames(broker: State<'_, Broker>, on: bool) -> Result<(), String> {
     broker.send(BrokerCmd::WatchFrames(on))
 }
 
-/// Starts or stops recording frames to `captures/local`; returns the file
-/// being written (`None` once stopped) and emits `"recording"`.
+/// Starts or stops recording frames to the capture directory; returns the
+/// file being written (`None` once stopped) and emits `"recording"`.
 #[tauri::command]
 pub fn record_frames(
     app: AppHandle,
     recorder: State<'_, Recorder>,
+    capture_dir: State<'_, CaptureDir>,
     on: bool,
 ) -> Result<Option<String>, String> {
     let path = recorder
-        .set(&frame_log::default_dir(), on)
+        .set(&capture_dir.0, on)
         .map_err(|e| format!("could not record frames: {e}"))?;
     let event = RecordingEvent::new(path.as_deref());
     let _ = app.emit("recording", event.clone());

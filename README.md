@@ -65,14 +65,14 @@ Hotkeys are recorded in the scene editor as Tauri accelerators and registered wi
 Settings has an "Advanced panel" switch; turning it on adds the Advanced screen. It is off by default and has three parts:
 
 - Capabilities: every function the headphones declare, with its name. A chip says DECLARED (the headphones listed it) or PROVEN (it answered the probe although it was not declared, for this unit).
-- Frame log: the frames going to and from the headphones, live. Record writes them to a file in `captures/local`, and Stop ends the file.
+- Frame log: the frames going to and from the headphones, live. Record writes them to a file in `~/Library/Logs/com.drake0306.hairline/captures/` (macOS), and Stop ends the file.
 - Raw command: type the bytes in hex and pick the table. A GET is sent directly. Any other opcode needs you to type `SEND` first. The deny-list is absolute: a denied payload is refused even with `SEND`, and there is no reset anywhere in the app.
 
 ## Probe
 
 The probe, on the Advanced screen, walks the read-only requests of the protocol to find functions the headphones answer but do not declare. It sends 46 GET opcodes, 441 requests in all, one at a time, waiting 1.5 s for a reply and 150 ms between requests. That is about 13 minutes. You start it by typing `RUN`, and Stop ends it at any time. It never sends a SET.
 
-Results go to `captures/local/probe-<secs>.json`. A function that answered although the headphones did not declare it becomes "proven" for this unit and is remembered in `devices/<address>.json`. Hairline may then read it, but never changes it. Two reads are left out: reset settings, and the LE Audio identity key (its reply is a pairing secret). The catalogue is in `crates/mdr-proto/src/probe.rs`.
+Results go to `~/Library/Logs/com.drake0306.hairline/captures/probe-<secs>.json`. A function that answered although the headphones did not declare it becomes "proven" for this unit and is remembered in `devices/<address>.json`. Hairline may then read it, but never changes it. Two reads are left out: reset settings, and the LE Audio identity key (its reply is a pairing secret). The catalogue is in `crates/mdr-proto/src/probe.rs`.
 
 ## Battery history
 
@@ -124,7 +124,7 @@ cd apps/desktop && pnpm check && pnpm test
 
 ## Debugging
 
-`HAIRLINE_FRAME_LOG=1` writes every frame and session log line to `captures/local/<YYYY-MM-DD-HHMMSS>.log` (time in UTC).
+`HAIRLINE_FRAME_LOG=1` writes every frame and session log line to `<YYYY-MM-DD-HHMMSS>.log` (time in UTC) in the capture directory: `~/Library/Logs/com.drake0306.hairline/captures/` on macOS, `captures` in the app's `logs` directory under the local data directory on Windows and Linux (for example `%LOCALAPPDATA%\com.drake0306.hairline\logs\captures\`). The probe results and the Record button write there too.
 To record from a running app instead, turn on the Advanced panel and press Record in the frame log. Raw commands are sent from the same screen; the deny-list still applies.
 
 ## Layout

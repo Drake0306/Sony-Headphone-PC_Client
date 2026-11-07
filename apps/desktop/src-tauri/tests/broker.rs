@@ -161,6 +161,44 @@ fn frame_log_file_is_named_by_utc_time() {
 }
 
 #[test]
+fn captures_go_under_the_log_dir_else_the_config_dir() {
+    use hairline_lib::frame_log::capture_dir;
+    use std::path::PathBuf;
+    let log = PathBuf::from("/logs/app");
+    let config = PathBuf::from("/config/app");
+    assert_eq!(
+        capture_dir(Some(log.clone()), Some(config.clone())),
+        log.join("captures")
+    );
+    assert_eq!(
+        capture_dir(None, Some(config.clone())),
+        config.join("captures")
+    );
+    assert!(capture_dir(None, None).ends_with("captures"));
+}
+
+#[test]
+fn recording_from_the_tap_writes_into_its_capture_dir() {
+    // `HAIRLINE_FRAME_LOG=1` and the Record button both go through `record`.
+    let dir = std::env::temp_dir()
+        .join(format!("hairline-capture-dir-{}", std::process::id()))
+        .join("captures");
+    let recorder = Recorder::default();
+    let mut tap = FrameTap::new(
+        dir.clone(),
+        recorder.clone(),
+        Box::new(|_| {}),
+        Box::new(|_| {}),
+    );
+    tap.record(true);
+    let path = recorder.path().expect("recording");
+    assert_eq!(path.parent(), Some(dir.as_path()));
+    assert!(path.exists());
+    tap.record(false);
+    std::fs::remove_dir_all(dir.parent().unwrap()).unwrap();
+}
+
+#[test]
 fn broker_writes_frames_and_logs_to_the_frame_log() {
     let dir = std::env::temp_dir().join(format!("hairline-frame-log-{}", std::process::id()));
     let recorder = Recorder::default();

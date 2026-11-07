@@ -104,6 +104,8 @@ pub fn run() {
             // Read by the broker thread when it starts.
             hotkeys::apply(app.handle(), &scenes);
             app.manage(Mutex::new(scenes));
+            let capture_dir = frame_log::app_capture_dir(app.handle());
+            app.manage(frame_log::CaptureDir(capture_dir.clone()));
             tray::create(app.handle())?;
             popover::create(app.handle())?;
             let tx = broker::spawn_broker(
@@ -111,6 +113,7 @@ pub fn run() {
                 fake,
                 dir.as_ref().ok().cloned(),
                 recorder.clone(),
+                capture_dir,
             );
             app.manage(commands::Broker(tx));
             socket::spawn(app.handle().clone());

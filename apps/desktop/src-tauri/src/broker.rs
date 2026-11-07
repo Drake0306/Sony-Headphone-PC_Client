@@ -17,7 +17,6 @@ use tauri::{AppHandle, Emitter, Manager};
 use crate::audio_macos::current_output_device_name;
 use crate::battery_history::{self, BatteryHost};
 use crate::device_record;
-use crate::frame_log;
 use crate::frame_ring::{FrameEntry, FrameTap, Recorder};
 use crate::probe::{ProbeEvent, ProbeHost, ProbeRunner};
 use crate::scenes::engine::{apply_actions, Engine};
@@ -547,13 +546,14 @@ pub fn next_backoff(prev: u64) -> u64 {
 /// Starts the broker thread: connects (or uses the fake device), runs the
 /// session, and retries with an exponential back-off after a failed connect or
 /// a lost link. A `Connect` command cuts the wait short. `record_dir` is the
-/// settings directory (device records); `recorder` is shared with the
-/// `record_frames` command.
+/// settings directory (device records); `recorder` and `capture_dir` (frame
+/// logs and probe results) are shared with the `record_frames` command.
 pub fn spawn_broker(
     app: AppHandle,
     fake: bool,
     record_dir: Option<PathBuf>,
     recorder: Recorder,
+    capture_dir: PathBuf,
 ) -> Sender<BrokerCmd> {
     let (tx, rx) = channel();
     std::thread::Builder::new()
@@ -590,7 +590,7 @@ pub fn spawn_broker(
                 }),
             };
             let mut tap = FrameTap::new(
-                frame_log::default_dir(),
+                capture_dir.clone(),
                 recorder,
                 Box::new(|frames: &[FrameEntry]| {
                     // Only the main window shows frames; the popover never gets them.
@@ -605,7 +605,7 @@ pub fn spawn_broker(
             }
             let mut probe = ProbeHost::new(
                 ProbeRunner::new(),
-                frame_log::default_dir(),
+                capture_dir,
                 Box::new(|event: &ProbeEvent| {
                     let _ = app.emit("probe", event);
                 }),

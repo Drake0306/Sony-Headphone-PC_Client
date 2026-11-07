@@ -94,3 +94,7 @@ Support function bytes (T1 FunctionType) relevant to us: `12` CODEC_INDICATOR, `
 ## Things to probe later (Advanced → opcode probe)
 
 GET-only walk of declared and undeclared inquired types: `70` AUTO_NCASM wire format, `C9` action logs (passive), Power types `0B..0E` (battery safe mode, caring charge, BT standby, stamina), Audio `00`/`02`/`05`, T2 safe listening `56 …`. Never SET during a probe.
+
+## Probe catalogue
+
+The probe walks `GET_CATALOGUE` in `crates/mdr-proto/src/probe.rs`: 46 GET opcodes with the inquired types libmdr defines for each, 441 requests. It is GET-only; `probe_points` re-checks each entry against the opcode role table and the deny-list, so a wrong edit cannot make it send a SET. Excluded reads: the protocol-info and support-function requests (the handshake already sent them), System RESET_SETTINGS (nothing near a reset is sent, not even its read), and T2 LEA GET_IDENTITY_RESOLVING_KEY (the reply is a pairing secret). A function that answers although it was not declared is "proven" and stored per unit in `devices/<address>.json`, never globally.

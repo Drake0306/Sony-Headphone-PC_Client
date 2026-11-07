@@ -100,3 +100,18 @@ The Windows transport compiles and passes unit tests on Windows CI; it has not y
 - [ ] `recv_timeout` returns `None` on a quiet link and an error when the headphones are switched off.
 - [ ] After many quiet-link timeouts (several minutes idle), notifications still arrive. If not, switch `recv_timeout` from `SO_RCVTIMEO` to `select()` before `recv`.
 - [ ] Phone contention: behaviour when the phone holds the v2 channel.
+
+## 8. Phase 4 (owner present)
+
+Run with the real headphones connected. Use `HAIRLINE_FRAME_LOG=1` if you also want the log from launch.
+
+- [ ] Settings: turn on "Advanced panel"; the Advanced screen appears.
+- [ ] The capability list shows the declared ids with their names (DECLARED chips).
+- [ ] Press Record in the frame log; after a reconnect the log shows the handshake. Stop ends the file in `captures/local`.
+- [ ] Raw GET `66 17` (T1) returns a RET in the log, and it is sent without typing SEND.
+- [ ] Raw SET on a declared function, for example volume `A8 20 <n>`: it is refused until `SEND` is typed, and the NTFY in the log confirms the change.
+- [ ] A deny-listed raw (`24 03 01`) is refused even with `SEND`.
+- [ ] Run the probe to completion (about 13 minutes, type `RUN`). Record how many functions answered and how many became proven, and attach the `captures/local/probe-<secs>.json` summary. Check `devices/<address>.json` lists the proven functions.
+- [ ] Time left appears after an hour of listening (30 minutes and a 2 % drop at least), and Clear in Settings empties it.
+- [ ] From a terminal, `hairlinectl state` and `hairlinectl battery` print the same values as the window.
+- [ ] `hairlinectl volume 31` is refused with the same text as the window.

@@ -12,6 +12,10 @@ body {
   background: transparent;
 }
 
+body.main {
+  background: var(--paper);
+}
+
 body {
   font-family: "Instrument Sans", system-ui, sans-serif;
   color: var(--ink);

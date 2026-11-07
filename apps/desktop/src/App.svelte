@@ -13,6 +13,8 @@
   });
 
   onMount(() => {
+    // The main window is opaque paper edge to edge; the popover stays transparent.
+    if (view === "main") document.body.classList.add("main");
     // Focus rings only for keyboard users: a Tab press turns them on, a click turns them off.
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Tab") document.body.classList.add("kbd");

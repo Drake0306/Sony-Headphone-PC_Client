@@ -4,7 +4,7 @@
 use std::collections::HashSet;
 
 use super::eval::parse_hhmm;
-use super::model::{Scene, Trigger};
+use super::model::{Nc, Scene, Trigger};
 use crate::commands::{EQ_PRESETS, VOLUME_MAX};
 use crate::hotkeys::{lacks_modifier, WINDOW_ERROR_KEY};
 
@@ -51,6 +51,9 @@ pub fn check_scene(s: &Scene) -> Result<(), String> {
     if let Some(v) = a.ambient_level.filter(|v| !(1..=20).contains(v)) {
         return bad("ambient_level", format!("{v} is outside 1..=20"));
     }
+    if a.voice_focus.is_some() && a.nc != Some(Nc::Ambient) {
+        return bad("voice_focus", "needs Noise set to Ambient".into());
+    }
     if let Some(v) = a.ult.filter(|&v| v > 2) {
         return bad("ult", format!("{v} is outside 0..=2"));
     }
@@ -68,8 +71,8 @@ pub fn check_scene(s: &Scene) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::check_scenes;
-    use crate::scenes::model::{Actions, Scene, Trigger};
+    use super::{check_scene, check_scenes};
+    use crate::scenes::model::{Actions, Nc, Scene, Trigger};
     use crate::scenes::store::seed_scenes;
 
     fn scene(id: &str, trigger: Trigger, actions: Actions) -> Scene {
@@ -158,6 +161,33 @@ mod tests {
             err_of(&[reserved]),
             "scene \"__window\": id \"__window\" is reserved"
         );
+    }
+
+    #[test]
+    fn voice_focus_needs_ambient() {
+        for nc in [None, Some(Nc::NoiseCancelling), Some(Nc::Off)] {
+            let e = check_scene(&scene(
+                "v",
+                Trigger::Manual,
+                Actions {
+                    nc,
+                    voice_focus: Some(true),
+                    ..Actions::default()
+                },
+            ))
+            .unwrap_err();
+            assert!(e.contains("voice_focus needs Noise set to Ambient"), "{e}");
+        }
+        check_scene(&scene(
+            "v",
+            Trigger::Manual,
+            Actions {
+                nc: Some(Nc::Ambient),
+                voice_focus: Some(false),
+                ..Actions::default()
+            },
+        ))
+        .unwrap();
     }
 
     #[test]

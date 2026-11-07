@@ -143,6 +143,14 @@ describe("validateScene", () => {
     );
   });
 
+  it("validate_scene_voice_focus_needs_ambient", () => {
+    for (const nc of [null, "NoiseCancelling", "Off"] as const) {
+      const s = { ...newScene(), name: "X", actions: { ...KEEP, nc, voice_focus: true } };
+      expect(validateScene(s)).toBe('scene "X": voice_focus needs Noise set to Ambient');
+    }
+    expect(validateScene({ ...newScene(), name: "X", actions: { ...KEEP, nc: "Ambient", voice_focus: true } })).toBeNull();
+  });
+
   it("validate_scene_needs_a_modifier_on_the_hotkey", () => {
     for (const hotkey of ["1", "Shift+A", "Space"]) {
       expect(validateScene(scene("X", { hotkey }))).toBe(`scene "X": hotkey ${JSON.stringify(hotkey)} needs Ctrl, Alt or Super`);

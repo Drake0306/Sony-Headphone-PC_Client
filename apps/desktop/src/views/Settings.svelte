@@ -172,9 +172,6 @@
             onpick={(v) => assistant.request(v, () => setVoiceAssistant(v))}
           />
         </Row>
-        <Row label="Reset headphones" note="Phase 4">
-          <button class="btn unavailable" aria-disabled="true" tabindex="-1">Reset…</button>
-        </Row>
       </div>
     </div>
     <div>

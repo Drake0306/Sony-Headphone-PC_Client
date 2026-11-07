@@ -16,6 +16,7 @@
     parseHex,
     probeEstimate,
     probeRow,
+    rawNote,
     type CapabilityRow,
     type FrameEntry,
     type ProbeEvent,
@@ -25,6 +26,7 @@
     capabilityList,
     onFrames,
     onProbe,
+    onRaw,
     onRecording,
     probeStart,
     probeStop,
@@ -68,14 +70,14 @@
   const bytes = $derived(parseHex(hex));
   const needsConfirm = $derived(bytes !== null && isSetOpcode(table, bytes));
 
+  // The command only hands the bytes to the broker; the "raw" event that
+  // follows says whether the session queued them.
   function send() {
     if (sending || hex.trim() === "") return;
     sending = true;
+    result = null;
     sendRaw(table === "T1" ? "t1" : "t2", hex, needsConfirm ? confirm : "")
-      .then(() => {
-        result = { ok: true, text: "Sent" };
-        confirm = "";
-      })
+      .then(() => (confirm = ""))
       .catch((e) => (result = { ok: false, text: errText(e) }))
       .finally(() => (sending = false));
   }
@@ -140,6 +142,7 @@
     let alive = true;
     const offFrames = onFrames(takeFrames);
     const offRecording = onRecording((e) => (recording = e.path));
+    const offRaw = onRaw((e) => (result = { ok: e.ok, text: rawNote(e) }));
     const offProbe = onProbe((e) => {
       if (e.file !== probe?.file) copied = false;
       probe = e;
@@ -151,7 +154,7 @@
     return () => {
       alive = false;
       watchFrames(false).catch((e) => console.error(e));
-      for (const off of [offFrames, offRecording, offProbe]) off.then((stop) => stop()).catch(() => {});
+      for (const off of [offFrames, offRecording, offRaw, offProbe]) off.then((stop) => stop()).catch(() => {});
     };
   });
 </script>

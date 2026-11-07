@@ -5,7 +5,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use hairline_lib::broker::{raw_command, run_broker_logged, BrokerCmd, BrokerContext};
+use hairline_lib::broker::{raw_command, run_broker_logged, BrokerCmd, BrokerContext, RawEvent};
 use hairline_lib::frame_ring::{FrameDir, FrameEntry, FrameTap, Recorder};
 use hairline_lib::settings::{raw_allowed, AppSettings};
 use mdr_proto::Table;
@@ -200,6 +200,37 @@ fn watch_frames_re_emits_the_recording_state() {
     std::fs::remove_dir_all(&dir).unwrap();
 }
 
+#[test]
+fn raw_outcome_is_reported() {
+    let rig = Rig::start(None);
+    rig.cmd(raw_command("t1", "22 00", "").unwrap());
+    assert_eq!(
+        rig.raw_event(),
+        RawEvent {
+            ok: true,
+            detail: "queued".into()
+        }
+    );
+    // Past the panel's own check (it refuses this too): the session's deny-list.
+    rig.cmd(BrokerCmd::Raw {
+        table: Table::T1,
+        bytes: vec![0x24, 0x03, 0x01],
+        confirmed_set: true,
+    });
+    let refused = rig.raw_event();
+    assert!(!refused.ok);
+    assert!(refused.detail.contains("denied"), "{refused:?}");
+    // A SET that skipped the confirmation.
+    rig.cmd(BrokerCmd::Raw {
+        table: Table::T1,
+        bytes: vec![0x58, 0x03, 0x01],
+        confirmed_set: false,
+    });
+    let unconfirmed = rig.raw_event();
+    assert!(!unconfirmed.ok && unconfirmed.detail.contains("confirmation"));
+    rig.stop();
+}
+
 /// Whether a sent frame carries `payload`.
 fn sent(frames: &[FrameEntry], payload: &[u8]) -> bool {
     frames
@@ -217,6 +248,7 @@ struct Rig {
     tx: Sender<BrokerCmd>,
     frames: Receiver<Vec<FrameEntry>>,
     recording: Receiver<Option<PathBuf>>,
+    raw: Receiver<RawEvent>,
     handle: JoinHandle<std::io::Result<()>>,
 }
 
@@ -226,6 +258,7 @@ impl Rig {
         let (ftx, frames) = channel();
         let (rtx, recording) = channel();
         let (stx, states) = channel();
+        let (raw_tx, raw) = channel();
         let log_dir = log_dir.unwrap_or_else(|| std::env::temp_dir().join("hairline-unused"));
         let handle = std::thread::spawn(move || {
             let mut tap = FrameTap::new(
@@ -238,6 +271,9 @@ impl Rig {
                     let _ = rtx.send(p.map(Path::to_owned));
                 }),
             );
+            let emit_raw = move |e: &RawEvent| {
+                let _ = raw_tx.send(e.clone());
+            };
             run_broker_logged(
                 Box::new(FakeDevice::ult_wear()),
                 rx,
@@ -247,6 +283,7 @@ impl Rig {
                 monotonic_ms,
                 BrokerContext {
                     frames: Some(&mut tap),
+                    raw: Some(&emit_raw),
                     ..BrokerContext::default()
                 },
             )
@@ -261,6 +298,7 @@ impl Rig {
             tx,
             frames,
             recording,
+            raw,
             handle,
         }
     }
@@ -282,6 +320,12 @@ impl Rig {
                 return f;
             }
         }
+    }
+
+    fn raw_event(&self) -> RawEvent {
+        self.raw
+            .recv_timeout(Duration::from_secs(5))
+            .expect("raw event before the deadline")
     }
 
     fn stop(self) {

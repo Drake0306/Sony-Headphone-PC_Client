@@ -442,11 +442,14 @@ pub fn record_frames(
 /// Sends a hand-written request from the Advanced panel (`table` is `"t1"`
 /// or `"t2"`, `hex` the payload). Anything but a GET needs `confirm` to be
 /// `SEND`; the session's deny-list still applies. Refused unless the
-/// Advanced panel is enabled in Settings.
+/// Advanced panel is enabled in Settings and the headphones are connected.
+/// `Ok` means handed to the broker; the `"raw"` event says whether the
+/// session queued it.
 #[tauri::command]
 pub fn send_raw(
     broker: State<'_, Broker>,
     settings: State<'_, Mutex<settings::AppSettings>>,
+    state: State<'_, Mutex<DeviceState>>,
     table: String,
     hex: String,
     confirm: String,
@@ -456,6 +459,13 @@ pub fn send_raw(
         .map(|s| s.clone())
         .map_err(|_| "settings unavailable".to_string())?;
     settings::raw_allowed(&current)?;
+    let connected = state
+        .lock()
+        .map(|s| s.connected)
+        .map_err(|_| "state unavailable".to_string())?;
+    if !connected {
+        return Err("not connected".into());
+    }
     broker.send(raw_command(&table, &hex, &confirm)?)
 }
 

@@ -1,10 +1,10 @@
 // Typed wrappers around the Tauri commands and the app events ("state",
-// "settings", "scenes", "frames", "recording", "battery").
+// "settings", "scenes", "frames", "recording", "raw", "battery").
 
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { BatteryEstimate } from "./battery";
-import type { CapabilityRow, FrameEntry, ProbeEvent, RecordingEvent } from "./advanced";
+import type { CapabilityRow, FrameEntry, ProbeEvent, RawEvent, RecordingEvent } from "./advanced";
 import type { Scene, ScenesEvent } from "./scenes";
 import type { AppSettings, DeviceState, RuntimeInfo } from "./state";
 
@@ -89,12 +89,18 @@ export const watchFrames = (on: boolean) => invoke<null>("watch_frames", { on })
 export const recordFrames = (on: boolean) => invoke<string | null>("record_frames", { on });
 
 /**
- * Queues raw bytes on table "t1" or "t2"; rejects with the reason (a non-GET
- * without `confirm === "SEND"`, a deny-listed payload, malformed hex, or the
- * Advanced panel switched off). The reply shows in the frame log.
+ * Hands raw bytes on table "t1" or "t2" to the broker; rejects with the
+ * reason (a non-GET without `confirm === "SEND"`, a deny-listed payload,
+ * malformed hex, not connected, or the Advanced panel switched off). The
+ * "raw" event then says whether the session queued it; the reply shows in
+ * the frame log.
  */
 export const sendRaw = (table: "t1" | "t2", hex: string, confirm: string) =>
   invoke<null>("send_raw", { table, hex, confirm });
+
+/** What the broker did with a raw request: queued, or refused and why. */
+export const onRaw = (handler: (e: RawEvent) => void): Promise<UnlistenFn> =>
+  listen<RawEvent>("raw", (event) => handler(event.payload));
 
 export const onFrames = (handler: (frames: FrameEntry[]) => void): Promise<UnlistenFn> =>
   listen<FrameEntry[]>("frames", (event) => handler(event.payload));

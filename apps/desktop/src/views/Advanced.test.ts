@@ -21,6 +21,11 @@ vi.mock("@tauri-apps/api/core", () => ({
     if (cmd === "probe_start" || cmd === "probe_stop") return null;
     if (cmd === "send_raw") {
       if (args.hex?.startsWith("58") && args.confirm !== "SEND") throw "type SEND to send a SET";
+      // The broker's verdict follows as a "raw" event.
+      const payload = args.hex?.startsWith("A8")
+        ? { ok: false, detail: "not connected" }
+        : { ok: true, detail: "queued" };
+      setTimeout(() => backend.handlers.raw?.({ payload }), 0);
       return null;
     }
   }),
@@ -86,14 +91,22 @@ describe("Advanced", () => {
     expect(calls("send_raw").at(-1)).toEqual({ table: "t1", hex: "58 03 01", confirm: "" });
   });
 
-  it("sends a confirmed SET and says Sent", async () => {
+  it("sends a confirmed SET and says it was queued", async () => {
     const r = renderIt();
     await fireEvent.click(r.getByText("T2", { selector: "button" }));
     await fireEvent.input(r.getByLabelText("Raw bytes"), { target: { value: "58 03 01" } });
     await fireEvent.input(r.getByPlaceholderText("type SEND"), { target: { value: "SEND" } });
     await fireEvent.click(r.getByText("Send", { selector: "button" }));
-    await waitFor(() => expect(r.getByText("Sent")).not.toHaveClass("live"));
+    await waitFor(() => expect(r.getByText("Queued; reply shows in the frame log")).not.toHaveClass("live"));
     expect(calls("send_raw").at(-1)).toEqual({ table: "t2", hex: "58 03 01", confirm: "SEND" });
+  });
+
+  it("shows the session's refusal from the raw event in orange", async () => {
+    const r = renderIt();
+    await fireEvent.input(r.getByLabelText("Raw bytes"), { target: { value: "A8 20 05" } });
+    await fireEvent.input(r.getByPlaceholderText("type SEND"), { target: { value: "SEND" } });
+    await fireEvent.click(r.getByText("Send", { selector: "button" }));
+    await waitFor(() => expect(r.getByText("not connected")).toHaveClass("live"));
   });
 
   it("records and shows the file path while recording", async () => {

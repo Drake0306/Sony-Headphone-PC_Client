@@ -81,6 +81,64 @@ pub enum BrokerCmd {
 /// The word the Advanced panel asks for before a raw SET.
 pub const RAW_SET_CONFIRMATION: &str = "SEND";
 
+/// The `"raw"` event: what the broker did with a raw request. `ok` once the
+/// session queued it (`detail` is `"queued"`), else why it was refused.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct RawEvent {
+    pub ok: bool,
+    pub detail: String,
+}
+
+impl RawEvent {
+    fn new(outcome: &Result<(), String>) -> RawEvent {
+        match outcome {
+            Ok(()) => RawEvent {
+                ok: true,
+                detail: "queued".into(),
+            },
+            Err(why) => RawEvent {
+                ok: false,
+                detail: why.clone(),
+            },
+        }
+    }
+}
+
+/// Publishes a `RawEvent`.
+pub type EmitRaw<'a> = dyn Fn(&RawEvent) + 'a;
+
+/// A session refusal as the Advanced panel shows it.
+pub fn session_error_text(e: &SessionError) -> String {
+    match e {
+        SessionError::Unavailable(id) => format!("unavailable: function {id:#04X} not declared"),
+        SessionError::Denied(reason) => format!("denied: {reason}"),
+        SessionError::NotConnected => "not connected".into(),
+        SessionError::Busy => "busy: device state not read yet".into(),
+        SessionError::InvalidValue => "invalid value".into(),
+    }
+}
+
+/// Queues a raw request: a SET without the typed confirmation is refused,
+/// and the session applies the deny-list. Returns the refusal text.
+fn send_raw(
+    session: &mut Session,
+    table: Table,
+    bytes: Vec<u8>,
+    confirmed_set: bool,
+) -> Result<(), String> {
+    if !confirmed_set && needs_confirmation(table, &bytes) {
+        return Err("a SET needs confirmation".into());
+    }
+    session
+        .request(Request {
+            table,
+            bytes,
+            capability: None,
+            group: Group::Raw,
+        })
+        .map_err(|e| session_error_text(&e))
+}
+
 /// Whether a raw payload needs the typed confirmation: everything whose
 /// opcode is not a GET in the libmdr role table (SETs, and unknown opcodes
 /// to be safe).
@@ -244,6 +302,8 @@ pub struct BrokerContext<'a, 's, 'f, 'p, 'b> {
     pub probe: Option<&'a mut ProbeHost<'p>>,
     /// The battery sampler; writes `battery.jsonl` and emits `"battery"`.
     pub battery: Option<&'a mut BatteryHost<'b>>,
+    /// Publishes what happened to each raw request (the `"raw"` event).
+    pub raw: Option<&'a EmitRaw<'a>>,
 }
 
 /// As `run_broker`, with the device, scenes, frame tap and device records
@@ -263,6 +323,7 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
         record_dir,
         mut probe,
         mut battery,
+        raw,
     } = ctx;
     let address = device.map(|d| d.address.as_str());
     // Ends a running probe with its partial results (Stop or a lost link).
@@ -402,12 +463,18 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
                 }
                 Ok(BrokerCmd::Raw {
                     table,
-                    ref bytes,
-                    confirmed_set: false,
-                }) if needs_confirmation(table, bytes) => {
-                    events.push(Event::Log(format!(
-                        "raw {table:?} {bytes:02X?} not sent: a SET needs confirmation"
-                    )));
+                    bytes,
+                    confirmed_set,
+                }) => {
+                    let label = format!("raw {table:?} {bytes:02X?}");
+                    let outcome = send_raw(&mut session, table, bytes, confirmed_set);
+                    if let Err(why) = &outcome {
+                        events.push(Event::Log(format!("{label} not sent: {why}")));
+                    }
+                    if let Some(emit_raw) = raw {
+                        emit_raw(&RawEvent::new(&outcome));
+                    }
+                    changed = true;
                 }
                 Ok(cmd) => {
                     if let Err(e) = apply(&mut session, cmd.clone()) {
@@ -492,20 +559,16 @@ fn apply(session: &mut Session, cmd: BrokerCmd) -> Result<(), SessionError> {
         BrokerCmd::SetSidetone(on) => session.set_sidetone(on),
         // Handled by the scene host; without one there is nothing to do.
         BrokerCmd::ApplyScene(_) | BrokerCmd::SetScenes(_) | BrokerCmd::EmitScenes => Ok(()),
-        BrokerCmd::Raw { table, bytes, .. } => session.request(Request {
-            table,
-            bytes,
-            capability: None,
-            group: Group::Raw,
-        }),
         BrokerCmd::Refresh => {
             session.request(request::battery_get())?;
             session.request(request::ncasm_get())?;
             session.request(request::eq_ult_get())
         }
-        // Already connected, or handled by the frame tap or the probe host.
+        // Already connected, handled by the frame tap or the probe host, or
+        // (raw) by the command loop, which reports the outcome.
         BrokerCmd::Connect
         | BrokerCmd::Disconnect
+        | BrokerCmd::Raw { .. }
         | BrokerCmd::WatchFrames(_)
         | BrokerCmd::RecordFrames(_)
         | BrokerCmd::ProbeStart
@@ -619,6 +682,9 @@ pub fn spawn_broker(
                     }),
                 )
             });
+            let emit_raw = |event: &RawEvent| {
+                let _ = app.emit("raw", event);
+            };
             let mut backoff = 0;
             loop {
                 let result = match open_transport(fake) {
@@ -636,6 +702,7 @@ pub fn spawn_broker(
                                 record_dir: record_dir.as_deref(),
                                 probe: Some(&mut probe),
                                 battery: battery.as_mut(),
+                                raw: Some(&emit_raw),
                             },
                         )
                     }
@@ -643,7 +710,7 @@ pub fn spawn_broker(
                 };
                 tap.flush_pending();
                 let next = match result {
-                    Ok(()) => wait_for_connect(&rx, None, &mut host, &mut tap, &probe),
+                    Ok(()) => wait_for_connect(&rx, None, &mut host, &mut tap, &probe, &emit_raw),
                     Err(e) => {
                         backoff = next_backoff(backoff);
                         eprintln!(
@@ -656,6 +723,7 @@ pub fn spawn_broker(
                             &mut host,
                             &mut tap,
                             &probe,
+                            &emit_raw,
                         )
                     }
                 };
@@ -712,6 +780,7 @@ fn wait_for_connect(
     host: &mut SceneHost<'_>,
     tap: &mut FrameTap<'_>,
     probe: &ProbeHost<'_>,
+    emit_raw: &EmitRaw<'_>,
 ) -> Result<(), ()> {
     let deadline = timeout.map(|t| Instant::now() + t);
     let tick_every = Duration::from_millis(SCENES_EVERY_MS);
@@ -741,6 +810,7 @@ fn wait_for_connect(
             }
             BrokerCmd::RecordFrames(on) => tap.record(on),
             BrokerCmd::ProbeStart => eprintln!("hairline: probe not started: not connected"),
+            BrokerCmd::Raw { .. } => emit_raw(&RawEvent::new(&Err("not connected".into()))),
             cmd => {
                 host.command(&cmd, false);
             }

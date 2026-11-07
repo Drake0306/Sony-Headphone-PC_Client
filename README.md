@@ -66,7 +66,7 @@ Settings has an "Advanced panel" switch; turning it on adds the Advanced screen.
 
 - Capabilities: every function the headphones declare, with its name. A chip says DECLARED (the headphones listed it) or PROVEN (it answered the probe although it was not declared, for this unit).
 - Frame log: the frames going to and from the headphones, live. Record writes them to a file in `~/Library/Logs/com.drake0306.hairline/captures/` (macOS), and Stop ends the file.
-- Raw command: type the bytes in hex and pick the table. A GET is sent directly. Any other opcode needs you to type `SEND` first. The deny-list is absolute: a denied payload is refused even with `SEND`, and there is no reset anywhere in the app.
+- Raw command: type the bytes in hex and pick the table. A GET is sent directly. Any other opcode needs you to type `SEND` first. The deny-list is absolute: a denied payload is refused even with `SEND`, and there is no reset anywhere in the app. Raw commands need the headphones connected. The note under Send says "Queued; reply shows in the frame log" once the request is queued, or why it was refused.
 
 ## Probe
 

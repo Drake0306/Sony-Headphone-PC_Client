@@ -27,6 +27,15 @@ export interface RecordingEvent {
   path: string | null;
 }
 
+/** The "raw" event: the session queued the request, or refused it (`detail` says why). */
+export interface RawEvent {
+  ok: boolean;
+  detail: string;
+}
+
+/** The Advanced screen's note for a raw outcome. */
+export const rawNote = (e: RawEvent) => (e.ok ? "Queued; reply shows in the frame log" : e.detail);
+
 const byte = (b: number) => b.toString(16).toUpperCase().padStart(2, "0");
 
 /** "3E 0C 00 …": uppercase two-digit groups. */

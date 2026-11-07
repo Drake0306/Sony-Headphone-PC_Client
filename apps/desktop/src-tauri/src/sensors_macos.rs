@@ -1,6 +1,12 @@
 //! Desktop trigger inputs for scenes: the frontmost app and whether any app is
-//! using the microphone. Other platforms report nothing. A failing sensor is
-//! logged once and then reads as `None`/`false`.
+//! using the microphone. A failing sensor is logged once and then reads as
+//! `None`/`false`.
+//!
+//! Other non-Windows systems (Linux) report nothing yet. The routes for later
+//! on Linux: the frontmost app has no portable answer under Wayland (X11 has
+//! `_NET_ACTIVE_WINDOW`; GNOME and KDE need their own D-Bus interfaces), and
+//! the microphone is in use when PipeWire has an active capture stream (a
+//! `Stream/Input/Audio` node in the running state).
 
 /// The frontmost app's localized name, e.g. `zoom.us`.
 #[cfg(target_os = "macos")]
@@ -91,11 +97,13 @@ pub fn mic_in_use() -> bool {
     running != 0
 }
 
+/// Unknown off macOS until a Linux module exists.
 #[cfg(not(target_os = "macos"))]
 pub fn frontmost_app_name() -> Option<String> {
     None
 }
 
+/// Unknown off macOS until a Linux module (PipeWire) exists.
 #[cfg(not(target_os = "macos"))]
 pub fn mic_in_use() -> bool {
     false

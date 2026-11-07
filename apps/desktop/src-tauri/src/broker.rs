@@ -11,7 +11,9 @@ use std::time::{Duration, Instant};
 use mdr_proto::function::{opcode_role, Role};
 use mdr_proto::{request, Group, NcAsmState, Request, Table, UltLevel};
 use mdr_session::{DeviceState, Event, PairedDevice, Session, SessionError};
-use mdr_transport::{connect, discover, is_ult_wear_name, Candidate, FakeDevice, Transport};
+use mdr_transport::{
+    connect_with_hint, discover, is_ult_wear_name, Candidate, FakeDevice, Transport,
+};
 use tauri::{AppHandle, Emitter, Manager};
 
 #[cfg(not(target_os = "windows"))]
@@ -22,7 +24,8 @@ use crate::frame_ring::{FrameEntry, FrameTap, Recorder};
 use crate::probe::{ProbeEvent, ProbeHost, ProbeRunner};
 use crate::scenes::engine::{apply_actions, Engine};
 use crate::scenes::model::{Actions, Inputs, Scene};
-// macOS reads its sensors; other non-Windows systems get the stubs in the same module.
+// macOS reads its sensors; other non-Windows systems (Linux) get the stubs in
+// the same module.
 #[cfg(not(target_os = "windows"))]
 use crate::sensors_macos::{frontmost_app_name, mic_in_use};
 #[cfg(target_os = "windows")]
@@ -346,6 +349,10 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
         for (table, function) in device_record::load(dir, &device.address).proven {
             session.mark_proven(table, function);
         }
+        // The next connect tries this channel first (Linux has no SDP lookup).
+        if let Err(e) = device_record::remember_channel(dir, &device.address, transport.channel()) {
+            eprintln!("hairline: RFCOMM channel not recorded: {e}");
+        }
     }
     if let Some(tap) = frames.as_deref_mut() {
         tap.new_link();
@@ -600,7 +607,8 @@ fn paired_devices(device_name: Option<&str>) -> Vec<PairedDevice> {
     crate::audio_windows::paired_devices(device_name)
 }
 
-/// The host's own entry in the Link list.
+/// The host's own entry in the Link list: none on Linux until its audio
+/// module exists.
 #[cfg(not(target_os = "windows"))]
 fn paired_devices(device_name: Option<&str>) -> Vec<PairedDevice> {
     if !cfg!(target_os = "macos") {
@@ -700,7 +708,7 @@ pub fn spawn_broker(
             };
             let mut backoff = 0;
             loop {
-                let result = match open_transport(fake) {
+                let result = match open_transport(fake, record_dir.as_deref()) {
                     Ok((t, device)) => {
                         backoff = 0;
                         run_broker_logged(
@@ -831,8 +839,12 @@ fn wait_for_connect(
     }
 }
 
-/// The transport and, for a real device, the candidate it was opened to.
-fn open_transport(fake: bool) -> io::Result<(Box<dyn Transport>, Option<Candidate>)> {
+/// The transport and, for a real device, the candidate it was opened to. The
+/// channel recorded for that device (in `record_dir`) is passed as the hint.
+fn open_transport(
+    fake: bool,
+    record_dir: Option<&Path>,
+) -> io::Result<(Box<dyn Transport>, Option<Candidate>)> {
     if fake {
         return Ok((Box::new(FakeDevice::ult_wear()), None));
     }
@@ -852,5 +864,10 @@ fn open_transport(fake: bool) -> io::Result<(Box<dyn Transport>, Option<Candidat
                 "no connected device exposes the v2 service",
             )
         })?;
-    Ok((connect(&pick.address)?, Some(pick.clone())))
+    let recorded =
+        record_dir.and_then(|dir| device_record::load(dir, &pick.address).rfcomm_channel);
+    Ok((
+        connect_with_hint(&pick.address, recorded)?,
+        Some(pick.clone()),
+    ))
 }

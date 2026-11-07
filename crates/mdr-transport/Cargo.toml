@@ -20,3 +20,8 @@ dispatch2 = "0.3"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Networking_WinSock", "Win32_Devices_Bluetooth"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+bluer = { version = "0.17", default-features = false, features = ["bluetoothd"] }
+tokio = { version = "1", features = ["rt"] }

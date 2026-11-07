@@ -89,3 +89,13 @@ Run with `HAIRLINE_FRAME_LOG=1` and check each result in the log under `captures
 - [ ] Hotkey conflict: record one that another app already uses and record what macOS does when another app holds the same combination (refused with the reason in the editor and in Settings, or taken silently).
 - [ ] Keep: a scene with a Keep field leaves that setting untouched: no SET changes it (the value inside a combined NC or EQ request is unchanged).
 
+## 7. Windows (Phase 3a, to do when a Windows machine is available)
+
+The Windows transport compiles and passes unit tests on Windows CI; it has not yet been run against the headphones on Windows. Nothing below is verified.
+
+- [ ] Discovery: with the headphones paired and connected, `discover()` lists them with `connected_audio: true`; paired but disconnected, they are listed with `connected_audio: false`.
+- [ ] Connect while disconnected fails at once with `NotConnected` and does not hang.
+- [ ] Connect while connected opens the v2 channel (stack resolves it from SDP); record the channel `getpeername` reports, or that it reports none.
+- [ ] Handshake completes read-only (the section 2 sequence) over the Winsock link.
+- [ ] `recv_timeout` returns `None` on a quiet link and an error when the headphones are switched off.
+- [ ] Phone contention: behaviour when the phone holds the v2 channel.

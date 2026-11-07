@@ -136,7 +136,7 @@ sudo apt-get install libdbus-1-dev pkg-config libwebkit2gtk-4.1-dev \
   libayatana-appindicator3-dev librsvg2-dev patchelf libgtk-3-dev libxdo-dev libssl-dev
 ```
 
-The tray icon needs a desktop with StatusNotifierItem support (on GNOME, the AppIndicator extension). Linux trays report no clicks, so the popover opens from the tray menu's "Show Hairline". BlueZ does not expose SDP over D-Bus, so the transport finds the MDR v2 RFCOMM channel itself: `HAIRLINE_RFCOMM_CHANNEL=18` names it; otherwise it tries the channel recorded at the last connect, then scans channels 1 to 30, sending each only the protocol-info GET (`00 00`) and keeping the first that answers as v2. The channel used is printed (`hairline: RFCOMM channel 18 (channel scan)`) and recorded in `devices/<address>.json`.
+The tray icon needs a desktop with StatusNotifierItem support (on GNOME, the AppIndicator extension). Linux trays report no clicks, so the popover opens from the tray menu's "Show Hairline". BlueZ does not expose SDP over D-Bus, so the transport finds the MDR v2 RFCOMM channel itself: `HAIRLINE_RFCOMM_CHANNEL=18` names it; otherwise it uses the channel recorded at the last connect. Either is used as soon as it accepts the connection, and the session's handshake proves it. If neither connects, it scans the other channels 1 to 30, sending each only the protocol-info GET (`00 00`) and keeping the first that answers as v2. A channel that refuses, is busy (held by HFP or another program) or does not connect within 5 seconds is skipped. The channel used is printed (`hairline: RFCOMM channel 18 (channel scan)`) and recorded in `devices/<address>.json`.
 
 ## Tests
 

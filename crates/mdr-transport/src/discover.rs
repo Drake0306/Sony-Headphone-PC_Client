@@ -34,7 +34,8 @@ pub fn connect(address: &str) -> io::Result<Box<dyn Transport>> {
 
 /// [`connect`] with the RFCOMM channel recorded after an earlier connect.
 /// Only Linux uses the hint: BlueZ has no SDP browsing over D-Bus, so it tries
-/// `HAIRLINE_RFCOMM_CHANNEL`, then this channel, then scans channels 1..=30
+/// `HAIRLINE_RFCOMM_CHANNEL`, then this channel (both used without a probe;
+/// the session's handshake proves them), then scans channels 1..=30
 /// with the protocol-info GET alone. macOS and Windows resolve the channel
 /// from SDP and ignore the hint. `Transport::channel` reports the channel used.
 pub fn connect_with_hint(address: &str, channel: Option<u8>) -> io::Result<Box<dyn Transport>> {

@@ -2,8 +2,10 @@ Hairline controls Sony ULT WEAR (WH-ULT900N) headphones from the menu bar or tra
 
 ## Install on macOS
 1. Open the `.dmg` and drag Hairline to Applications.
-2. First launch: right-click Hairline and choose Open, then Open again. macOS asks because the app is not signed with an Apple Developer certificate yet. After that it opens normally.
-3. Pair the headphones in System Settings → Bluetooth first. Hairline connects on its own.
+2. Open Hairline once. macOS says it could not verify the app, because it is not signed with an Apple Developer certificate yet. Click Done.
+3. Open System Settings → Privacy & Security, scroll to Security, and click Open Anyway next to the Hairline message. Enter your password, then click Open. After that it opens normally.
+   Terminal alternative: `xattr -dr com.apple.quarantine /Applications/Hairline.app`
+4. Pair the headphones in System Settings → Bluetooth first. Hairline connects on its own.
 
 ## Install on Windows
 1. Run the `.msi` or the `-setup.exe`.

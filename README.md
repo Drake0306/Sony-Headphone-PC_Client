@@ -148,7 +148,7 @@ hairlinectl --json state
 
 Builds for macOS and Windows are on the [Releases page](https://github.com/Drake0306/Sony-Headphone-PC_Client/releases).
 
-macOS: open the `.dmg` and drag Hairline to Applications. On first launch, right-click Hairline and choose Open, then Open again. macOS asks because the app is not signed with an Apple Developer certificate yet; after that it opens normally. Pair the headphones in System Settings → Bluetooth first.
+macOS: open the `.dmg` and drag Hairline to Applications. Open it once; macOS says it could not verify the app because it is not signed with an Apple Developer certificate yet. Click Done, then go to System Settings → Privacy & Security, scroll to Security, click Open Anyway, enter your password and click Open. After that it opens normally. Terminal alternative: `xattr -dr com.apple.quarantine /Applications/Hairline.app`. Pair the headphones in System Settings → Bluetooth first.
 
 Windows: run the `.msi` or the `-setup.exe`. If SmartScreen appears, choose More info → Run anyway. The Windows build compiles and passes its tests but has not been tried with real headphones on Windows.
 

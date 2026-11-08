@@ -260,7 +260,8 @@ async fn fetch(
 }
 
 /// Starts the quiet checks: the first 15 s after launch, then every 6 hours.
-/// Does nothing when automatic checks are off (read at launch).
+/// Does nothing when automatic checks are off at launch; switching them off
+/// later skips the checks that follow.
 pub fn spawn_background_checks(app: &AppHandle, enabled: bool) {
     if !enabled {
         return;
@@ -270,6 +271,11 @@ pub fn spawn_background_checks(app: &AppHandle, enabled: bool) {
         let mut log = BackgroundLog::default();
         tokio::time::sleep(FIRST_CHECK).await;
         loop {
+            // Switched off since launch: skip the checks until it is back on.
+            if !still_enabled(&app) {
+                tokio::time::sleep(CHECK_EVERY).await;
+                continue;
+            }
             let result = fetch(&app)
                 .await
                 .map(|found| found.map(|(_, info)| info))
@@ -299,6 +305,13 @@ pub fn spawn_background_checks(app: &AppHandle, enabled: bool) {
             tokio::time::sleep(CHECK_EVERY).await;
         }
     });
+}
+
+/// The current `auto_check_updates` setting (on when unknown).
+fn still_enabled(app: &AppHandle) -> bool {
+    app.try_state::<Mutex<crate::settings::AppSettings>>()
+        .and_then(|s| s.lock().ok().map(|s| s.auto_check_updates))
+        .unwrap_or(true)
 }
 
 /// The running app's version.

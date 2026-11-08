@@ -9,6 +9,7 @@ const backend = vi.hoisted(() => ({
   emitOnApply: true,
   hotkeyErrors: {} as Record<string, string>,
   handler: null as ((e: { payload: unknown }) => void) | null,
+  update: null as ((e: { payload: unknown }) => void) | null,
 }));
 const emit = () =>
   backend.handler?.({ payload: { scenes: backend.list, active: backend.active, hotkey_errors: backend.hotkeyErrors } });
@@ -24,6 +25,8 @@ vi.mock("@tauri-apps/api/core", () => ({
       return { ...emptyState(), connected: true, model: "ULT WEAR" };
     }
     if (cmd === "runtime_info") return { fake: true, version: "0" };
+    if (cmd === "current_version") return "0.2.0";
+    if (cmd === "update_status") return { available: null, dismissed: null };
     if (cmd === "apply_scene") {
       if (backend.reject) throw backend.reject;
       backend.active = args.id ?? null;
@@ -34,12 +37,14 @@ vi.mock("@tauri-apps/api/core", () => ({
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn(async (name: string, h: (e: { payload: unknown }) => void) => {
     if (name === "scenes") backend.handler = h;
+    if (name === "update") backend.update = h;
     return () => {};
   }),
   emitTo: vi.fn(async () => {}),
 }));
 
 import { invoke } from "@tauri-apps/api/core";
+import { emitTo } from "@tauri-apps/api/event";
 import Popover from "./Popover.svelte";
 
 const scene = (id: string, enabled = true): Scene => ({
@@ -122,5 +127,24 @@ describe("Popover mode row", () => {
     emit();
     await waitFor(() => expect(r.queryByText("Alt+Super+N")).toBeNull());
     expect(r.getByText("Open window")).toBeInTheDocument();
+  });
+});
+
+describe("Popover update notice", () => {
+  it("shows the notice until Later and opens Settings", async () => {
+    const r = render(Popover);
+    await waitFor(() => expect(backend.update).not.toBeNull());
+    expect(r.queryByText(/Update available/)).toBeNull();
+    backend.update!({ payload: { phase: "available", version: "0.2.1", notes: "", date: null } });
+    const notice = await r.findByRole("button", { name: /Update available · open Hairline/ });
+    await fireEvent.click(notice);
+    await waitFor(() => expect(vi.mocked(emitTo)).toHaveBeenCalledWith("main", "navigate", "settings"));
+    // Later in Settings (another window) hides it here too.
+    const dismissed = vi.mocked((await import("@tauri-apps/api/event")).listen).mock.calls.find(
+      ([n]) => n === "update-dismissed",
+    )?.[1] as (e: { payload: unknown }) => void;
+    dismissed({ payload: "0.2.1" });
+    await waitFor(() => expect(r.queryByText(/Update available/)).toBeNull());
+    r.unmount();
   });
 });

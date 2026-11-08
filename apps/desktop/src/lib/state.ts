@@ -108,7 +108,20 @@ export interface RuntimeInfo {
 }
 
 /** `AppSettings` (apps/desktop/src-tauri/src/settings.rs). */
-export type Theme = "paper" | "ink" | "system";
+export type Theme =
+  | "paper"
+  | "ink"
+  | "system"
+  | "latte"
+  | "solarized"
+  | "dawn"
+  | "sepia"
+  | "kraft"
+  | "nord"
+  | "mocha"
+  | "gruvbox"
+  | "tokyo"
+  | "oled";
 
 export interface AppSettings {
   theme: Theme;

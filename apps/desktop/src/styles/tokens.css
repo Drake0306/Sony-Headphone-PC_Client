@@ -47,29 +47,180 @@
   color-scheme: light;
 }
 
-/* Keep in sync: the two Ink blocks below must carry the same values. */
+/* Themes. Each block sets the same eight tokens and nothing else, and is
+   matched on any element, not only <html>, so a swatch in the picker can carry
+   `data-theme` and paint itself with the theme's own colours. `--ult` is the
+   theme's accent, the colour of everything live; `--on-ult` reads on it.
+   Keep in sync: the two Ink blocks must carry the same values. */
 
 /* Ink: paper and ink swap; Forest Gray and orange stay. Chosen explicitly,
    or by "System" (no data-theme) when the system appearance is dark. */
-:root[data-theme="ink"] {
+[data-theme="ink"] {
   --paper: #161614;
   --ink: #efede6;
   --hair: #3a3a36;
   --muted: #9a9a92;
   --box: #1f1f1d;
   --stripe: #9a9a92;
+  --ult: #ff6600;
+  --on-ult: #161614;
   color-scheme: dark;
 }
 
-/* Keep in sync with the :root[data-theme="ink"] block above. */
+/* Keep in sync with the [data-theme="ink"] block above. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="paper"]) {
+  :root:not([data-theme]) {
     --paper: #161614;
     --ink: #efede6;
     --hair: #3a3a36;
     --muted: #9a9a92;
     --box: #1f1f1d;
     --stripe: #9a9a92;
+    --ult: #ff6600;
+    --on-ult: #161614;
     color-scheme: dark;
   }
+}
+
+/* Paper, chosen explicitly: the :root values again, so a swatch can show it. */
+[data-theme="paper"] {
+  --paper: #efede6;
+  --ink: #161614;
+  --hair: #cfccc2;
+  --muted: #6f726d;
+  --box: #f8f7f3;
+  --stripe: #3a3a36;
+  --ult: #ff6600;
+  --on-ult: #161614;
+  color-scheme: light;
+}
+
+/* Catppuccin Latte (light). */
+[data-theme="latte"] {
+  --paper: #eff1f5;
+  --ink: #4c4f69;
+  --hair: #ccd0da;
+  --muted: #6c6f85;
+  --box: #e6e9ef;
+  --stripe: #9ca0b0;
+  --ult: #fe640b;
+  --on-ult: #eff1f5;
+  color-scheme: light;
+}
+
+/* Solarized Light. */
+[data-theme="solarized"] {
+  --paper: #fdf6e3;
+  --ink: #073642;
+  --hair: #d6cfb8;
+  --muted: #657b83;
+  --box: #eee8d5;
+  --stripe: #93a1a1;
+  --ult: #cb4b16;
+  --on-ult: #fdf6e3;
+  color-scheme: light;
+}
+
+/* Rosé Pine Dawn (light). */
+[data-theme="dawn"] {
+  --paper: #faf4ed;
+  --ink: #575279;
+  --hair: #dfd9d3;
+  --muted: #797593;
+  --box: #fffaf3;
+  --stripe: #9893a5;
+  --ult: #d7827e;
+  --on-ult: #faf4ed;
+  color-scheme: light;
+}
+
+/* Sepia (light): aged paper for reading. */
+[data-theme="sepia"] {
+  --paper: #f1e6d0;
+  --ink: #3b2f23;
+  --hair: #d8c9a8;
+  --muted: #7d6b55;
+  --box: #f7efdf;
+  --stripe: #a08c6c;
+  --ult: #b5451b;
+  --on-ult: #f7efdf;
+  color-scheme: light;
+}
+
+/* Kraft (light): brown packing paper; the accent stays ULT orange. */
+[data-theme="kraft"] {
+  --paper: #cfbb94;
+  --ink: #231c15;
+  --hair: #b39f78;
+  --muted: #665441;
+  --box: #dccba8;
+  --stripe: #8a7656;
+  --ult: #ff6600;
+  --on-ult: #231c15;
+  color-scheme: light;
+}
+
+/* Nord (dark). */
+[data-theme="nord"] {
+  --paper: #2e3440;
+  --ink: #eceff4;
+  --hair: #434c5e;
+  --muted: #9aa3b5;
+  --box: #3b4252;
+  --stripe: #81a1c1;
+  --ult: #88c0d0;
+  --on-ult: #2e3440;
+  color-scheme: dark;
+}
+
+/* Catppuccin Mocha (dark). */
+[data-theme="mocha"] {
+  --paper: #1e1e2e;
+  --ink: #cdd6f4;
+  --hair: #45475a;
+  --muted: #a6adc8;
+  --box: #313244;
+  --stripe: #9399b2;
+  --ult: #fab387;
+  --on-ult: #1e1e2e;
+  color-scheme: dark;
+}
+
+/* Gruvbox (dark). */
+[data-theme="gruvbox"] {
+  --paper: #282828;
+  --ink: #ebdbb2;
+  --hair: #504945;
+  --muted: #a89984;
+  --box: #3c3836;
+  --stripe: #928374;
+  --ult: #fe8019;
+  --on-ult: #282828;
+  color-scheme: dark;
+}
+
+/* Tokyo Night (dark). */
+[data-theme="tokyo"] {
+  --paper: #1a1b26;
+  --ink: #c0caf5;
+  --hair: #3b4261;
+  --muted: #9aa5ce;
+  --box: #24283b;
+  --stripe: #565f89;
+  --ult: #7aa2f7;
+  --on-ult: #1a1b26;
+  color-scheme: dark;
+}
+
+/* OLED Black (dark): true black, the accent stays ULT orange. */
+[data-theme="oled"] {
+  --paper: #000000;
+  --ink: #e8e8e3;
+  --hair: #262626;
+  --muted: #8a8a84;
+  --box: #0d0d0d;
+  --stripe: #8a8a84;
+  --ult: #ff6600;
+  --on-ult: #161614;
+  color-scheme: dark;
 }

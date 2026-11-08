@@ -6,6 +6,7 @@
   import { onMount } from "svelte";
   import { getVersion } from "@tauri-apps/api/app";
   import Boxes from "../lib/controls/Boxes.svelte";
+  import ThemePicker from "../lib/controls/ThemePicker.svelte";
   import LinkList from "../lib/controls/LinkList.svelte";
   import Row from "../lib/controls/Row.svelte";
   import Toggle from "../lib/controls/Toggle.svelte";
@@ -41,11 +42,6 @@
     { label: "Google", value: 0x31 },
     { label: "Alexa", value: 0x32 },
     { label: "Off", value: 0xff },
-  ];
-  const THEMES: { label: string; value: Theme }[] = [
-    { label: "Paper", value: "paper" },
-    { label: "Ink", value: "ink" },
-    { label: "System", value: "system" },
   ];
   const PENDING: Status = { Pending: { since_ms: 0 } };
   const hex = (id: number) => `0x${id.toString(16).toUpperCase().padStart(2, "0")}`;
@@ -231,15 +227,6 @@
             <button class="btn" onclick={() => clearBatteryHistory().catch((e) => console.error(e))}>Clear</button>
           {/if}
         </Row>
-        <Row label="Appearance">
-          <Boxes
-            options={THEMES}
-            value={theme.shown}
-            status={theme.status}
-            width="200px"
-            onpick={(t) => theme.request(t, () => save("theme", t))}
-          />
-        </Row>
         <Row label="Advanced panel" note="Frame log, capability list, raw commands">
           <Toggle
             on={advanced.shown}
@@ -248,6 +235,15 @@
             onpick={(on) => advanced.request(on, () => save("show_advanced", on))}
           />
         </Row>
+      </div>
+      <div class="block">
+        <h4>Appearance</h4>
+        <ThemePicker
+          value={theme.shown}
+          status={theme.status}
+          attempted={theme.refused?.value ?? null}
+          onpick={(t) => theme.request(t, () => save("theme", t))}
+        />
       </div>
       <div class="block">
         <h4>Updates</h4>

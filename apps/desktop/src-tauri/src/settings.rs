@@ -19,8 +19,19 @@ pub enum Theme {
     #[default]
     Paper,
     Ink,
-    /// Follows the system's light/dark appearance.
+    /// Follows the system's light/dark appearance (Paper or Ink).
     System,
+    // The ten added in 0.4.0; their colours are in the frontend's tokens.css.
+    Latte,
+    Solarized,
+    Dawn,
+    Sepia,
+    Kraft,
+    Nord,
+    Mocha,
+    Gruvbox,
+    Tokyo,
+    Oled,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]

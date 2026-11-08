@@ -128,3 +128,29 @@ fn auto_check_setting_round_trip() {
     assert!(!load(&dir).auto_check_updates);
     std::fs::remove_dir_all(&dir).unwrap();
 }
+
+#[test]
+fn every_theme_round_trips_by_its_lowercase_name() {
+    use shdc_lib::settings::Theme;
+    let all = [
+        (Theme::Paper, "paper"),
+        (Theme::Ink, "ink"),
+        (Theme::System, "system"),
+        (Theme::Latte, "latte"),
+        (Theme::Solarized, "solarized"),
+        (Theme::Dawn, "dawn"),
+        (Theme::Sepia, "sepia"),
+        (Theme::Kraft, "kraft"),
+        (Theme::Nord, "nord"),
+        (Theme::Mocha, "mocha"),
+        (Theme::Gruvbox, "gruvbox"),
+        (Theme::Tokyo, "tokyo"),
+        (Theme::Oled, "oled"),
+    ];
+    for (theme, name) in all {
+        let json = serde_json::to_string(&theme).unwrap();
+        assert_eq!(json, format!("\"{name}\""));
+        let back: Theme = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, theme);
+    }
+}

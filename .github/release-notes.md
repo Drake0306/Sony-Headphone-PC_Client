@@ -1,8 +1,7 @@
 SHDC (Sony Headphone Desktop Client) controls Sony ULT WEAR (WH-ULT900N) headphones from the menu bar or tray: noise control, ambient level, ULT, equalizer, battery, scenes with desktop triggers, hotkeys, an advanced ten-band equalizer with shareable codes, and a command-line tool.
 
 ## What changed
-- Windows: the popover opens just above the taskbar, centred on the tray icon, instead of far up the screen. Its position is now computed from the monitor's work area, so a taskbar at the top or on a side is handled too, and so is a second monitor or a scaled display.
-- The popover offers "Open window" while the headphones are not connected as well, so the full window is reachable from the tray at any time.
+- Ten new appearance themes next to Paper and Ink, picked from swatches in Settings → Appearance. Light: Latte, Solarized, Dawn, Sepia, Kraft. Dark: Nord, Mocha, Gruvbox, Tokyo Night, OLED Black. Each theme brings its own accent for live controls; Kraft and OLED Black keep ULT orange. System still follows the OS between Paper and Ink.
 
 ## Updating from an earlier version
 Settings → Updates → Update now. On a Mac the file in Applications keeps the name it was installed under (for example `Hairline.app`), because the update replaces the contents, not the file; rename it in Finder if you like.

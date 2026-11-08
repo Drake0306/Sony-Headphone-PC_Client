@@ -282,14 +282,44 @@ pub fn open_main_window(app: &AppHandle) -> tauri::Result<()> {
         window.unminimize()?;
         return window.set_focus();
     }
+    // Hidden until its page has loaded (no white flash, and on Windows a
+    // webview shown before it has painted could stay white); a timer shows
+    // it anyway after a moment so a page that never loads is still a window
+    // the user can see and report.
     let window =
         WebviewWindowBuilder::new(app, MAIN, WebviewUrl::App("index.html?view=main".into()))
             .title("SHDC · Sony Headphone Desktop Client")
             .inner_size(880.0, 560.0)
             .min_inner_size(880.0, 560.0)
             .resizable(true)
-            .visible(true)
+            .visible(false)
+            .on_page_load(|window, payload| {
+                crate::diag::log(
+                    window.app_handle(),
+                    &format!("main window page {:?}: {}", payload.event(), payload.url()),
+                );
+                if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                    reveal(&window, "page loaded");
+                }
+            })
             .build()?;
+    crate::diag::log(
+        app,
+        &format!(
+            "main window created at {}",
+            window.url().map(|u| u.to_string()).unwrap_or_default()
+        ),
+    );
+    let fallback = window.clone();
+    std::thread::Builder::new()
+        .name("shdc-main-window-reveal".into())
+        .spawn(move || {
+            std::thread::sleep(REVEAL_FALLBACK);
+            if !fallback.is_visible().unwrap_or(true) {
+                reveal(&fallback, "no page load after the fallback wait");
+            }
+        })
+        .ok();
     let handle = app.clone();
     window.on_window_event(move |event| {
         if let WindowEvent::Destroyed = event {
@@ -302,8 +332,20 @@ pub fn open_main_window(app: &AppHandle) -> tauri::Result<()> {
         }
     });
     // Only once the window exists, so a failed build leaves no Dock icon behind.
-    bring_forward(app)?;
-    window.set_focus()
+    bring_forward(app)
+}
+
+/// How long a new main window may stay hidden waiting for its page.
+const REVEAL_FALLBACK: Duration = Duration::from_millis(1500);
+
+/// Shows and focuses the main window, once; logs why.
+fn reveal(window: &WebviewWindow, why: &str) {
+    if window.is_visible().unwrap_or(false) {
+        return;
+    }
+    crate::diag::log(window.app_handle(), &format!("main window shown ({why})"));
+    let _ = window.show();
+    let _ = window.set_focus();
 }
 
 /// Switches to the Regular policy (Dock icon) and unhides the app, so the main
@@ -313,4 +355,21 @@ fn bring_forward(app: &AppHandle) -> tauri::Result<()> {
     #[cfg(target_os = "macos")]
     app.show()?;
     Ok(())
+}
+
+/// Opens the main window's web inspector (creating the window first), from
+/// the tray menu's "Web inspector".
+pub fn open_inspector(app: &AppHandle) {
+    if app.get_webview_window(MAIN).is_none() {
+        if let Err(e) = open_main_window(app) {
+            crate::diag::log(
+                app,
+                &format!("main window not created for the inspector: {e}"),
+            );
+            return;
+        }
+    }
+    if let Some(window) = app.get_webview_window(MAIN) {
+        window.open_devtools();
+    }
 }

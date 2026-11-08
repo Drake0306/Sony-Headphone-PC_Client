@@ -145,7 +145,7 @@ The app builds and its tests pass on Windows CI. The owner's first run on a Wind
 - [ ] With the taskbar on the left, right or top, the popover opens by the icon and fully on screen.
 - [ ] Clicking outside hides the popover (set_focus takes the foreground, so focus loss arrives). Clicking the tray icon while it is open hides it and does not reopen it at once; the next click opens it.
 - [ ] Right click on the tray icon shows Quit, and Quit ends the app.
-- [ ] The popover footer opens the main window; it appears in the taskbar like an ordinary window, and closing it leaves the tray icon running.
+- [ ] The popover footer opens the main window with its content drawn (the owner's 0.3.x build showed a white window here; 0.5.2 creates the window as its own main-thread task and shows it after the page loads); it appears in the taskbar like an ordinary window, and closing it leaves the tray icon running. If it is still white: `%LOCALAPPDATA%\\com.drake0306.hairline\\logs\\shdc.log` says whether the page loaded, and the tray's "Web inspector" (Advanced panel on) shows the page console.
 - [ ] With the headphones off, the popover still shows "Open window" under Connect, and it opens the full window.
 - [ ] With the headphones paired and connected, the popover shows battery, noise control and ULT, and a change from the popover takes effect on the headphones.
 - [ ] Devices: the Link list shows no host entry and no "playing" (the Windows audio module does not exist yet).

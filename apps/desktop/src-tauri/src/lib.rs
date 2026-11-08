@@ -7,6 +7,7 @@ pub mod battery_history;
 pub mod broker;
 pub mod commands;
 pub mod device_record;
+pub mod diag;
 pub mod dock;
 pub mod eq_curve;
 pub mod frame_log;
@@ -78,6 +79,7 @@ pub fn run() {
             commands::apply_scene,
             commands::connect,
             commands::open_main_window,
+            commands::report_frontend_error,
             commands::capability_list,
             commands::watch_frames,
             commands::record_frames,

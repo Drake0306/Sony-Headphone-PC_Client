@@ -66,6 +66,15 @@
 
   const status = $derived(statusLabel(st.connected, st.firmware, fake));
 
+  // Scroll position of the content column, for the bar's hairline.
+  let scroller = $state<HTMLElement | null>(null);
+  let scrolled = $state(false);
+  $effect(() => {
+    void tab;
+    void advancedEq;
+    scrolled = (scroller?.scrollTop ?? 0) > 0;
+  });
+
   onMount(() => {
     const onHash = () => {
       advancedEq = false;
@@ -87,15 +96,23 @@
 </script>
 
 <div class="win">
-  {#if !eqOpen}
-    <nav class="tabs">
-      {#each tabs as t (t.id)}
-        <a href={`#${t.id}`} class:on={tab === t.id} aria-current={tab === t.id ? "page" : undefined}>{t.label}</a>
-      {/each}
-    </nav>
-  {/if}
-  <span class="status lab">{status}</span>
-  <main>
+  <!-- The bar is glass: content scrolling under it shows blurred, never
+       sharp, and a hairline appears along its foot once anything has scrolled
+       beneath. The Advanced equalizer takes the whole area and never scrolls,
+       so there the bar is plain and only the status remains. -->
+  <header class="bar" class:scrolled class:plain={eqOpen}>
+    {#if !eqOpen}
+      <nav class="tabs">
+        {#each tabs as t (t.id)}
+          <a href={`#${t.id}`} class:on={tab === t.id} aria-current={tab === t.id ? "page" : undefined}>{t.label}</a>
+        {/each}
+      </nav>
+    {:else}
+      <span></span>
+    {/if}
+    <span class="status lab">{status}</span>
+  </header>
+  <main bind:this={scroller} onscroll={() => (scrolled = (scroller?.scrollTop ?? 0) > 0)}>
     {#if eqOpen}
       <AdvancedEq {st} onback={() => (advancedEq = false)} />
     {:else if tab === "sound"}
@@ -123,10 +140,39 @@
     background: var(--wash), var(--paper);
   }
 
-  .tabs {
+  .bar {
     position: absolute;
-    top: 13px;
-    left: 32px;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 2;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px 0 32px;
+    /* Paper at 72 %, the rest blurred content; a flat paper first for a
+       WebKit without color-mix. */
+    background: var(--paper);
+    background: color-mix(in srgb, var(--paper) 72%, transparent);
+    -webkit-backdrop-filter: blur(16px) saturate(1.3);
+    backdrop-filter: blur(16px) saturate(1.3);
+    border-bottom: 1px solid transparent;
+    transition: border-color 120ms ease-out;
+  }
+
+  .bar.scrolled {
+    border-bottom-color: var(--hair);
+  }
+
+  .bar.plain {
+    background: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    pointer-events: none;
+  }
+
+  .tabs {
     display: flex;
     gap: 18px;
   }
@@ -147,9 +193,7 @@
   }
 
   .status {
-    position: absolute;
-    top: 12px;
-    right: 16px;
+    pointer-events: none;
   }
 
   /* The content column scrolls inside the window so the paper never ends

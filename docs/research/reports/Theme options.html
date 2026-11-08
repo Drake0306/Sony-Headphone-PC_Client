@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Theme options</title>
+<meta name="description" content="Ten appearance themes for SHDC beyond Paper and Ink, each previewed on the popover and the Sound screen with its token values.">
+<style>
+  @font-face { font-family: "Instrument Sans"; src: url("../../../apps/desktop/src/assets/fonts/instrument-sans/InstrumentSans[wdth,wght].ttf") format("truetype"); font-weight: 400 700; }
+  @font-face { font-family: "Doto"; src: url("../../../apps/desktop/src/assets/fonts/doto/Doto[ROND,wght].ttf") format("truetype"); font-weight: 100 900; }
+  @font-face { font-family: "DM Mono"; src: url("../../../apps/desktop/src/assets/fonts/dm-mono/DMMono-Regular.ttf") format("truetype"); font-weight: 400; }
+  @font-face { font-family: "DM Mono"; src: url("../../../apps/desktop/src/assets/fonts/dm-mono/DMMono-Medium.ttf") format("truetype"); font-weight: 500; }
+
+  :root {
+    --page: #efede6; --text: #161614; --rule: #cfccc2; --dim: #6f726d; --orange: #ff6600;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --page: #161614; --text: #efede6; --rule: #3a3a36; --dim: #9a9a92; color-scheme: dark; }
+  }
+  :root[data-theme="dark"] { --page: #161614; --text: #efede6; --rule: #3a3a36; --dim: #9a9a92; color-scheme: dark; }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text); font: 15px/1.5 "Instrument Sans", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+  main { max-width: 1180px; margin: 0 auto; padding: 44px max(16px, env(safe-area-inset-left, 0px)) 72px max(16px, env(safe-area-inset-right, 0px)); }
+  h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 4px; }
+  .sub { color: var(--dim); margin: 0 0 20px; max-width: 72ch; }
+  h2 { font: 400 11px/1 "DM Mono", ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin: 40px 0 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+  p { margin: 0 0 12px; max-width: 72ch; }
+  ul { margin: 0 0 12px; padding-left: 18px; max-width: 72ch; }
+  li { margin: 0 0 6px; }
+  code { font: 13px "DM Mono", ui-monospace, monospace; }
+
+  /* The one control on the page: which accent each preview uses. */
+  .control { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 0 28px; }
+  .control span { font: 400 10px/1 "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+  .seg { display: grid; grid-auto-flow: column; gap: 2px; }
+  .seg button { background: transparent; color: var(--text); border: 1px solid var(--text); border-radius: 0; font: 11px "DM Mono", ui-monospace, monospace; padding: 6px 12px; cursor: pointer; }
+  .seg button.on { background: var(--text); color: var(--page); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(540px, 1fr)); gap: 22px; }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+
+  /* One theme card. Everything inside paints with the theme's own tokens. */
+  .theme { border: 1px solid var(--rule); padding: 0; background: var(--paper); color: var(--ink); min-width: 0; }
+  .theme.accent-ult { --accent: #ff6600; --on-accent: #161614; }
+  .theme .head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 14px 18px 10px; border-bottom: 1px solid var(--hair); }
+  .theme .head h3 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .theme .head .num { font-family: "Doto", monospace; font-weight: 900; font-size: 22px; margin-right: 8px; color: var(--accent); }
+  .theme .head .lab { white-space: nowrap; }
+  .theme .why { padding: 10px 18px 0; font-size: 13px; color: var(--muted); max-width: none; }
+  .theme .preview { display: grid; grid-template-columns: 230px 1fr; gap: 18px; padding: 16px 18px 18px; }
+  @media (max-width: 600px) { .theme .preview { grid-template-columns: 1fr; } }
+
+  /* Tokens as the app defines them. */
+  .lab { font-family: "DM Mono", monospace; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .dot { font-family: "Doto", monospace; font-weight: 900; }
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--hair); font-size: 12px; gap: 10px; }
+  .row:last-child { border-bottom: none; }
+  .name { font-weight: 600; font-size: 12px; }
+  .big { font-size: 34px; line-height: 1; }
+  .big small { font-family: "Instrument Sans", system-ui, sans-serif; font-size: 11px; color: var(--muted); }
+  .boxes { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; }
+  .boxes button { background: var(--box); color: var(--ink); border: 1px solid var(--ink); border-radius: 0; text-align: center; font-family: "DM Mono", monospace; font-size: 10px; padding: 5px 3px; white-space: nowrap; cursor: default; }
+  .boxes button.on { background: var(--ink); color: var(--paper); }
+  .boxes button.on.orange { background: var(--accent); color: var(--on-accent); font-weight: 500; }
+  .boxes.pending button.on { background: repeating-linear-gradient(45deg, var(--ink) 0 4px, var(--stripe) 4px 8px); color: var(--paper); }
+  .ticks { display: flex; gap: 3px; }
+  .ticks i { display: block; width: 5px; height: 12px; background: var(--box); border: 1px solid var(--ink); }
+  .ticks i.on { background: var(--ink); }
+  .footer { padding-top: 8px; border-top: 1px solid var(--hair); display: flex; justify-content: space-between; }
+
+  .pop { background: var(--paper); border: 1px solid var(--hair); padding: 12px 14px; }
+  .pop .footer { margin-top: 2px; }
+
+  .sound { min-width: 0; }
+  .sound .title { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .sound .title b { font-size: 13px; font-weight: 600; }
+  .faders { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin: 10px 0 12px; }
+  .fader { display: grid; justify-items: center; gap: 4px; }
+  .fader .val { font-family: "Doto", monospace; font-weight: 900; font-size: 13px; color: var(--ink); }
+  .fader .val.live { color: var(--accent); }
+  .rail { position: relative; width: 22px; height: 92px; display: grid; grid-template-rows: repeat(21, 1fr); gap: 1px; }
+  .rail i { display: block; background: var(--hair); height: 2px; align-self: center; width: 100%; }
+  .rail i.zero { background: var(--ink); height: 2px; }
+  .rail .fill { position: absolute; left: 9px; width: 4px; background: var(--accent); }
+  .rail .knob { position: absolute; left: 2px; width: 18px; height: 8px; background: var(--accent); border: 1px solid var(--ink); }
+  .ends { display: flex; justify-content: space-between; width: 100%; }
+  .ends span { font-family: "DM Mono", monospace; font-size: 8px; color: var(--muted); }
+
+  .swatches { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 0 18px 16px; }
+  .sw { display: flex; align-items: center; gap: 6px; font: 10px "DM Mono", ui-monospace, monospace; color: var(--muted); }
+  .sw i { display: block; width: 14px; height: 14px; border: 1px solid var(--hair); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 0 0 12px; }
+  td, th { text-align: left; padding: 7px 8px 7px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font: 400 11px/1 "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Theme options</h1>
+  <p class="sub">Ten appearances for SHDC beyond Paper and Ink, Saturday 8 November 2026. Each card paints the real popover and a slice of the Sound screen with that theme's six tokens. Nothing else changes: the type, the one-pixel rules, the boxed switches and the faders stay Hairline.</p>
+
+  <div class="control">
+    <span>Accent on live controls</span>
+    <div class="seg" role="group" aria-label="Accent">
+      <button class="on" data-accent="theme">Theme's own</button>
+      <button data-accent="ult">ULT orange</button>
+    </div>
+    <span>Switch to compare. The app marks "live" with orange today; a theme can keep that or bring its signature colour.</span>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <h2>How I chose</h2>
+  <p>Five light, five dark, so System mode has a matching pair whichever way you go. The seven named palettes are the ones that turn up most in 2026 editor and terminal theme lists: Catppuccin is the most installed Neovim scheme and the one most often recommended as a default, Tokyo Night and Nord have the longest install histories on the VS Code marketplace, and Gruvbox, Dracula, Solarized and Rosé Pine ship bundled in most multi-theme tools. The three others answer requests that come up in app settings everywhere: a true-black OLED theme (black pixels are off, so it also saves power on OLED screens), a sepia reading theme, and a warm brown paper that follows this app's own metaphor.</p>
+  <p>What I did not include: a high-contrast accessibility theme (worth doing, but as a separate setting that also thickens rules and enlarges type rather than as a colour swap), and more than one variant of the same family (Catppuccin has four flavours, Rosé Pine three), to keep the picker readable.</p>
+
+  <h2>What adding them means</h2>
+  <ul>
+    <li>Each theme is one block of six values in <code>tokens.css</code> and one entry in the Appearance picker. No component changes.</li>
+    <li>The Appearance row has three boxes today (Paper, Ink, System). Twelve do not fit on one row, so the picker becomes a two-row grid or a small list with a swatch per theme. I will show the control before building it.</li>
+    <li>System keeps mapping to Paper and Ink. A later option could let you pick which light and which dark theme System switches between.</li>
+    <li>The QR code stays dark on light in every theme, as it does in Ink today, so phones can scan it.</li>
+    <li>On the accent: themes marked "own accent" look like their namesakes with it. If you prefer one orange everywhere, say so and every theme keeps ULT orange.</li>
+  </ul>
+
+  <h2>Pick</h2>
+  <p>Tell me the numbers to add, any names to change, and whether live controls use the theme's accent or ULT orange. I will then add them with tests and ship them in the next release.</p>
+</main>
+
+<script>
+  // Six tokens per theme, exactly the ones tokens.css defines, plus the
+  // theme's own accent and the ink colour that reads on it.
+  const THEMES = [
+    { n: 1, name: "Catppuccin Latte", kind: "light", why: "The light flavour of the most installed Neovim and terminal palette of the last two years. Soft grey-blue paper, lavender-grey ink, peach accent.",
+      t: { paper: "#eff1f5", ink: "#4c4f69", hair: "#ccd0da", muted: "#6c6f85", box: "#e6e9ef", stripe: "#9ca0b0", accent: "#fe640b", onAccent: "#eff1f5" } },
+    { n: 2, name: "Solarized Light", kind: "light", why: "Ethan Schoonover's 2011 palette, still the reference for a calibrated warm light theme. Cream paper, deep teal ink, its own orange sits close to ULT.",
+      t: { paper: "#fdf6e3", ink: "#073642", hair: "#d6cfb8", muted: "#657b83", box: "#eee8d5", stripe: "#93a1a1", accent: "#cb4b16", onAccent: "#fdf6e3" } },
+    { n: 3, name: "Rosé Pine Dawn", kind: "light", why: "The warm light variant of Rosé Pine. Blush paper, muted violet ink, rose accent. The gentlest of the light set.",
+      t: { paper: "#faf4ed", ink: "#575279", hair: "#dfd9d3", muted: "#797593", box: "#fffaf3", stripe: "#9893a5", accent: "#d7827e", onAccent: "#faf4ed" } },
+    { n: 4, name: "Sepia", kind: "light", why: "The reading theme people ask every app for: less glare than white, no inversion. Aged-paper tan, brown-black ink, rust accent.",
+      t: { paper: "#f1e6d0", ink: "#3b2f23", hair: "#d8c9a8", muted: "#7d6b55", box: "#f7efdf", stripe: "#a08c6c", accent: "#b5451b", onAccent: "#f7efdf" } },
+    { n: 5, name: "Kraft", kind: "light", why: "This app's own idea taken further: brown packing paper with near-black ink, like a printed label. Orange reads loud on it, so the live accent stays ULT.",
+      t: { paper: "#cfbb94", ink: "#231c15", hair: "#b39f78", muted: "#665441", box: "#dccba8", stripe: "#8a7656", accent: "#ff6600", onAccent: "#231c15" } },
+    { n: 6, name: "Nord", kind: "dark", why: "Arctic blue-grey, one of the most installed dark themes anywhere. Polar night paper, snow ink, frost accent.",
+      t: { paper: "#2e3440", ink: "#eceff4", hair: "#434c5e", muted: "#9aa3b5", box: "#3b4252", stripe: "#81a1c1", accent: "#88c0d0", onAccent: "#2e3440" } },
+    { n: 7, name: "Catppuccin Mocha", kind: "dark", why: "The dark flavour that most 2026 guides name as the comfortable default. Deep indigo paper, pale lavender ink, peach accent.",
+      t: { paper: "#1e1e2e", ink: "#cdd6f4", hair: "#45475a", muted: "#a6adc8", box: "#313244", stripe: "#9399b2", accent: "#fab387", onAccent: "#1e1e2e" } },
+    { n: 8, name: "Gruvbox", kind: "dark", why: "Retro warm dark with a 1980s terminal feel. Charcoal paper, cream ink, and its own orange, so it loses nothing with ULT either way.",
+      t: { paper: "#282828", ink: "#ebdbb2", hair: "#504945", muted: "#a89984", box: "#3c3836", stripe: "#928374", accent: "#fe8019", onAccent: "#282828" } },
+    { n: 9, name: "Tokyo Night", kind: "dark", why: "Cool night blue, the top dark theme on the VS Code marketplace for years. Navy paper, periwinkle ink, blue accent.",
+      t: { paper: "#1a1b26", ink: "#c0caf5", hair: "#3b4261", muted: "#9aa5ce", box: "#24283b", stripe: "#565f89", accent: "#7aa2f7", onAccent: "#1a1b26" } },
+    { n: 10, name: "OLED Black", kind: "dark", why: "True black for OLED screens and dark rooms: black pixels are off, and the orange glows. The ink is Ink's off-white, slightly dimmed.",
+      t: { paper: "#000000", ink: "#e8e8e3", hair: "#262626", muted: "#8a8a84", box: "#0d0d0d", stripe: "#8a8a84", accent: "#ff6600", onAccent: "#161614" } },
+  ];
+
+  // Band values for the Sound slice; one live fader per theme to show the accent.
+  const BANDS = [["CLEAR BASS", 6, true], ["400", 2, false], ["1K", 0, false], ["2.5K", -1, false], ["6.3K", 3, false], ["16K", 4, false]];
+
+  const fader = ([label, v, live]) => {
+    const segs = Array.from({ length: 21 }, (_, i) => `<i class="${i === 10 ? "zero" : ""}"></i>`).join("");
+    const top = 50 - v * 4.3;            // knob centre in % of the rail
+    const fillTop = Math.min(50, top), fillH = Math.abs(50 - top);
+    return `<div class="fader">
+      <span class="val ${live ? "live" : ""}">${v > 0 ? "+" + v : v}</span>
+      <div class="rail">${segs}<span class="fill" style="top:${fillTop}%;height:${fillH}%"></span><span class="knob" style="top:calc(${top}% - 4px)"></span></div>
+      <span class="lab">${label}</span>
+    </div>`;
+  };
+
+  const card = (th) => {
+    const t = th.t;
+    const vars = `--paper:${t.paper};--ink:${t.ink};--hair:${t.hair};--muted:${t.muted};--box:${t.box};--stripe:${t.stripe};--accent:${t.accent};--on-accent:${t.onAccent}`;
+    const sw = Object.entries(t).filter(([k]) => k !== "onAccent").map(([k, v]) => `<span class="sw"><i style="background:${v}"></i>${k === "accent" ? "accent" : k} ${v}</span>`).join("");
+    return `<section class="theme" style="${vars}" data-own-accent="${t.accent}" data-own-on="${t.onAccent}">
+      <div class="head"><h3><span class="num">${String(th.n).padStart(2, "0")}</span>${th.name}</h3><span class="lab">${th.kind} · ${t.accent === "#ff6600" ? "ULT accent" : "own accent"}</span></div>
+      <p class="why">${th.why}</p>
+      <div class="preview">
+        <div class="pop">
+          <div class="row"><span class="name">WH-ULT900N</span><span class="lab">Connected · AAC</span></div>
+          <div class="row"><span class="lab">Battery</span><span class="dot big">72<small>%</small></span></div>
+          <div class="row"><span class="lab">Noise</span><div class="boxes" style="width:150px"><button class="on">NC</button><button>Ambient</button><button>Off</button></div></div>
+          <div class="row"><span class="lab">Ambient</span><div class="ticks">${Array.from({ length: 20 }, (_, i) => `<i class="${i < 12 ? "on" : ""}"></i>`).join("")}</div></div>
+          <div class="row"><span class="lab">ULT</span><div class="boxes" style="width:150px"><button>Off</button><button>1</button><button class="on orange">2</button></div></div>
+          <div class="row"><span class="lab">Mode</span><div class="boxes pending" style="width:150px"><button class="on">Late</button><button>Desk</button><button>…</button></div></div>
+          <div class="footer"><span class="lab">Open window</span><span class="lab">⌥⌘N</span></div>
+        </div>
+        <div class="sound">
+          <div class="title"><b>Equalizer</b><span class="lab">Custom 1 · 21 steps</span></div>
+          <div class="boxes" style="margin-bottom:6px"><button>Off</button><button>Bright</button><button>Bass</button><button>Manual</button><button class="on orange">Custom 1</button><button>Custom 2</button></div>
+          <div class="faders">${BANDS.map(fader).join("")}</div>
+          <div class="row"><span class="lab">DSEE Extreme</span><div class="boxes" style="width:120px"><button class="on">Auto</button><button>Off</button></div></div>
+          <div class="row"><span class="lab">Codec</span><span class="dot" style="font-size:14px">AAC</span></div>
+        </div>
+      </div>
+      <div class="swatches">${sw}</div>
+    </section>`;
+  };
+
+  const grid = document.getElementById("grid");
+  grid.innerHTML = THEMES.map(card).join("");
+
+  // Accent toggle: the theme's own accent, or ULT orange on every theme.
+  document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll(".seg button").forEach((x) => x.classList.toggle("on", x === b));
+    const ult = b.dataset.accent === "ult";
+    document.querySelectorAll(".theme").forEach((card) => {
+      card.style.setProperty("--accent", ult ? "#ff6600" : card.dataset.ownAccent);
+      card.style.setProperty("--on-accent", ult ? "#161614" : card.dataset.ownOn);
+    });
+  }));
+</script>
+</body>
+</html>

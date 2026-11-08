@@ -45,7 +45,7 @@ fn theme_or_default<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Theme, D::
 pub struct AppSettings {
     /// An id this build does not know (from a newer or older build) reads as
     /// the default theme, so the other settings survive.
-    #[serde(deserialize_with = "theme_or_default")]
+    #[serde(default, deserialize_with = "theme_or_default")]
     pub theme: Theme,
     pub launch_at_login: bool,
     pub hide_dock_icon: bool,

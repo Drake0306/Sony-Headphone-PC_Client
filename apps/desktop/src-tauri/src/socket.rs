@@ -1,4 +1,4 @@
-//! The local socket the `hairlinectl` command-line tool talks to.
+//! The local socket the `shdcctl` command-line tool talks to.
 //!
 //! One JSON object per line in, one JSON object per line out:
 //! `state`, `set` (the controls in `commands::SOCKET_CONTROLS`, validated by
@@ -6,7 +6,7 @@
 //! no raw commands, no power off, no probe, no reset. A line that does not
 //! parse gets an error line and the connection stays open.
 //!
-//! The socket is `hairline.sock` in the settings directory, mode 0600, and
+//! The socket is `shdc.sock` in the settings directory, mode 0600, and
 //! is removed when the app exits. Unix only; elsewhere the server is not
 //! started.
 
@@ -23,7 +23,7 @@ use crate::scenes::model::Scene;
 use crate::settings;
 
 /// The socket file's name inside the settings directory.
-pub const SOCKET_NAME: &str = "hairline.sock";
+pub const SOCKET_NAME: &str = "shdc.sock";
 /// Longest request line accepted; a longer one closes the connection.
 pub const MAX_LINE: usize = 64 * 1024;
 
@@ -188,7 +188,7 @@ mod unix {
     const ACCEPT_BACKOFF: Duration = Duration::from_millis(50);
 
     /// Listens on `path`, made readable and writable by this user only. A
-    /// socket another Hairline still answers on is left alone (an error); a
+    /// socket another SHDC still answers on is left alone (an error); a
     /// dead socket or stale file there is removed first.
     pub fn bind(path: &Path) -> io::Result<UnixListener> {
         if std::fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_socket())
@@ -196,7 +196,7 @@ mod unix {
         {
             return Err(io::Error::new(
                 io::ErrorKind::AddrInUse,
-                format!("another Hairline is already serving {}", path.display()),
+                format!("another SHDC is already serving {}", path.display()),
             ));
         }
         match std::fs::remove_file(path) {
@@ -221,7 +221,7 @@ mod unix {
             };
             let ctx = ctx.clone();
             let _ = std::thread::Builder::new()
-                .name("hairline-socket".into())
+                .name("shdc-socket".into())
                 .spawn(move || {
                     let _ = connection(stream, &*ctx);
                 });
@@ -269,7 +269,7 @@ pub fn path(app: &AppHandle) -> Option<std::path::PathBuf> {
 #[cfg(unix)]
 pub fn spawn(app: AppHandle) {
     let Some(path) = path(&app) else {
-        eprintln!("hairline: no settings directory; the socket is off");
+        eprintln!("shdc: no settings directory; the socket is off");
         return;
     };
     if let Some(dir) = path.parent() {
@@ -278,25 +278,25 @@ pub fn spawn(app: AppHandle) {
     let listener = match bind(&path) {
         Ok(l) => l,
         Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
-            eprintln!("hairline: {e}; this instance's socket is off");
+            eprintln!("shdc: {e}; this instance's socket is off");
             return;
         }
         Err(e) => {
-            eprintln!("hairline: socket {} not started: {e}", path.display());
+            eprintln!("shdc: socket {} not started: {e}", path.display());
             return;
         }
     };
     OWNS_SOCKET.store(true, std::sync::atomic::Ordering::SeqCst);
     let ctx: std::sync::Arc<dyn SocketContext + Send + Sync> = std::sync::Arc::new(AppContext(app));
     let _ = std::thread::Builder::new()
-        .name("hairline-socket-accept".into())
+        .name("shdc-socket-accept".into())
         .spawn(move || serve(listener, ctx));
 }
 
 /// The socket server is Unix only for now.
 #[cfg(not(unix))]
 pub fn spawn(_: AppHandle) {
-    eprintln!("hairline: the socket is not supported on this system yet");
+    eprintln!("shdc: the socket is not supported on this system yet");
 }
 
 /// Set once this instance has bound the socket; only the owner removes it.

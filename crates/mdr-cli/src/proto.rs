@@ -7,14 +7,14 @@ use serde_json::{json, Value};
 
 /// The app's bundle identifier; its config directory holds the socket.
 const APP_ID: &str = "com.drake0306.hairline";
-const SOCKET_NAME: &str = "hairline.sock";
+const SOCKET_NAME: &str = "shdc.sock";
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "hairlinectl",
+    name = "shdcctl",
     version,
-    about = "Control the running Hairline app from a terminal",
-    long_about = "Control the running Hairline app from a terminal.\n\nTalks to the app over a local socket; Hairline must be running. Set HAIRLINE_SOCKET to use another socket path."
+    about = "Control the running SHDC app from a terminal",
+    long_about = "Control the running SHDC app from a terminal.\n\nTalks to the app over a local socket; SHDC must be running. Set SHDC_SOCKET to use another socket path."
 )]
 pub struct Cli {
     /// Print the app's raw JSON answer.
@@ -93,7 +93,7 @@ pub fn request(command: &Command) -> Value {
     }
 }
 
-/// `$HAIRLINE_SOCKET` when set, else `hairline.sock` in the app's config
+/// `$SHDC_SOCKET` when set, else `shdc.sock` in the app's config
 /// directory (the one Tauri's `app_config_dir` names).
 pub fn socket_path(env_socket: Option<&str>, home: &Path) -> PathBuf {
     if let Some(path) = env_socket.filter(|p| !p.is_empty()) {
@@ -256,7 +256,7 @@ mod tests {
     use super::*;
 
     fn req(args: &[&str]) -> Value {
-        let mut argv = vec!["hairlinectl"];
+        let mut argv = vec!["shdcctl"];
         argv.extend_from_slice(args);
         request(&Cli::try_parse_from(argv).expect("parses").command)
     }
@@ -303,16 +303,16 @@ mod tests {
     #[test]
     fn bad_arguments_are_refused_before_sending() {
         for args in [
-            vec!["hairlinectl"],
-            vec!["hairlinectl", "nc", "loud"],
-            vec!["hairlinectl", "nc", "ambient", "--voice", "maybe"],
-            vec!["hairlinectl", "volume", "loud"],
-            vec!["hairlinectl", "raw", "22"],
-            vec!["hairlinectl", "power"],
+            vec!["shdcctl"],
+            vec!["shdcctl", "nc", "loud"],
+            vec!["shdcctl", "nc", "ambient", "--voice", "maybe"],
+            vec!["shdcctl", "volume", "loud"],
+            vec!["shdcctl", "raw", "22"],
+            vec!["shdcctl", "power"],
         ] {
             assert!(Cli::try_parse_from(&args).is_err(), "{args:?}");
         }
-        let cli = Cli::try_parse_from(["hairlinectl", "--json", "state"]).unwrap();
+        let cli = Cli::try_parse_from(["shdcctl", "--json", "state"]).unwrap();
         assert!(cli.json);
     }
 
@@ -324,12 +324,12 @@ mod tests {
             PathBuf::from("/tmp/h.sock")
         );
         let default = socket_path(None, home);
-        assert!(default.ends_with("com.drake0306.hairline/hairline.sock"));
+        assert!(default.ends_with("com.drake0306.hairline/shdc.sock"));
         if cfg!(target_os = "macos") {
             assert_eq!(
                 default,
                 PathBuf::from(
-                    "/Users/roy/Library/Application Support/com.drake0306.hairline/hairline.sock"
+                    "/Users/roy/Library/Application Support/com.drake0306.hairline/shdc.sock"
                 )
             );
         }

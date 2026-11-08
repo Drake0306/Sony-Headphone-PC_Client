@@ -6,21 +6,21 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use hairline_lib::broker::{run_broker_logged, BrokerCmd, BrokerContext};
-use hairline_lib::device_record;
-use hairline_lib::probe::{probe_allowed, ProbeEvent, ProbeHost, ProbeRunner, ProbeState};
-use hairline_lib::settings::AppSettings;
 use mdr_frame::FrameType;
 use mdr_proto::function::{opcode_role, Role};
 use mdr_proto::probe::{probe_points, ProbePoint, GET_CATALOGUE};
 use mdr_proto::Table;
 use mdr_session::DeviceState;
 use mdr_transport::{Candidate, FakeDevice, ReceivedLog};
+use shdc_lib::broker::{run_broker_logged, BrokerCmd, BrokerContext};
+use shdc_lib::device_record;
+use shdc_lib::probe::{probe_allowed, ProbeEvent, ProbeHost, ProbeRunner, ProbeState};
+use shdc_lib::settings::AppSettings;
 
 const UNIT: &str = "AC:80:0A:77:88:99";
 
 fn temp_dir(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("hairline-probe-{name}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("shdc-probe-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     dir
 }

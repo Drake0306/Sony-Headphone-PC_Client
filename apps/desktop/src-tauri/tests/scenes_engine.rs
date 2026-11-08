@@ -3,12 +3,12 @@
 
 use std::time::Duration;
 
-use hairline_lib::scenes::engine::{apply_actions, Engine};
-use hairline_lib::scenes::model::{Actions, Inputs, Nc, Scene, Trigger};
 use mdr_frame::{Decoder, FrameType};
 use mdr_proto::{NcMode, UltLevel};
 use mdr_session::{Event, Session, SessionError, Status};
 use mdr_transport::{FakeDevice, Transport};
+use shdc_lib::scenes::engine::{apply_actions, Engine};
+use shdc_lib::scenes::model::{Actions, Inputs, Nc, Scene, Trigger};
 
 /// A session wired to the fake device, with every written data frame recorded.
 struct Rig {
@@ -411,12 +411,12 @@ mod broker_level {
     use std::sync::{Arc, Mutex, OnceLock};
     use std::time::{Duration, Instant};
 
-    use hairline_lib::broker::{run_broker_logged, BrokerCmd, BrokerContext, SceneHost};
-    use hairline_lib::scenes::engine::Engine;
-    use hairline_lib::scenes::model::{Actions, Inputs, Nc, Scene, Trigger};
     use mdr_frame::{Decoder, FrameType};
     use mdr_session::{DeviceState, Status};
     use mdr_transport::{FakeDevice, Transport};
+    use shdc_lib::broker::{run_broker_logged, BrokerCmd, BrokerContext, SceneHost};
+    use shdc_lib::scenes::engine::Engine;
+    use shdc_lib::scenes::model::{Actions, Inputs, Nc, Scene, Trigger};
 
     const NCASM_SET: u8 = 0x68;
     const VOLUME_SET: u8 = 0xA8;

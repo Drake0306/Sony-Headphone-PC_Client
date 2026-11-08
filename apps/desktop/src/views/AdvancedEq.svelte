@@ -48,12 +48,12 @@
   let { st, onback }: { st: DeviceState; onback: () => void } = $props();
 
   const NOTE =
-    "These bands run in Hairline only. The headphones keep their six-band curve; use Send best fit to put the closest match on them.";
+    "These bands run in SHDC only. The headphones keep their six-band curve; use Send best fit to put the closest match on them.";
   /** Top raw fader value; the curve's levels run LEVEL_MIN..LEVEL_MAX around its centre. */
   const SPAN = LEVEL_MAX - LEVEL_MIN;
   const CONFIRM_TITLE = "Send best fit to the headphones?";
   const confirmBody = (target: string) =>
-    `The headphones hold six bands (${DEVICE_BAND_LABELS.join(", ")}), not ten. Hairline fits your ten bands onto those six and writes them into ${target}.`;
+    `The headphones hold six bands (${DEVICE_BAND_LABELS.join(", ")}), not ten. SHDC fits your ten bands onto those six and writes them into ${target}.`;
   const ALL = Array.from({ length: BAND_COUNT }, (_, i) => i);
 
   /** Levels −10..=10; null until the stored curve has been read. */

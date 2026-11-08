@@ -1,7 +1,7 @@
 //! The frame ring: the last N frames, oldest first.
 
-use hairline_lib::frame_ring::{FrameDir, FrameEntry, FrameRing};
 use mdr_proto::Table;
+use shdc_lib::frame_ring::{FrameDir, FrameEntry, FrameRing};
 
 fn entry(t_ms: u64) -> FrameEntry {
     FrameEntry {
@@ -60,12 +60,12 @@ fn sent_frames_carry_their_table() {
 
 #[test]
 fn a_burst_of_frames_is_emitted_at_most_every_200_ms() {
-    use hairline_lib::frame_ring::{FrameTap, Recorder, FRAMES_EVERY_MS};
+    use shdc_lib::frame_ring::{FrameTap, Recorder, FRAMES_EVERY_MS};
     use std::cell::RefCell;
     use std::path::Path;
 
     let emits: RefCell<Vec<usize>> = RefCell::new(Vec::new());
-    let dir = std::env::temp_dir().join(format!("hairline-throttle-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("shdc-throttle-{}", std::process::id()));
     let mut tap = FrameTap::new(
         dir,
         Recorder::default(),

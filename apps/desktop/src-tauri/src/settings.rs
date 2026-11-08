@@ -15,7 +15,7 @@ const FILE_NAME: &str = "settings.json";
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Theme {
-    /// The default: the light Hairline palette.
+    /// The default: the light SHDC palette.
     #[default]
     Paper,
     Ink,
@@ -64,7 +64,7 @@ pub fn raw_allowed(s: &AppSettings) -> Result<(), String> {
 
 /// What to tell the broker when the settings change from `before` to
 /// `after`: switching the Advanced panel off stops the probe and the frame
-/// recording. Other saves send nothing (so a `HAIRLINE_FRAME_LOG=1`
+/// recording. Other saves send nothing (so a `SHDC_FRAME_LOG=1`
 /// recording survives a theme change).
 pub fn advanced_off_commands(before: &AppSettings, after: &AppSettings) -> Vec<BrokerCmd> {
     if before.show_advanced && !after.show_advanced {
@@ -127,7 +127,7 @@ pub fn set_settings(
     if let Some(broker) = app.try_state::<crate::commands::Broker>() {
         for cmd in stop {
             if let Err(e) = broker.send(cmd) {
-                eprintln!("hairline: {e}");
+                eprintln!("shdc: {e}");
             }
         }
     }
@@ -154,7 +154,7 @@ fn apply_launch_at_login(app: &AppHandle, on: bool) {
         autolaunch.disable()
     };
     if let Err(e) = result {
-        eprintln!("hairline: launch at login not changed: {e}");
+        eprintln!("shdc: launch at login not changed: {e}");
     }
 }
 
@@ -169,7 +169,7 @@ pub fn reconcile_launch_at_login(
     let enabled = match app.autolaunch().is_enabled() {
         Ok(enabled) => enabled,
         Err(e) => {
-            eprintln!("hairline: launch at login state unknown ({e}); keeping the setting");
+            eprintln!("shdc: launch at login state unknown ({e}); keeping the setting");
             return s;
         }
     };
@@ -177,13 +177,13 @@ pub fn reconcile_launch_at_login(
         return s;
     }
     eprintln!(
-        "hairline: launch at login was {} in settings but the login item says {enabled}; using the login item",
+        "shdc: launch at login was {} in settings but the login item says {enabled}; using the login item",
         s.launch_at_login
     );
     s.launch_at_login = enabled;
     if let Some(dir) = dir {
         if let Err(e) = save(dir, &s) {
-            eprintln!("hairline: could not save settings: {e}");
+            eprintln!("shdc: could not save settings: {e}");
         }
     }
     s

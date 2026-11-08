@@ -1,13 +1,13 @@
 [package]
 name = "mdr-cli"
 version = "0.1.0"
-description = "hairlinectl: control the running Hairline app from a terminal"
+description = "shdcctl: control the running SHDC (Sony Headphone Desktop Client) app from a terminal"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
 [[bin]]
-name = "hairlinectl"
+name = "shdcctl"
 path = "src/main.rs"
 
 [dependencies]

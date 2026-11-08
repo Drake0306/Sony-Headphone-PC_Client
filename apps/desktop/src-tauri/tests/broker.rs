@@ -5,15 +5,15 @@ use std::sync::mpsc::{channel, Receiver};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
-use hairline_lib::broker::{
-    is_playing, next_backoff, parse_raw, run_broker, run_broker_logged, BrokerCmd, BrokerContext,
-};
-use hairline_lib::frame_log::file_name;
-use hairline_lib::frame_ring::{FrameTap, Recorder};
 use mdr_proto::Table;
 use mdr_proto::UltLevel;
 use mdr_session::{DeviceState, Status};
 use mdr_transport::FakeDevice;
+use shdc_lib::broker::{
+    is_playing, next_backoff, parse_raw, run_broker, run_broker_logged, BrokerCmd, BrokerContext,
+};
+use shdc_lib::frame_log::file_name;
+use shdc_lib::frame_ring::{FrameTap, Recorder};
 
 fn monotonic_ms() -> u64 {
     static START: OnceLock<Instant> = OnceLock::new();
@@ -162,7 +162,7 @@ fn frame_log_file_is_named_by_utc_time() {
 
 #[test]
 fn captures_go_under_the_log_dir_else_the_config_dir() {
-    use hairline_lib::frame_log::capture_dir;
+    use shdc_lib::frame_log::capture_dir;
     use std::path::PathBuf;
     let log = PathBuf::from("/logs/app");
     let config = PathBuf::from("/config/app");
@@ -179,9 +179,9 @@ fn captures_go_under_the_log_dir_else_the_config_dir() {
 
 #[test]
 fn recording_from_the_tap_writes_into_its_capture_dir() {
-    // `HAIRLINE_FRAME_LOG=1` and the Record button both go through `record`.
+    // `SHDC_FRAME_LOG=1` and the Record button both go through `record`.
     let dir = std::env::temp_dir()
-        .join(format!("hairline-capture-dir-{}", std::process::id()))
+        .join(format!("shdc-capture-dir-{}", std::process::id()))
         .join("captures");
     let recorder = Recorder::default();
     let mut tap = FrameTap::new(
@@ -200,7 +200,7 @@ fn recording_from_the_tap_writes_into_its_capture_dir() {
 
 #[test]
 fn broker_writes_frames_and_logs_to_the_frame_log() {
-    let dir = std::env::temp_dir().join(format!("hairline-frame-log-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("shdc-frame-log-{}", std::process::id()));
     let recorder = Recorder::default();
     let path = recorder.set(&dir, true).unwrap().expect("a recording path");
     let (tx, rx) = channel();

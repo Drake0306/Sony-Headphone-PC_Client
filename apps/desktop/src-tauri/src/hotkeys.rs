@@ -101,7 +101,7 @@ pub fn conflicts(scenes: &[Scene]) -> Vec<(String, String)> {
 pub fn apply(app: &AppHandle, scenes: &[Scene]) -> HashMap<String, String> {
     let gs = app.global_shortcut();
     if let Err(e) = gs.unregister_all() {
-        eprintln!("hairline: could not clear hotkeys: {e}");
+        eprintln!("shdc: could not clear hotkeys: {e}");
     }
     let window = gs.on_shortcut(WINDOW_SHORTCUT, |app, _, event| {
         if event.state == ShortcutState::Pressed {
@@ -111,7 +111,7 @@ pub fn apply(app: &AppHandle, scenes: &[Scene]) -> HashMap<String, String> {
     let (register, refused) = plan(scenes);
     let mut errors: HashMap<String, String> = refused.into_iter().collect();
     if let Err(e) = window {
-        eprintln!("hairline: window hotkey {WINDOW_SHORTCUT} not registered: {e}");
+        eprintln!("shdc: window hotkey {WINDOW_SHORTCUT} not registered: {e}");
         errors.insert(WINDOW_ERROR_KEY.into(), e.to_string());
     }
     let mut registered = 0;
@@ -136,7 +136,7 @@ pub fn apply(app: &AppHandle, scenes: &[Scene]) -> HashMap<String, String> {
         }
     }
     eprintln!(
-        "hairline: hotkeys registered ({registered} scene, {} refused or invalid)",
+        "shdc: hotkeys registered ({registered} scene, {} refused or invalid)",
         errors.len()
     );
     if let Some(state) = app.try_state::<HotkeyErrors>() {

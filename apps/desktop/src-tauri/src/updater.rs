@@ -386,7 +386,7 @@ pub fn spawn_background_checks(app: &AppHandle, enabled: bool) {
                     .map_err(|e| e.to_string());
                 let outcome = background_outcome(&current(&app), result, &mut log);
                 if let Some(line) = outcome.log {
-                    eprintln!("hairline: {line}");
+                    eprintln!("shdc: {line}");
                 }
                 if outcome.forget {
                     with_state(&app, |s| s.available = None);
@@ -451,7 +451,7 @@ pub async fn check_update(
             Ok(info)
         }
         Err(e) => {
-            eprintln!("hairline: update check failed: {e}");
+            eprintln!("shdc: update check failed: {e}");
             Err(fail(&app, classify(&e)))
         }
     }
@@ -489,7 +489,7 @@ async fn install(app: &AppHandle) -> Result<(), Phase> {
             return Ok(());
         }
         Err(e) => {
-            eprintln!("hairline: update check failed: {e}");
+            eprintln!("shdc: update check failed: {e}");
             return Err(classify(&e));
         }
     };
@@ -516,13 +516,13 @@ async fn install(app: &AppHandle) -> Result<(), Phase> {
         )
         .await
         .map_err(|e| {
-            eprintln!("hairline: update not downloaded: {e}");
+            eprintln!("shdc: update not downloaded: {e}");
             classify(&e)
         })?;
     send(Progress::Verified);
     // `install` checks the signature once more before it touches anything.
     if let Err(e) = update.install(&bytes) {
-        eprintln!("hairline: update not installed: {e}");
+        eprintln!("shdc: update not installed: {e}");
         return Err(classify(&e));
     }
     let step = next_step(Progress::Installed(Ok(())));

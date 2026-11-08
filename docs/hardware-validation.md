@@ -78,7 +78,7 @@ Menu bar: the owner reports the tray icon and popover look right ("looks good").
 
 ## 6. Scenes (Phase 2b, to do on the owner's next session)
 
-Run with `HAIRLINE_FRAME_LOG=1` and check each result in the log under `~/Library/Logs/com.drake0306.hairline/captures/` (the app's log directory; on Windows and Linux, `captures` in the app's local data `logs` directory).
+Run with `SHDC_FRAME_LOG=1` and check each result in the log under `~/Library/Logs/com.drake0306.hairline/captures/` (the app's log directory; on Windows and Linux, `captures` in the app's local data `logs` directory).
 
 - [ ] Apply a scene by hand from the Scenes screen, then another from the popover MODE row. The controls update and the headphones confirm.
 - [ ] HeadphonesConnected: enable "At the desk", reconnect the headphones. Expect Ambient 14 with voice focus on, and nothing else changed.
@@ -103,7 +103,7 @@ The Windows transport compiles and passes unit tests on Windows CI; it has not y
 
 ## 8. Phase 4 (owner present)
 
-Run with the real headphones connected. Use `HAIRLINE_FRAME_LOG=1` if you also want the log from launch.
+Run with the real headphones connected. Use `SHDC_FRAME_LOG=1` if you also want the log from launch.
 
 - [ ] Settings: turn on "Advanced panel"; the Advanced screen appears.
 - [ ] The capability list shows the declared ids with their names (DECLARED chips).
@@ -113,8 +113,8 @@ Run with the real headphones connected. Use `HAIRLINE_FRAME_LOG=1` if you also w
 - [ ] A deny-listed raw (`24 03 01`) is refused even with `SEND`.
 - [ ] Run the probe to completion (up to about 13 minutes, type `RUN`). Record how many functions answered and how many became proven, and attach the `~/Library/Logs/com.drake0306.hairline/captures/probe-<secs>.json` summary. Check `devices/<address>.json` lists the proven functions.
 - [ ] Time left appears after an hour of listening (30 minutes and a 2 % drop at least), and Clear in Settings empties it.
-- [ ] From a terminal, `hairlinectl state` and `hairlinectl battery` print the same values as the window.
-- [ ] `hairlinectl volume 31` is refused with the same text as the window.
+- [ ] From a terminal, `shdcctl state` and `shdcctl battery` print the same values as the window.
+- [ ] `shdcctl volume 31` is refused with the same text as the window.
 
 ## 9. Phase 5 (owner present)
 
@@ -129,7 +129,7 @@ Run with the real headphones connected.
 - [ ] On the Sound screen with Bright selected at 880×560, the fixed-preset note fits under the faders with no clipping and nothing scrolls. In Advanced on Bright, "On the headphones now" reads "--" and the same note sits under the values.
 - [ ] "On the headphones now" in the Advanced view matches the fit, and the Sound screen faders show the same six values.
 - [ ] Back on the Sound screen, the fader knobs snap to the 21 segments and the +10, 0 and −10 labels are not clipped in the real window.
-- [ ] Restart Hairline; the Advanced curve is still there (`eq_curve.json` in the config directory).
+- [ ] Restart SHDC; the Advanced curve is still there (`eq_curve.json` in the config directory).
 
 - [ ] Share codes (Phase 5c): on Custom 1 with a visible curve and ULT 1, press Share on the Sound screen. "Share this preset" shows a QR and a code starting with `S`; Copy says "Copied" and the clipboard holds the dashed code. Scanning the QR with a phone camera reads the same text. On Bright, Off, or disconnected, Share is unavailable. In the Ink theme the QR is still dark modules on a light square and scans.
 - [ ] Change the curve and ULT, then (on another run, after a restart) press "Paste a code" and paste the copied code in lower case without dashes. The six values, "ULT 1" and "Custom 1" appear under the field; changing one character shows "That code has a typo (check failed).". Press Apply: the dialog "Apply this preset to the headphones?" opens and nothing has gone out yet (frame log). Cancel sends nothing. Apply again and confirm: exactly one `58 03 A1 01 06 <six bands>` goes out and the NTFY `59 03 A1 01 …` brings the Sound faders back to the shared values.
@@ -139,7 +139,7 @@ Run with the real headphones connected.
 
 The app builds and its tests pass on Windows CI; it has not been started on a Windows machine or run against the headphones on Windows. Nothing below is verified. Do section 7 (the transport) first.
 
-- [ ] `HAIRLINE_FAKE=1`: the app starts, the tray icon appears in the notification area, and a left click opens the popover centred above the icon with the `FAKE` label.
+- [ ] `SHDC_FAKE=1`: the app starts, the tray icon appears in the notification area, and a left click opens the popover centred above the icon with the `FAKE` label.
 - [ ] The tray icon is visible on both light and dark taskbars.
 - [ ] The popover has no title bar, stays on top, and does not appear in the taskbar.
 - [ ] With the taskbar on the left, right or top, the popover opens by the icon and fully on screen.
@@ -149,7 +149,7 @@ The app builds and its tests pass on Windows CI; it has not been started on a Wi
 - [ ] With the headphones paired and connected, the popover shows battery, noise control and ULT, and a change from the popover takes effect on the headphones.
 - [ ] Devices: the Link list shows no host entry and no "playing" (the Windows audio module does not exist yet).
 - [ ] Scenes: an "App in front" trigger with an executable name (for example `Zoom` for `Zoom.exe`) applies when that app is in front. A "Microphone in use" trigger never fires on Windows yet.
-- [ ] Launch at login: turning it on in Settings starts Hairline after signing in again.
+- [ ] Launch at login: turning it on in Settings starts SHDC after signing in again.
 - [ ] Record the Windows version and the headphones' firmware with the results.
 
 ## 11. Linux (Phase 8a, to do with a Linux machine)
@@ -157,17 +157,17 @@ The app builds and its tests pass on Windows CI; it has not been started on a Wi
 The transport and the app build and their tests pass on Linux CI (`ubuntu-latest`); nothing has been started on a Linux machine or run against the headphones on Linux. Nothing below is verified.
 
 - [ ] Install the libraries from the README's Linux paragraph; `pnpm tauri dev` builds.
-- [ ] `HAIRLINE_FAKE=1`: the app starts and the tray icon appears (GNOME needs the AppIndicator extension; KDE shows it in the system tray). The icon is readable on the panel.
-- [ ] The tray menu shows "Show Hairline" and "Quit Hairline". "Show Hairline" opens the popover at the top-right of the screen with the `FAKE` label; it has no title bar, stays on top, and is not in the task list. Clicking outside hides it. Quit ends the app.
+- [ ] `SHDC_FAKE=1`: the app starts and the tray icon appears (GNOME needs the AppIndicator extension; KDE shows it in the system tray). The icon is readable on the panel.
+- [ ] The tray menu shows "Show SHDC" and "Quit SHDC". "Show SHDC" opens the popover at the top-right of the screen with the `FAKE` label; it has no title bar, stays on top, and is not in the task list. Clicking outside hides it. Quit ends the app.
 - [ ] The popover footer opens the main window; closing it leaves the tray icon running.
-- [ ] Pair and connect the headphones with BlueZ (`bluetoothctl connect <address>` or the desktop's Bluetooth settings), then start Hairline without the fake. Note the `hairline: RFCOMM channel N (...)` line on stderr: which channel was chosen, and whether it came from the channel scan, the recorded channel or `HAIRLINE_RFCOMM_CHANNEL`. Expected: channel 18 on Roy's unit, from the scan on the first connect.
+- [ ] Pair and connect the headphones with BlueZ (`bluetoothctl connect <address>` or the desktop's Bluetooth settings), then start SHDC without the fake. Note the `shdc: RFCOMM channel N (...)` line on stderr: which channel was chosen, and whether it came from the channel scan, the recorded channel or `SHDC_RFCOMM_CHANNEL`. Expected: channel 18 on Roy's unit, from the scan on the first connect.
 - [ ] If the scan ran: note how long it took (from start to the `RFCOMM channel` line). While it probes the channels before 18 (15 is expected to open, and 19, 20 and 22 if the scan gets past 18), watch the audio: music keeps playing, and on a call (HFP) the call audio and microphone are not interrupted or switched. Note anything that glitches and on which channel.
 - [ ] `devices/<address>.json` in the config directory (`~/.config/com.drake0306.hairline/`) now holds `"rfcomm_channel": 18`. Quit and start again: the line says "recorded channel" and no scan runs.
-- [ ] `HAIRLINE_RFCOMM_CHANNEL=18` is used first, without a probe. An invalid value (for example `99`) logs `ignoring HAIRLINE_RFCOMM_CHANNEL` and is not used. A valid but wrong channel that accepts connections (for example 15) is trusted, so the session fails and keeps retrying on it: unset the variable to recover. A wrong recorded channel behaves the same way: delete `rfcomm_channel` from `devices/<address>.json`.
-- [ ] If the log says `no RFCOMM channel answered the MDR v2 protocol`: try `HAIRLINE_RFCOMM_CHANNEL=18`, or find the channel with `sdptool browse <address>` (needs `bluetoothd` started with `--compat`) by looking for the record with UUID `956C7B26-D49A-4BA8-B03F-B17D393CB6E2`, and note the channel it lists.
-- [ ] With the headphones paired but not connected, Hairline logs "no connected device exposes the v2 service" and opens no socket; connecting them later is picked up by the retry.
+- [ ] `SHDC_RFCOMM_CHANNEL=18` is used first, without a probe. An invalid value (for example `99`) logs `ignoring SHDC_RFCOMM_CHANNEL` and is not used. A valid but wrong channel that accepts connections (for example 15) is trusted, so the session fails and keeps retrying on it: unset the variable to recover. A wrong recorded channel behaves the same way: delete `rfcomm_channel` from `devices/<address>.json`.
+- [ ] If the log says `no RFCOMM channel answered the MDR v2 protocol`: try `SHDC_RFCOMM_CHANNEL=18`, or find the channel with `sdptool browse <address>` (needs `bluetoothd` started with `--compat`) by looking for the record with UUID `956C7B26-D49A-4BA8-B03F-B17D393CB6E2`, and note the channel it lists.
+- [ ] With the headphones paired but not connected, SHDC logs "no connected device exposes the v2 service" and opens no socket; connecting them later is picked up by the retry.
 - [ ] With the headphones connected, the popover shows battery, noise control and ULT, and a change from the popover takes effect on the headphones.
 - [ ] Devices: the Link list shows no host entry and no "playing" (the Linux audio module does not exist yet). Scenes: a "Microphone in use" or "App in front" trigger never fires on Linux yet.
-- [ ] `cargo install --path crates/mdr-cli`, then `hairlinectl state`, `hairlinectl nc ambient --level 12` and `hairlinectl battery` work against the running app.
-- [ ] Launch at login: turning it on in Settings starts Hairline after signing in again.
+- [ ] `cargo install --path crates/mdr-cli`, then `shdcctl state`, `shdcctl nc ambient --level 12` and `shdcctl battery` work against the running app.
+- [ ] Launch at login: turning it on in Settings starts SHDC after signing in again.
 - [ ] Record the distribution, desktop, BlueZ version (`bluetoothctl --version`) and the headphones' firmware with the results.

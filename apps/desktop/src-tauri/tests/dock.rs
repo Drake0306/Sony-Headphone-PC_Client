@@ -1,6 +1,6 @@
 //! The Dock icon shows while the main window is open or when the user keeps it.
 
-use hairline_lib::dock::{policy, ActivationPolicyKind};
+use shdc_lib::dock::{policy, ActivationPolicyKind};
 
 #[test]
 fn dock_policy_follows_main_window() {

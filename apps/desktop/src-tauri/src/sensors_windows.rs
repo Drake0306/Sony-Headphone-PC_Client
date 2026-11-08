@@ -27,7 +27,7 @@ pub fn frontmost_app_name() -> Option<String> {
     match foreground_image_path() {
         Ok(path) => path.and_then(|path| app_name_from_path(&path)),
         Err(what) => {
-            FAILED.call_once(|| eprintln!("hairline: frontmost app unknown ({what})"));
+            FAILED.call_once(|| eprintln!("shdc: frontmost app unknown ({what})"));
             None
         }
     }

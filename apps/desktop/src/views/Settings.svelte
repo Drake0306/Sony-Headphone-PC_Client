@@ -205,7 +205,7 @@
           />
         </Row>
         <Row label="Show in menu bar" note="The popover lives here">
-          <Toggle readonly on={true} label="Show in menu bar" title="Hairline always lives in the menu bar" />
+          <Toggle readonly on={true} label="Show in menu bar" title="SHDC always lives in the menu bar" />
         </Row>
         <Row label="Hide Dock icon">
           <Toggle
@@ -252,14 +252,14 @@
       <div class="block">
         <h4>Updates</h4>
         {#if $update.current}
-          <Row label={`Hairline ${$update.current}`} note={checkNote}>
+          <Row label={`SHDC ${$update.current}`} note={checkNote}>
             <button class="btn" disabled={checking || installing} onclick={check}>{checking ? "Checking…" : "Check now"}</button>
           </Row>
         {/if}
         {#if $update.available && ($visible || installing)}
           <div class="release">
             <div>
-              Hairline {$update.available.version} is available{#if $update.available.date}<small
+              SHDC {$update.available.version} is available{#if $update.available.date}<small
                   >{$update.available.date}</small
                 >{/if}
             </div>
@@ -295,9 +295,11 @@
       <div class="block">
         <LinkList
           items={[
+            { label: "SHDC", value: "Sony Headphone Desktop Client" },
             { label: "App version", value: version },
             { label: "App protocol", value: "MDR v2 · tables 1+2" },
-            { label: "Not affiliated with Sony", value: "" },
+            { label: "Trademarks", value: "Sony and ULT WEAR belong to Sony Group Corporation" },
+            { label: "Independent", value: "Not affiliated with or endorsed by Sony" },
           ]}
         />
       </div>

@@ -49,7 +49,7 @@ import AdvancedEq from "./AdvancedEq.svelte";
 import advSrc from "./AdvancedEq.svelte?raw";
 
 const NOTE =
-  "These bands run in Hairline only. The headphones keep their six-band curve; use Send best fit to put the closest match on them.";
+  "These bands run in SHDC only. The headphones keep their six-band curve; use Send best fit to put the closest match on them.";
 
 const MANUAL = 0xa0;
 const CUSTOM_1 = 0xa1;
@@ -70,7 +70,7 @@ const levelText = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${-v}` : "0");
 const calls = (cmd: string) => backend.calls.filter((c) => c.cmd === cmd);
 const deviceWrites = () => backend.calls.filter((c) => c.cmd === "send_best_fit" || c.cmd === "set_eq_bands");
 const body = (target: string) =>
-  `The headphones hold six bands (Clear Bass, 400 Hz, 1 kHz, 2.5 kHz, 6.3 kHz, 16 kHz), not ten. Hairline fits your ten bands onto those six and writes them into ${target}.`;
+  `The headphones hold six bands (Clear Bass, 400 Hz, 1 kHz, 2.5 kHz, 6.3 kHz, 16 kHz), not ten. SHDC fits your ten bands onto those six and writes them into ${target}.`;
 
 /** The declarations of the first `selector { ... }` rule in a component's styles. */
 const rule = (css: string, selector: string) => {

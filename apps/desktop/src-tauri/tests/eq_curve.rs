@@ -5,19 +5,19 @@ use std::sync::mpsc::{channel, Receiver};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
-use hairline_lib::broker::{run_broker, BrokerCmd};
-use hairline_lib::eq_curve::{
-    check_curve, check_shape, check_target_preset, fit_command, load, prepare_preset_ult_bands,
-    prepare_send, save, EqCurve,
-};
 use mdr_frame::FrameType;
 use mdr_proto::eq::{best_fit, to_raw};
 use mdr_proto::{EqUltCapability, UltLevel};
 use mdr_session::{DeviceState, Status};
 use mdr_transport::FakeDevice;
+use shdc_lib::broker::{run_broker, BrokerCmd};
+use shdc_lib::eq_curve::{
+    check_curve, check_shape, check_target_preset, fit_command, load, prepare_preset_ult_bands,
+    prepare_send, save, EqCurve,
+};
 
 fn temp_dir(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("hairline-eqcurve-{name}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("shdc-eqcurve-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     dir
 }

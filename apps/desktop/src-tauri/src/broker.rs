@@ -238,7 +238,7 @@ impl SceneHost<'_> {
             BrokerCmd::ApplyScene(id) => {
                 let actions = self.engine.apply_manual(id);
                 if actions.is_none() {
-                    eprintln!("hairline: no scene {id:?} to apply");
+                    eprintln!("shdc: no scene {id:?} to apply");
                 }
                 actions
             }
@@ -355,7 +355,7 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
         }
         // The next connect tries this channel first (Linux has no SDP lookup).
         if let Err(e) = device_record::remember_channel(dir, &device.address, transport.channel()) {
-            eprintln!("hairline: RFCOMM channel not recorded: {e}");
+            eprintln!("shdc: RFCOMM channel not recorded: {e}");
         }
     }
     if let Some(tap) = frames.as_deref_mut() {
@@ -525,7 +525,7 @@ pub fn run_broker_logged<E: Fn(&DeviceState)>(
                     gave_up = true;
                 }
                 Event::Log(msg) => {
-                    eprintln!("hairline: {msg}");
+                    eprintln!("shdc: {msg}");
                     if let Some(tap) = frames.as_deref_mut() {
                         tap.note(clock(), msg);
                     }
@@ -649,7 +649,7 @@ pub fn spawn_broker(
 ) -> Sender<BrokerCmd> {
     let (tx, rx) = channel();
     std::thread::Builder::new()
-        .name("hairline-broker".into())
+        .name("shdc-broker".into())
         .spawn(move || {
             let start = Instant::now();
             let clock = move || start.elapsed().as_millis() as u64;
@@ -692,7 +692,7 @@ pub fn spawn_broker(
                     let _ = app.emit("recording", RecordingEvent::new(path));
                 }),
             );
-            if std::env::var("HAIRLINE_FRAME_LOG").is_ok_and(|v| v == "1") {
+            if std::env::var("SHDC_FRAME_LOG").is_ok_and(|v| v == "1") {
                 tap.record(true);
             }
             let mut probe = ProbeHost::new(
@@ -743,7 +743,7 @@ pub fn spawn_broker(
                     Err(e) => {
                         backoff = next_backoff(backoff);
                         eprintln!(
-                            "hairline: no link ({:?}: {e}); retrying in {backoff}s",
+                            "shdc: no link ({:?}: {e}); retrying in {backoff}s",
                             e.kind()
                         );
                         wait_for_connect(
@@ -838,7 +838,7 @@ fn wait_for_connect(
                 }
             }
             BrokerCmd::RecordFrames(on) => tap.record(on),
-            BrokerCmd::ProbeStart => eprintln!("hairline: probe not started: not connected"),
+            BrokerCmd::ProbeStart => eprintln!("shdc: probe not started: not connected"),
             BrokerCmd::Raw { .. } => emit_raw(&RawEvent::new(&Err("not connected".into()))),
             cmd => {
                 host.command(&cmd, false);

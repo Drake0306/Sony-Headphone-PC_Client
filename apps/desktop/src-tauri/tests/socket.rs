@@ -7,14 +7,14 @@ use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use hairline_lib::battery_history::BatteryEstimate;
-use hairline_lib::broker::BrokerCmd;
-use hairline_lib::commands::control_command;
-use hairline_lib::scenes::model::{Actions, Scene, Trigger};
-use hairline_lib::socket::{bind, handle_line, serve, SocketContext};
 use mdr_proto::{NcAsmState, NcMode, UltLevel};
 use mdr_session::{DeviceState, Status, Tracked};
 use serde_json::{json, Value};
+use shdc_lib::battery_history::BatteryEstimate;
+use shdc_lib::broker::BrokerCmd;
+use shdc_lib::commands::control_command;
+use shdc_lib::scenes::model::{Actions, Scene, Trigger};
+use shdc_lib::socket::{bind, handle_line, serve, SocketContext};
 
 #[derive(Default)]
 struct Fake {
@@ -238,7 +238,7 @@ fn temp_sock(name: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("hl-sock-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    dir.join("hairline.sock")
+    dir.join("shdc.sock")
 }
 
 #[test]
@@ -247,8 +247,7 @@ fn socket_bind_refuses_a_live_socket() {
     let first = bind(&path).unwrap();
     let err = bind(&path).unwrap_err();
     assert!(
-        err.to_string()
-            .contains("another Hairline is already serving"),
+        err.to_string().contains("another SHDC is already serving"),
         "{err}"
     );
     // The first server's socket is untouched and still answers.

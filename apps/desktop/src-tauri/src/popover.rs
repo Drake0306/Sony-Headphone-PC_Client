@@ -56,7 +56,7 @@ tauri_nspanel::tauri_panel! {
 
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let window = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html".into()))
-        .title("Hairline")
+        .title("SHDC")
         .inner_size(340.0, 420.0)
         .decorations(false)
         .transparent(true)
@@ -73,7 +73,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         let panel = window.to_panel::<PopoverPanel>()?;
         panel.set_level(PanelLevel::Floating.value());
         if let Err(e) = panel.add_style_mask(StyleMask::empty().nonactivating_panel().value()) {
-            eprintln!("hairline: popover stays activating: {e:?}");
+            eprintln!("shdc: popover stays activating: {e:?}");
         }
     }
 
@@ -118,7 +118,7 @@ fn place(window: &WebviewWindow) {
     let _ = window.move_window(Position::TopRight);
 }
 
-/// Shows the popover (the Linux tray menu's "Show Hairline").
+/// Shows the popover (the Linux tray menu's "Show SHDC").
 pub fn show_popover(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(LABEL) {
         show(app, &window);
@@ -166,7 +166,7 @@ pub fn open_main_window(app: &AppHandle) -> tauri::Result<()> {
     }
     let window =
         WebviewWindowBuilder::new(app, MAIN, WebviewUrl::App("index.html?view=main".into()))
-            .title("Hairline")
+            .title("SHDC · Sony Headphone Desktop Client")
             .inner_size(880.0, 560.0)
             .min_inner_size(880.0, 560.0)
             .resizable(true)

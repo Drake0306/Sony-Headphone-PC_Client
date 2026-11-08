@@ -5,12 +5,12 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use hairline_lib::broker::{raw_command, run_broker_logged, BrokerCmd, BrokerContext, RawEvent};
-use hairline_lib::frame_ring::{FrameDir, FrameEntry, FrameTap, Recorder};
-use hairline_lib::settings::{raw_allowed, AppSettings};
 use mdr_proto::Table;
 use mdr_session::DeviceState;
 use mdr_transport::FakeDevice;
+use shdc_lib::broker::{raw_command, run_broker_logged, BrokerCmd, BrokerContext, RawEvent};
+use shdc_lib::frame_ring::{FrameDir, FrameEntry, FrameTap, Recorder};
+use shdc_lib::settings::{raw_allowed, AppSettings};
 
 const VOLUME_SET: [u8; 3] = [0xA8, 0x20, 0x0F];
 const BATTERY_GET: [u8; 2] = [0x22, 0x00];
@@ -139,7 +139,7 @@ fn watch_frames_streams_sent_and_received() {
 
 #[test]
 fn record_frames_creates_and_closes_a_file() {
-    let dir = std::env::temp_dir().join(format!("hairline-record-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("shdc-record-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     let rig = Rig::start(Some(dir.clone()));
     // Watching (from Rig::start) re-emits the recording state: none yet.
@@ -178,7 +178,7 @@ fn record_frames_creates_and_closes_a_file() {
 
 #[test]
 fn watch_frames_re_emits_the_recording_state() {
-    let dir = std::env::temp_dir().join(format!("hairline-rewatch-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("shdc-rewatch-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     let rig = Rig::start(Some(dir.clone()));
     assert_eq!(
@@ -259,7 +259,7 @@ impl Rig {
         let (rtx, recording) = channel();
         let (stx, states) = channel();
         let (raw_tx, raw) = channel();
-        let log_dir = log_dir.unwrap_or_else(|| std::env::temp_dir().join("hairline-unused"));
+        let log_dir = log_dir.unwrap_or_else(|| std::env::temp_dir().join("shdc-unused"));
         let handle = std::thread::spawn(move || {
             let mut tap = FrameTap::new(
                 log_dir,

@@ -1,8 +1,8 @@
 //! Which global shortcuts get registered, and which are refused as conflicts.
 //! OS-level registration needs a running app and is not covered here.
 
-use hairline_lib::hotkeys::{conflicts, parse, plan_registrations, WINDOW_SHORTCUT};
-use hairline_lib::scenes::model::{Actions, Scene, Trigger};
+use shdc_lib::hotkeys::{conflicts, parse, plan_registrations, WINDOW_SHORTCUT};
+use shdc_lib::scenes::model::{Actions, Scene, Trigger};
 
 fn scene(id: &str, enabled: bool, hotkey: Option<&str>) -> Scene {
     Scene {

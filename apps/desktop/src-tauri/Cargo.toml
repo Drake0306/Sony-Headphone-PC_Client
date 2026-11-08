@@ -1,13 +1,13 @@
 [package]
-name = "hairline"
-version = "0.2.1"
-description = "Hairline: a desktop controller for the ULT WEAR headphones"
+name = "shdc"
+version = "0.3.0"
+description = "SHDC, Sony Headphone Desktop Client: control Sony ULT WEAR headphones from the menu bar or tray"
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
 [lib]
-name = "hairline_lib"
+name = "shdc_lib"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

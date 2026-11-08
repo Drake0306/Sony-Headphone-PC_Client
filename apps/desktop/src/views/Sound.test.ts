@@ -173,7 +173,7 @@ describe("Sound share codes", () => {
     await fireEvent.input(r.getByRole("textbox"), { target: { value: encodeSound({ bands, ult: 2, slot: 3 }) } });
     await fireEvent.click(within(r.getByRole("dialog", { name: "Paste a code" })).getByRole("button", { name: "Apply" }));
     const confirm = r.getByRole("dialog", { name: "Apply this preset to the headphones?" });
-    expect(within(confirm).getByText("Hairline writes these six bands and ULT 2 into Custom 1.")).toBeTruthy();
+    expect(within(confirm).getByText("SHDC writes these six bands and ULT 2 into Custom 1.")).toBeTruthy();
     await new Promise((done) => setTimeout(done, 50));
     expect(writes()).toEqual([]);
     await fireEvent.click(within(confirm).getByRole("button", { name: "Apply" }));

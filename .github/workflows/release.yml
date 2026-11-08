@@ -44,9 +44,9 @@ jobs:
         shell: bash
         run: |
           {
-            echo "body<<HAIRLINE_NOTES"
+            echo "body<<SHDC_NOTES"
             cat .github/release-notes.md
-            echo "HAIRLINE_NOTES"
+            echo "SHDC_NOTES"
           } >> "$GITHUB_OUTPUT"
       - uses: tauri-apps/tauri-action@v0
         env:
@@ -57,7 +57,7 @@ jobs:
         with:
           projectPath: apps/desktop
           tagName: ${{ github.ref_name }}
-          releaseName: Hairline ${{ github.ref_name }}
+          releaseName: SHDC ${{ github.ref_name }}
           releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           prerelease: false

@@ -44,10 +44,18 @@
      ink and paper), so every scanner reads it. Not redefined for Ink. */
   --qr-dark: #161614;
   --qr-light: #efede6;
-  /* Flair tokens, off in every palette theme: a wash (gradient or texture)
-     laid over the paper, a second accent for the big numerals, a third for
-     the ambient ticks, a glow behind live controls, and a colour per
-     equalizer band (knob) and its fill. A flair theme sets all sixteen. */
+  color-scheme: light;
+}
+
+/* Flair tokens, off in every palette theme: a wash (gradient or texture) laid
+   over the paper, a second accent for the big numerals, a third for the
+   ambient ticks, a glow behind live controls, and a colour per equalizer
+   band (knob) and its fill. Set on :root and on every themed element, so a
+   palette swatch inside a flair theme resets them to its own plain look
+   (and `var(--ult)` resolves against that element's own accent). A flair
+   theme sets all sixteen. */
+:root,
+[data-theme] {
   --wash: none;
   --accent-2: var(--ink);
   --accent-3: var(--ink);
@@ -64,11 +72,10 @@
   --fill-4: var(--ink);
   --fill-5: var(--ink);
   --fill-6: var(--ink);
-  color-scheme: light;
 }
 
-/* Themes. Each block sets the same eight tokens and nothing else, and is
-   matched on any element, not only <html>, so a swatch in the picker can carry
+/* Themes. Each palette block sets the same eight tokens (a flair block also the
+   sixteen flair tokens), and is matched on any element, not only <html>, so a swatch in the picker can carry
    `data-theme` and paint itself with the theme's own colours. `--ult` is the
    theme's accent, the colour of everything live; `--on-ult` reads on it.
    Keep in sync: the two Ink blocks must carry the same values. */
@@ -289,14 +296,14 @@
   --on-ult: #1f2e8a;
   --wash: radial-gradient(rgba(31, 46, 138, 0.1) 0.6px, transparent 0.7px) 0 0 / 3px 3px, radial-gradient(rgba(255, 72, 176, 0.1) 0.6px, transparent 0.7px) 1px 2px / 4px 4px;
   --accent-2: #d64400;
-  --accent-3: #ffdd1f;
+  --accent-3: #1f2e8a;
   --glow: none;
   --band-1: #ff48b0;
   --band-2: #d64400;
   --band-3: #ff48b0;
   --band-4: #1f2e8a;
   --band-5: #d64400;
-  --band-6: #ffdd1f;
+  --band-6: #1f2e8a;
   --fill-1: var(--band-1);
   --fill-2: var(--band-2);
   --fill-3: var(--band-3);
@@ -317,7 +324,7 @@
   --on-ult: #0b0b0b;
   --wash: none;
   --accent-2: #1f3bff;
-  --accent-3: #ff5500;
+  --accent-3: #0b0b0b;
   --glow: none;
   --band-1: #ff00a8;
   --band-2: #1f3bff;
@@ -343,7 +350,7 @@
   --stripe: #4b6f8e;
   --ult: #2ee6a6;
   --on-ult: #06101c;
-  --wash: radial-gradient(60% 40% at 30% 0%, rgba(46, 230, 166, 0.35), transparent 70%), radial-gradient(60% 40% at 70% 10%, rgba(167, 139, 255, 0.3), transparent 70%), radial-gradient(40% 30% at 50% 5%, rgba(25, 179, 214, 0.3), transparent 70%);
+  --wash: radial-gradient(60% 40% at 30% 0%, rgba(46, 230, 166, 0.22), transparent 70%), radial-gradient(60% 40% at 70% 10%, rgba(167, 139, 255, 0.18), transparent 70%), radial-gradient(40% 30% at 50% 5%, rgba(25, 179, 214, 0.18), transparent 70%);
   --accent-2: #a78bff;
   --accent-3: #19b3d6;
   --glow: 0 0 10px rgba(46, 230, 166, 0.45);
@@ -375,9 +382,9 @@
   --accent-2: #8e4b00;
   --accent-3: #6b2d5c;
   --glow: none;
-  --band-1: #ff8a3d;
-  --band-2: #ff6b4a;
-  --band-3: #ff4f5e;
+  --band-1: #d4540e;
+  --band-2: #e0473a;
+  --band-3: #c62a4d;
   --band-4: #ff3d6e;
   --band-5: #c93a7a;
   --band-6: #6b2d5c;
@@ -401,12 +408,12 @@
   --on-ult: #ffffff;
   --wash: none;
   --accent-2: #00805a;
-  --accent-3: #1e7bff;
+  --accent-3: #0a5fd6;
   --glow: none;
   --band-1: #ff3b30;
-  --band-2: #ff9500;
-  --band-3: #e6b800;
-  --band-4: #00a870;
+  --band-2: #d97400;
+  --band-3: #b38600;
+  --band-4: #00805a;
   --band-5: #1e7bff;
   --band-6: #6f3cff;
   --fill-1: var(--band-1);

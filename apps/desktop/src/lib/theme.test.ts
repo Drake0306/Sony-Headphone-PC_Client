@@ -33,10 +33,11 @@ describe("themes", () => {
     }
   });
 
-  it("a flair theme sets all sixteen flair tokens, a palette theme none, and :root defaults them", () => {
+  it("a flair theme sets all sixteen flair tokens, a palette theme none, and the defaults block resets them", () => {
     const FLAIR = ["--wash", "--accent-2", "--accent-3", "--glow", ...[1, 2, 3, 4, 5, 6].flatMap((n) => [`--band-${n}`, `--fill-${n}`])];
-    const root = TOKENS.match(/:root \{([^}]*)\}/)![1];
-    for (const token of FLAIR) expect(root, `:root defaults ${token}`).toContain(`${token}:`);
+    const defaults = TOKENS.match(/:root,\s*\[data-theme\] \{([^}]*)\}/);
+    expect(defaults, "a defaults block for :root and every themed element").toBeTruthy();
+    for (const token of FLAIR) expect(defaults![1], `defaults ${token}`).toContain(`${token}:`);
     for (const t of THEMES) {
       if (t.value === "system") continue;
       const css = block(t.value);

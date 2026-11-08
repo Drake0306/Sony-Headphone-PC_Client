@@ -43,3 +43,5 @@ windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_
 [dev-dependencies]
 mdr-frame = { path = "../../../crates/mdr-frame" }
 minisign-verify = "0.3"
+# The live updater test builds a mock app around the real updater plugin.
+tauri = { version = "2", features = ["test"] }

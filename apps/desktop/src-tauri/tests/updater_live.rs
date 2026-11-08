@@ -6,6 +6,10 @@
 //! every release beats, so the newest release is fetched, downloaded and
 //! checked against the public key, exactly as the plugin does it in the app;
 //! nothing is installed. Not part of the normal test run (it needs GitHub).
+//! On Windows the test binary exits at start-up before the harness runs, even
+//! with the test ignored, so it is compiled out there; macOS and Linux run it.
+
+#![cfg(not(windows))]
 
 use tauri_plugin_updater::UpdaterExt;
 

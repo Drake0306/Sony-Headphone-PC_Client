@@ -21,6 +21,7 @@ pub mod sensors_windows;
 pub mod settings;
 pub mod socket;
 mod tray;
+pub mod updater;
 
 use std::sync::Mutex;
 
@@ -42,7 +43,8 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build());
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build());
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_nspanel::init());
     builder
@@ -51,6 +53,7 @@ pub fn run() {
         .manage(hotkeys::HotkeyErrors::default())
         .manage(recorder.clone())
         .manage(socket::ActiveScene::default())
+        .manage(updater::UpdateState::default())
         .invoke_handler(tauri::generate_handler![
             commands::runtime_info,
             commands::get_state,
@@ -89,6 +92,11 @@ pub fn run() {
             eq_curve::send_best_fit,
             settings::get_settings,
             settings::set_settings,
+            updater::current_version,
+            updater::update_status,
+            updater::dismiss_update,
+            updater::check_update,
+            updater::install_update,
         ])
         .setup(move |app| {
             let dir = settings::dir(app.handle());
@@ -106,6 +114,7 @@ pub fn run() {
             );
             #[cfg(target_os = "macos")]
             app.set_activation_policy(dock::policy(false, app_settings.hide_dock_icon).into());
+            updater::spawn_background_checks(app.handle(), app_settings.auto_check_updates);
             app.manage(Mutex::new(app_settings));
             let scenes = match &dir {
                 Ok(dir) => scenes::store::load(dir),

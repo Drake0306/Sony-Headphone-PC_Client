@@ -1,6 +1,6 @@
 [package]
 name = "hairline"
-version = "0.1.0"
+version = "0.2.0"
 description = "Hairline: a desktop controller for the ULT WEAR headphones"
 edition.workspace = true
 license.workspace = true
@@ -25,6 +25,9 @@ tauri = { version = "2.12", features = ["tray-icon", "image-png", "macos-private
 tauri-plugin-positioner = { version = "2.4", features = ["tray-icon"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-global-shortcut = "2"
+tauri-plugin-updater = "2"
+semver = "1"
+tokio = { version = "1", features = ["time"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-nspanel = "2.1"
@@ -39,3 +42,4 @@ windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_
 
 [dev-dependencies]
 mdr-frame = { path = "../../../crates/mdr-frame" }
+minisign-verify = "0.3"

@@ -1,11 +1,12 @@
 // Typed wrappers around the Tauri commands and the app events ("state",
-// "settings", "scenes", "frames", "recording", "raw", "battery").
+// "settings", "scenes", "frames", "recording", "raw", "battery", "update").
 
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { BatteryEstimate } from "./battery";
 import type { CapabilityRow, FrameEntry, ProbeEvent, RawEvent, RecordingEvent } from "./advanced";
 import type { Scene, ScenesEvent } from "./scenes";
+import type { UpdateInfo, UpdatePhase } from "./update";
 import type { AppSettings, DeviceState, RuntimeInfo } from "./state";
 
 export type NcModeArg = "off" | "nc" | "ambient";
@@ -155,6 +156,30 @@ export const onBattery = (handler: (e: BatteryEstimate) => void): Promise<Unlist
 
 export const onRecording = (handler: (e: RecordingEvent) => void): Promise<UnlistenFn> =>
   listen<RecordingEvent>("recording", (event) => handler(event.payload));
+
+/** The running app's version. */
+export const currentVersion = () => invoke<string>("current_version");
+
+/** The release the app last found, the version put off with Later and the install's last phase (no network). */
+export const updateStatus = () =>
+  invoke<{ available: UpdateInfo | null; dismissed: string | null; phase: UpdatePhase | null; installing: boolean }>(
+    "update_status",
+  );
+
+/** Asks GitHub now; an "update" event follows (available or up to date). Rejects with the reason. */
+export const checkUpdate = () => invoke<UpdateInfo | null>("check_update");
+
+/** Downloads, verifies, installs and relaunches; "update" events report each step. Only from Update now. */
+export const installUpdate = () => invoke<null>("install_update");
+
+/** Later: hides this version's notice in every window until the next launch. */
+export const dismissUpdate = (version: string) => invoke<null>("dismiss_update", { version });
+
+export const onUpdate = (handler: (e: UpdatePhase) => void): Promise<UnlistenFn> =>
+  listen<UpdatePhase>("update", (event) => handler(event.payload));
+
+export const onUpdateDismissed = (handler: (version: string | null) => void): Promise<UnlistenFn> =>
+  listen<string | null>("update-dismissed", (event) => handler(event.payload));
 
 /** Where the popover leaves the tab for a main window it has just created (not listening yet). */
 export const OPEN_TAB_KEY = "hairline.openTab";

@@ -152,6 +152,16 @@ macOS: open the `.dmg` and drag Hairline to Applications. Open it once; macOS sa
 
 Windows: run the `.msi` or the `-setup.exe`. If SmartScreen appears, choose More info → Run anyway. The Windows build compiles and passes its tests but has not been tried with real headphones on Windows.
 
+## Updates
+
+Hairline checks the latest GitHub release for a newer version 15 seconds after it starts and every 6 hours while it runs. It reads `latest.json` from the release; nothing else is sent. A failed check (offline, GitHub down) shows nothing.
+
+When a newer version is out, Settings shows "Hairline 0.x.y is available" with the release notes, and the popover shows "Update available · open Hairline". Later hides that version until Hairline is next started. Update now downloads it with a progress bar, installs it and relaunches Hairline as the new version. On Windows the installer takes over and starts Hairline again when it is done; it may ask for permission. Nothing is downloaded or installed unless you click Update now. Check now in Settings asks at any time.
+
+Every update is signed in the release workflow, and Hairline carries the public key. A download whose signature does not match is not installed, and Settings says "Update could not be verified".
+
+To stop the automatic checks, switch off "Check for updates automatically" in Settings. Check now still works. Switching it back on takes effect the next time Hairline starts.
+
 ## Run it
 
 Prerequisites: Rust stable, Node 22, pnpm 10.

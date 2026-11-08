@@ -116,6 +116,8 @@ export interface AppSettings {
   hide_dock_icon: boolean;
   /** Shows the Advanced tab (frame log, capability list, raw commands). */
   show_advanced: boolean;
+  /** Checks GitHub for a newer release on launch and every 6 hours (read at launch). */
+  auto_check_updates: boolean;
 }
 
 /** `AppSettings::default()`. */
@@ -124,6 +126,7 @@ export const defaultSettings = (): AppSettings => ({
   launch_at_login: false,
   hide_dock_icon: true,
   show_advanced: false,
+  auto_check_updates: true,
 });
 
 const unavailable = <T>(): Tracked<T> => ({ value: null, status: "Unavailable" });

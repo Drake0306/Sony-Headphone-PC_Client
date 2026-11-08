@@ -24,6 +24,7 @@
   } from "../lib/ipc";
   import { hotkeyList, scenes } from "../lib/scenes";
   import { settings } from "../lib/settings";
+  import { busy, checkNow, installNow, later, percent, update, visible } from "../lib/update";
   import { AUTO_POWER_OFF, type AppSettings, type DeviceState, type Status, type Theme } from "../lib/state";
 
   let { st }: { st: DeviceState } = $props();
@@ -87,6 +88,22 @@
   const dock = control<boolean>(appSource("hide_dock_icon"));
   const theme = control<Theme>(appSource("theme"));
   const advanced = control<boolean>(appSource("show_advanced"));
+  const autoCheck = control<boolean>(appSource("auto_check_updates"));
+
+  // Updates: the release card shows while one is offered (not put off with
+  // Later) or an install is under way.
+  let checking = $state(false);
+  const phase = $derived($update.phase);
+  const installing = $derived(busy(phase));
+  const pct = $derived(percent(phase));
+  const checkNote = $derived(
+    phase?.phase === "up_to_date" ? "Up to date" : phase?.phase === "failed" ? phase.error : undefined,
+  );
+  async function check() {
+    checking = true;
+    await checkNow();
+    checking = false;
+  }
 
   function save<K extends keyof AppSettings>(key: K, value: AppSettings[K]) {
     const cur = $settings;
@@ -233,6 +250,49 @@
         </Row>
       </div>
       <div class="block">
+        <h4>Updates</h4>
+        {#if $update.current}
+          <Row label={`Hairline ${$update.current}`} note={checkNote}>
+            <button class="btn" disabled={checking || installing} onclick={check}>{checking ? "Checking…" : "Check now"}</button>
+          </Row>
+        {/if}
+        {#if $update.available && ($visible || installing)}
+          <div class="release">
+            <div>
+              Hairline {$update.available.version} is available{#if $update.available.date}<small
+                  >{$update.available.date}</small
+                >{/if}
+            </div>
+            {#if $update.available.notes}<div class="notes">{$update.available.notes}</div>{/if}
+            {#if phase?.phase === "downloading"}
+              <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={pct ?? undefined}>
+                <span style:width={`${pct ?? 0}%`}></span>
+              </div>
+              <p class="note">Downloading…{pct !== null ? ` ${pct} %` : ""}</p>
+            {:else if phase?.phase === "verifying"}
+              <p class="note">Verifying…</p>
+            {:else if phase?.phase === "installing"}
+              <p class="note">Installing…</p>
+            {:else if phase?.phase === "restarting"}
+              <p class="note">Restarting…</p>
+            {:else}
+              <div class="btnrow">
+                <button class="btn" onclick={() => later()}>Later</button>
+                <button class="btn fill" onclick={() => installNow()}>Update now</button>
+              </div>
+            {/if}
+          </div>
+        {/if}
+        <Row label="Check for updates automatically" note="On launch and every 6 hours">
+          <Toggle
+            on={autoCheck.shown}
+            status={autoCheck.status}
+            label="Check for updates automatically"
+            onpick={(on) => autoCheck.request(on, () => save("auto_check_updates", on))}
+          />
+        </Row>
+      </div>
+      <div class="block">
         <LinkList
           items={[
             { label: "App version", value: version },
@@ -264,6 +324,41 @@
     display: flex;
     align-items: center;
     gap: 10px;
+  }
+
+  .release {
+    padding: 9px 0;
+    border-bottom: 1px solid var(--hair);
+    font-size: 13px;
+  }
+
+  .release small {
+    margin-left: 8px;
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  /* The release notes: about six lines, then scroll. */
+  .notes {
+    margin-top: 6px;
+    max-height: calc(6 * 1.45em);
+    overflow-y: auto;
+    white-space: pre-line;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .bar {
+    margin-top: 10px;
+    height: 2px;
+    background: var(--hair);
+  }
+
+  .bar span {
+    display: block;
+    height: 100%;
+    background: var(--ink);
   }
 
   /* Why a scene's hotkey was refused: orange, like the refused chips. */

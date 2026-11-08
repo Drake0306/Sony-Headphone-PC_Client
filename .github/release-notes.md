@@ -1,5 +1,7 @@
 Hairline controls Sony ULT WEAR (WH-ULT900N) headphones from the menu bar or tray: noise control, ambient level, ULT, equalizer, battery, scenes with desktop triggers, hotkeys, an advanced ten-band equalizer with shareable codes, and a command-line tool.
 
+Hairline checks this page for updates and offers them in Settings.
+
 ## Install on macOS
 1. Open the `.dmg` and drag Hairline to Applications.
 2. Open Hairline once. macOS says it could not verify the app, because it is not signed with an Apple Developer certificate yet. Click Done.

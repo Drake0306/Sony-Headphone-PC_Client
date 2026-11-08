@@ -1,4 +1,4 @@
-//! App settings (theme, launch at login, Dock icon), stored as `settings.json`
+//! App settings (theme, launch at login, Dock icon, update checks), stored as `settings.json`
 //! in the app config directory.
 
 use std::io;
@@ -31,6 +31,14 @@ pub struct AppSettings {
     /// Shows the Advanced screen (frame log, capabilities, raw command).
     #[serde(default)]
     pub show_advanced: bool,
+    /// Checks GitHub for a newer release on launch and every 6 hours; read
+    /// at launch. On unless switched off.
+    #[serde(default = "yes")]
+    pub auto_check_updates: bool,
+}
+
+fn yes() -> bool {
+    true
 }
 
 impl Default for AppSettings {
@@ -40,6 +48,7 @@ impl Default for AppSettings {
             launch_at_login: false,
             hide_dock_icon: true,
             show_advanced: false,
+            auto_check_updates: true,
         }
     }
 }

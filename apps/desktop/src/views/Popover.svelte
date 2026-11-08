@@ -20,6 +20,7 @@
     type Status,
     type UltLevel,
   } from "../lib/state";
+  import { visible as updateVisible } from "../lib/update";
 
   const NOISE: { label: string; value: NcMode }[] = [
     { label: "NC", value: "NoiseCancelling" },
@@ -189,6 +190,7 @@
     {#if devices.length > 0}
       <div class="devices"><LinkList items={devices} /></div>
     {/if}
+    {@render updateRow()}
     <button class="row footer" onclick={() => openMainWindow()}>
       <span class="lab">Open window</span>{#if !windowRefused}<span class="lab">{windowKeys}</span>{/if}
     </button>
@@ -215,8 +217,17 @@
       <span>Turn the headphones on, or reconnect from the Bluetooth menu. Controls return the moment they link.</span>
     </div>
     <div class="btnrow"><button class="btn fill" onclick={() => connect()}>Connect</button></div>
+    {@render updateRow()}
   </div>
 {/if}
+
+{#snippet updateRow()}
+  {#if $updateVisible}
+    <button class="row footer" onclick={() => openMainWindowOn("settings").catch((e) => console.error(e))}>
+      <span class="lab">Update available · open Hairline</span>
+    </button>
+  {/if}
+{/snippet}
 
 {#snippet modeRow()}
   {#if boxes.shown.length > 0}

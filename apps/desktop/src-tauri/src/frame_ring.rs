@@ -140,6 +140,13 @@ impl Recorder {
         Ok(log.as_ref().map(|l| l.path().to_owned()))
     }
 
+    /// Stops recording and closes the file (the updater's exit path).
+    pub fn stop(&self) {
+        if let Ok(mut log) = self.0.lock() {
+            *log = None;
+        }
+    }
+
     /// The file being written, if recording.
     pub fn path(&self) -> Option<PathBuf> {
         self.0.lock().ok()?.as_ref().map(|l| l.path().to_owned())

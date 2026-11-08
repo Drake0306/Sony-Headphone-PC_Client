@@ -3,7 +3,7 @@ import { get } from "svelte/store";
 
 const io = vi.hoisted(() => ({
   handlers: {} as Record<string, (e: { payload: unknown }) => void>,
-  status: { available: null as unknown, dismissed: null as string | null },
+  status: { available: null as unknown, dismissed: null as string | null, phase: null as unknown, installing: false },
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -58,14 +58,26 @@ describe("update reducer", () => {
 
 describe("update store", () => {
   beforeEach(() => {
-    io.status = { available: null, dismissed: null };
+    io.status = { available: null, dismissed: null, phase: null, installing: false };
   });
 
   it("starts from the running version and the app's last known release", async () => {
-    io.status = { available: { version: "0.2.1", notes: "", date: null }, dismissed: null };
+    io.status = { available: { version: "0.2.1", notes: "", date: null }, dismissed: null, phase: null, installing: false };
     const stop = update.subscribe(() => {});
     await vi.waitFor(() => expect(get(update).current).toBe("0.2.0"));
     await vi.waitFor(() => expect(get(visible)).toBe(true));
+    stop();
+  });
+
+  it("shows an install already under way to a window opened mid-download", async () => {
+    io.status = {
+      available: { version: "0.2.1", notes: "", date: null },
+      dismissed: null,
+      phase: { phase: "downloading", downloaded: 30, total: 100 },
+      installing: true,
+    };
+    const stop = update.subscribe(() => {});
+    await vi.waitFor(() => expect(percent(get(update).phase)).toBe(30));
     stop();
   });
 
@@ -76,6 +88,9 @@ describe("update store", () => {
     expect(get(update).available?.version).toBe("0.2.1");
     send("update", { phase: "downloading", downloaded: 50, total: 100 });
     expect(percent(get(update).phase)).toBe(50);
+    send("update", { phase: "verifying" });
+    send("update", available);
+    expect(get(update).phase?.phase).toBe("verifying");
     send("update", { phase: "installing" });
     expect(get(update).phase?.phase).toBe("installing");
     stop();

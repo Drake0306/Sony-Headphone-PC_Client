@@ -19,7 +19,7 @@ vi.mock("@tauri-apps/api/core", () => ({
     }
     if (cmd === "get_scenes") return [];
     if (cmd === "current_version") return "0.2.0";
-    if (cmd === "update_status") return { available: null, dismissed: null };
+    if (cmd === "update_status") return { available: null, dismissed: null, phase: null, installing: false };
     if (cmd === "check_update") {
       if (typeof backend.check === "string") {
         setTimeout(() => backend.update?.({ payload: { phase: "failed", error: backend.check } }), 0);
@@ -115,6 +115,9 @@ describe("Settings", () => {
     backend.update!({ payload: { phase: "downloading", downloaded: 42, total: 100 } });
     await waitFor(() => expect(r.getByText("Downloading… 42 %")).toBeInTheDocument());
     expect(r.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "42");
+    expect(r.queryByRole("button", { name: "Update now" })).toBeNull();
+    backend.update!({ payload: { phase: "verifying" } });
+    await waitFor(() => expect(r.getByText("Verifying…")).toBeInTheDocument());
     expect(r.queryByRole("button", { name: "Update now" })).toBeNull();
     backend.update!({ payload: { phase: "installing" } });
     await waitFor(() => expect(r.getByText("Installing…")).toBeInTheDocument());

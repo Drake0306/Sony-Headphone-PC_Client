@@ -223,7 +223,7 @@
 
 {#snippet updateRow()}
   {#if $updateVisible}
-    <button class="row footer update" onclick={() => openMainWindowOn("settings").catch((e) => console.error(e))}>
+    <button class="row footer" onclick={() => openMainWindowOn("settings").catch((e) => console.error(e))}>
       <span class="lab">Update available · open Hairline</span>
     </button>
   {/if}

@@ -18,6 +18,7 @@ export interface UpdateInfo {
 export type UpdatePhase =
   | ({ phase: "available" } & UpdateInfo)
   | { phase: "downloading"; downloaded: number; total: number | null }
+  | { phase: "verifying" }
   | { phase: "installing" }
   | { phase: "restarting" }
   | { phase: "failed"; error: string }
@@ -35,8 +36,9 @@ export interface UpdateState {
 
 export const initial = (): UpdateState => ({ current: "", available: null, phase: null, dismissedVersion: null });
 
-const busy = (p: UpdatePhase | null) =>
-  p?.phase === "downloading" || p?.phase === "installing" || p?.phase === "restarting";
+/** Downloading, verifying, installing or restarting. */
+export const busy = (p: UpdatePhase | null) =>
+  p?.phase === "downloading" || p?.phase === "verifying" || p?.phase === "installing" || p?.phase === "restarting";
 
 /** The state after an "update" event. A background notice never interrupts an install. */
 export function reduce(s: UpdateState, e: UpdatePhase): UpdateState {
@@ -67,8 +69,13 @@ const state = writable<UpdateState>(initial(), (_set, update) => {
     .then((current) => update((s) => ({ ...s, current })))
     .catch((e) => console.error(e));
   updateStatus()
-    .then(({ available, dismissed }) =>
-      update((s) => ({ ...s, available: s.available ?? available, dismissedVersion: s.dismissedVersion ?? dismissed })),
+    .then(({ available, dismissed, phase }) =>
+      update((s) => ({
+        ...s,
+        available: s.available ?? available,
+        dismissedVersion: s.dismissedVersion ?? dismissed,
+        phase: s.phase ?? phase,
+      })),
     )
     .catch((e) => console.error(e));
   return () => stops.forEach((p) => p.then((stop) => stop()).catch(() => {}));

@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Permissions for the popover and the main window",
   "windows": ["popover", "main"],
-  "permissions": ["core:default", "positioner:default", "autostart:default", "updater:default", "process:allow-restart"]
+  "permissions": ["core:default", "positioner:default", "autostart:default"]
 }

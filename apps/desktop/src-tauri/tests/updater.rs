@@ -4,8 +4,8 @@
 //! exercised here.
 
 use hairline_lib::updater::{
-    background_outcome, classify, classify_error, is_newer, next_step, BackgroundLog, Phase,
-    Progress, UpdateInfo,
+    background_outcome, classify, classify_error, is_newer, next_step, Background, BackgroundLog,
+    PercentGate, Phase, Progress, UpdateInfo,
 };
 
 /// The public key built into the app (tauri.conf.json `plugins.updater.pubkey`).
@@ -38,6 +38,10 @@ fn newer_is_a_semver_comparison() {
     assert!(is_newer("0.2.0", "v1.0.0"));
     assert!(!is_newer("0.2.0", "0.2.0"));
     assert!(!is_newer("0.2.1", "0.2.0"));
+    // A pre-release of the next version is newer than this release, but older
+    // than its own final release.
+    assert!(is_newer("0.2.0", "0.2.1-beta.1"));
+    assert!(!is_newer("0.2.1", "0.2.1-beta.1"));
     assert!(!is_newer("0.2.0", "not a version"));
     assert!(!is_newer("garbage", "0.3.0"));
 }
@@ -68,6 +72,18 @@ fn update_without_valid_signature_is_refused() {
         classify(&tauri_plugin_updater::Error::SignatureUtf8("x".into())),
         not_verified()
     );
+    // A signature for another version (a tampered feed) is refused too.
+    assert_eq!(
+        classify(&tauri_plugin_updater::Error::SignedVersionMismatch {
+            signed: "0.2.1".into(),
+            announced: "9.9.9".into(),
+        }),
+        not_verified()
+    );
+    assert_eq!(
+        classify(&tauri_plugin_updater::Error::MissingSignedVersion),
+        not_verified()
+    );
     assert_eq!(
         classify_error("The signature verification failed"),
         not_verified()
@@ -86,9 +102,23 @@ fn network_errors_read_as_github_unreachable() {
     );
     assert_eq!(
         classify(&tauri_plugin_updater::Error::Network(
-            "Download request failed with status: 404".into()
+            "Download request failed with status: 503 Service Unavailable".into()
         )),
         unreachable()
+    );
+    // The feed names a file the release does not have.
+    let missing = Phase::Failed {
+        error: "The update file is missing from the release".into(),
+    };
+    assert_eq!(
+        classify(&tauri_plugin_updater::Error::Network(
+            "Download request failed with status: 404 Not Found".into()
+        )),
+        missing
+    );
+    assert_eq!(
+        classify_error("Download request failed with status: 404 Not Found"),
+        missing
     );
     assert_eq!(
         classify_error("error sending request for url (https://github.com/x): dns error"),
@@ -107,36 +137,64 @@ fn network_errors_read_as_github_unreachable() {
 fn offline_check_is_silent() {
     let mut log = BackgroundLog::default();
     let offline = || Err("error sending request for url (https://github.com)".to_string());
+    let quiet = Background {
+        emit: None,
+        log: None,
+        forget: false,
+    };
     // The first failure logs one line and emits nothing...
-    let (emit, line) = background_outcome("0.2.0", offline(), &mut log);
-    assert_eq!(emit, None);
-    assert!(line.is_some());
+    let first = background_outcome("0.2.0", offline(), &mut log);
+    assert_eq!(first.emit, None);
+    assert!(first.log.is_some());
+    assert!(!first.forget);
     // ...later failures in the same streak log nothing more.
-    let (emit, line) = background_outcome("0.2.0", offline(), &mut log);
-    assert_eq!((emit, line), (None, None));
-    // Up to date: still nothing (the background never says "up to date").
-    assert_eq!(
-        background_outcome("0.2.0", Ok(None), &mut log),
-        (None, None)
-    );
+    assert_eq!(background_outcome("0.2.0", offline(), &mut log), quiet);
     // A newer release is offered.
-    let (emit, line) = background_outcome("0.2.0", Ok(Some(info("0.2.1"))), &mut log);
+    let found = background_outcome("0.2.0", Ok(Some(info("0.2.1"))), &mut log);
     assert_eq!(
-        emit,
+        found.emit,
         Some(Phase::Available {
             version: "0.2.1".into(),
             notes: "Fixes".into(),
             date: Some("2026-11-08".into()),
         })
     );
-    assert_eq!(line, None);
-    // The same or an older version is not.
+    assert_eq!((found.log, found.forget), (None, false));
+    // Up to date, or the same version: nothing is emitted (the background
+    // never says "up to date"), and a release remembered earlier is forgotten.
+    let gone = Background {
+        emit: None,
+        log: None,
+        forget: true,
+    };
+    assert_eq!(background_outcome("0.2.0", Ok(None), &mut log), gone);
     assert_eq!(
         background_outcome("0.2.0", Ok(Some(info("0.2.0"))), &mut log),
-        (None, None)
+        gone
     );
     // Failing again after a success logs once more.
-    assert!(background_outcome("0.2.0", offline(), &mut log).1.is_some());
+    assert!(background_outcome("0.2.0", offline(), &mut log)
+        .log
+        .is_some());
+}
+
+#[test]
+fn progress_is_sent_once_per_whole_percent() {
+    let mut gate = PercentGate::default();
+    let sent: Vec<u64> = [1u64, 5, 9, 10, 15, 20, 1000]
+        .into_iter()
+        .filter(|&d| gate.pass(d, Some(1000)))
+        .collect();
+    // 0 % once, then 1 % (10 bytes), 2 % (20), 100 %.
+    assert_eq!(sent, [1, 10, 20, 1000]);
+    // Without a size, one event per MiB.
+    let mut gate = PercentGate::default();
+    let mib = 1024 * 1024;
+    let sent: Vec<u64> = [1u64, 500, mib, mib + 1, 3 * mib]
+        .into_iter()
+        .filter(|&d| gate.pass(d, None))
+        .collect();
+    assert_eq!(sent, [1, mib, 3 * mib]);
 }
 
 #[test]
@@ -148,14 +206,11 @@ fn install_then_relaunch_order() {
             downloaded: 10,
             total: Some(100),
         },
-        Progress::Chunk {
-            downloaded: 60,
-            total: Some(100),
-        },
         Progress::DownloadFinished {
             downloaded: 90,
             total: Some(100),
         },
+        Progress::Verified,
         Progress::Installed(Ok(())),
     ] {
         let step = next_step(p);
@@ -169,15 +224,13 @@ fn install_then_relaunch_order() {
                 downloaded: 10,
                 total: Some(100)
             },
-            Phase::Downloading {
-                downloaded: 60,
-                total: Some(100)
-            },
-            // The bar reaches 100 % before "Installing…".
+            // The bar reaches 100 % before the signature check...
             Phase::Downloading {
                 downloaded: 100,
                 total: Some(100)
             },
+            Phase::Verifying,
+            // ...and "Installing…" comes only after it passed.
             Phase::Installing,
             Phase::Restarting,
         ]
@@ -214,6 +267,10 @@ fn phases_serialise_with_a_phase_tag() {
     assert_eq!(
         json(&Phase::UpToDate),
         serde_json::json!({ "phase": "up_to_date" })
+    );
+    assert_eq!(
+        json(&Phase::Verifying),
+        serde_json::json!({ "phase": "verifying" })
     );
     assert_eq!(
         json(&Phase::Installing),

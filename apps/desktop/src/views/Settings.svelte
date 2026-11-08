@@ -24,7 +24,7 @@
   } from "../lib/ipc";
   import { hotkeyList, scenes } from "../lib/scenes";
   import { settings } from "../lib/settings";
-  import { checkNow, installNow, later, percent, update, visible } from "../lib/update";
+  import { busy, checkNow, installNow, later, percent, update, visible } from "../lib/update";
   import { AUTO_POWER_OFF, type AppSettings, type DeviceState, type Status, type Theme } from "../lib/state";
 
   let { st }: { st: DeviceState } = $props();
@@ -94,9 +94,7 @@
   // Later) or an install is under way.
   let checking = $state(false);
   const phase = $derived($update.phase);
-  const installing = $derived(
-    phase?.phase === "downloading" || phase?.phase === "installing" || phase?.phase === "restarting",
-  );
+  const installing = $derived(busy(phase));
   const pct = $derived(percent(phase));
   const checkNote = $derived(
     phase?.phase === "up_to_date" ? "Up to date" : phase?.phase === "failed" ? phase.error : undefined,
@@ -253,9 +251,11 @@
       </div>
       <div class="block">
         <h4>Updates</h4>
-        <Row label={`Hairline ${$update.current}`} note={checkNote}>
-          <button class="btn" disabled={checking || installing} onclick={check}>{checking ? "Checking…" : "Check now"}</button>
-        </Row>
+        {#if $update.current}
+          <Row label={`Hairline ${$update.current}`} note={checkNote}>
+            <button class="btn" disabled={checking || installing} onclick={check}>{checking ? "Checking…" : "Check now"}</button>
+          </Row>
+        {/if}
         {#if $update.available && ($visible || installing)}
           <div class="release">
             <div>
@@ -269,6 +269,8 @@
                 <span style:width={`${pct ?? 0}%`}></span>
               </div>
               <p class="note">Downloading…{pct !== null ? ` ${pct} %` : ""}</p>
+            {:else if phase?.phase === "verifying"}
+              <p class="note">Verifying…</p>
             {:else if phase?.phase === "installing"}
               <p class="note">Installing…</p>
             {:else if phase?.phase === "restarting"}

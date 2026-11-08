@@ -26,7 +26,7 @@ vi.mock("@tauri-apps/api/core", () => ({
     }
     if (cmd === "runtime_info") return { fake: true, version: "0" };
     if (cmd === "current_version") return "0.2.0";
-    if (cmd === "update_status") return { available: null, dismissed: null };
+    if (cmd === "update_status") return { available: null, dismissed: null, phase: null, installing: false };
     if (cmd === "apply_scene") {
       if (backend.reject) throw backend.reject;
       backend.active = args.id ?? null;

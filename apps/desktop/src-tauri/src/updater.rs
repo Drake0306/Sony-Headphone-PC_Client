@@ -6,7 +6,8 @@
 //! policy: a quiet background check (15 s after launch, then every 6 hours,
 //! only when `auto_check_updates` is on), a check the user asks for, and an
 //! install that runs only from the user's Update now click. Progress goes to
-//! every window as `"update"` events carrying a [`Phase`].
+//! every window as `"update"` events carrying a [`Phase`]: downloading, then
+//! verifying (the signature), then installing, then restarting.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -26,6 +27,9 @@ const CHECK_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
 
 const NOT_VERIFIED: &str = "Update could not be verified";
 const UNREACHABLE: &str = "Could not reach GitHub";
+const MISSING: &str = "The update file is missing from the release";
+/// Progress for a download of unknown size is sent once per this many bytes.
+const STEP_WITHOUT_SIZE: u64 = 1024 * 1024;
 
 /// A newer release, as `latest.json` describes it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -49,12 +53,24 @@ pub enum Phase {
         downloaded: u64,
         total: Option<u64>,
     },
+    /// The download is complete; the plugin is checking its signature.
+    Verifying,
     Installing,
     Restarting,
     Failed {
         error: String,
     },
     UpToDate,
+}
+
+impl Phase {
+    /// Downloading, verifying, installing or restarting.
+    pub fn busy(&self) -> bool {
+        matches!(
+            self,
+            Phase::Downloading { .. } | Phase::Verifying | Phase::Installing | Phase::Restarting
+        )
+    }
 }
 
 impl From<UpdateInfo> for Phase {
@@ -77,17 +93,31 @@ pub fn is_newer(current: &str, candidate: &str) -> bool {
     }
 }
 
+fn failed(error: &str) -> Phase {
+    Phase::Failed {
+        error: error.into(),
+    }
+}
+
 /// What to tell the user about a failed check or install, from the error's
-/// text: a signature problem means nothing was installed, a network problem
-/// means GitHub could not be reached; anything else keeps its own words.
+/// text: a signature problem means nothing was installed, a 404 on the
+/// download means the release lacks the file the feed names, other network
+/// problems mean GitHub could not be reached; anything else keeps its words.
 pub fn classify_error(e: &str) -> Phase {
     let lower = e.to_lowercase();
-    let error = if ["signature", "minisign", "verif", "public key", "base64"]
-        .iter()
-        .any(|w| lower.contains(w))
-    {
-        NOT_VERIFIED.to_string()
-    } else if [
+    let has = |words: &[&str]| words.iter().any(|w| lower.contains(w));
+    if has(&[
+        "signature",
+        "signed for",
+        "minisign",
+        "verif",
+        "public key",
+        "base64",
+    ]) {
+        failed(NOT_VERIFIED)
+    } else if has(&["status: 404"]) {
+        failed(MISSING)
+    } else if has(&[
         "error sending request",
         "request failed",
         "dns",
@@ -96,27 +126,26 @@ pub fn classify_error(e: &str) -> Phase {
         "network",
         "release json",
         "status:",
-    ]
-    .iter()
-    .any(|w| lower.contains(w))
-    {
-        UNREACHABLE.to_string()
+    ]) {
+        failed(UNREACHABLE)
     } else {
-        format!("Update failed: {e}")
-    };
-    Phase::Failed { error }
+        Phase::Failed {
+            error: format!("Update failed: {e}"),
+        }
+    }
 }
 
 /// [`classify_error`] on the plugin's error, by kind where the kind says it.
 pub fn classify(e: &tauri_plugin_updater::Error) -> Phase {
     use tauri_plugin_updater::Error as E;
     match e {
-        E::Minisign(_) | E::Base64(_) | E::SignatureUtf8(_) => Phase::Failed {
-            error: NOT_VERIFIED.into(),
-        },
-        E::Reqwest(_) | E::Network(_) | E::ReleaseNotFound => Phase::Failed {
-            error: UNREACHABLE.into(),
-        },
+        E::Minisign(_)
+        | E::Base64(_)
+        | E::SignatureUtf8(_)
+        | E::SignedVersionMismatch { .. }
+        | E::MissingSignedVersion => failed(NOT_VERIFIED),
+        E::Network(text) => classify_error(text),
+        E::Reqwest(_) | E::ReleaseNotFound => failed(UNREACHABLE),
         other => classify_error(&other.to_string()),
     }
 }
@@ -128,27 +157,67 @@ pub struct BackgroundLog {
     failing: bool,
 }
 
-/// What a background check does with its result: emit `Available` for a
-/// newer release, and otherwise nothing. A failure returns a log line only
-/// when it starts a run of failures.
+/// What a background check does with its result.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Background {
+    /// `Available`, for a newer release; never anything else.
+    pub emit: Option<Phase>,
+    /// A line for the log, when a run of failures starts.
+    pub log: Option<String>,
+    /// Nothing newer is out: forget a release remembered earlier.
+    pub forget: bool,
+}
+
+/// Emit `Available` for a newer release and otherwise nothing; a failure is
+/// logged once per run of failures and never shown.
 pub fn background_outcome(
     current: &str,
     result: Result<Option<UpdateInfo>, String>,
     log: &mut BackgroundLog,
-) -> (Option<Phase>, Option<String>) {
+) -> Background {
     match result {
         Err(e) => {
             let line = (!log.failing).then(|| format!("update check failed: {e}"));
             log.failing = true;
-            (None, line)
+            Background {
+                emit: None,
+                log: line,
+                forget: false,
+            }
         }
         Ok(found) => {
             log.failing = false;
             let emit = found
                 .filter(|i| is_newer(current, &i.version))
                 .map(Phase::from);
-            (emit, None)
+            Background {
+                forget: emit.is_none(),
+                emit,
+                log: None,
+            }
         }
+    }
+}
+
+/// Lets a download's progress through once per whole percent (once per MiB
+/// when the size is unknown), so the windows are not flooded.
+#[derive(Debug, Default)]
+pub struct PercentGate {
+    last: Option<u64>,
+}
+
+impl PercentGate {
+    /// True when `downloaded` reaches a percent (or MiB) not reported yet.
+    pub fn pass(&mut self, downloaded: u64, total: Option<u64>) -> bool {
+        let key = match total {
+            Some(t) if t > 0 => downloaded.min(t) * 100 / t,
+            _ => downloaded / STEP_WITHOUT_SIZE,
+        };
+        if self.last == Some(key) {
+            return false;
+        }
+        self.last = Some(key);
+        true
     }
 }
 
@@ -157,8 +226,10 @@ pub fn background_outcome(
 pub enum Progress {
     /// Bytes so far, out of `total` when the server said.
     Chunk { downloaded: u64, total: Option<u64> },
-    /// The download is complete and verified; installing starts now.
+    /// Every byte has arrived; the plugin checks the signature next.
     DownloadFinished { downloaded: u64, total: Option<u64> },
+    /// The signature matched; installing starts now.
+    Verified,
     /// The installer's result.
     Installed(Result<(), String>),
 }
@@ -170,42 +241,38 @@ pub struct Step {
     pub restart: bool,
 }
 
-/// The install sequence: the bar reaches 100 % before `Installing`, and the
-/// relaunch happens only after the installer returned Ok.
+/// The install sequence: the bar reaches 100 % before `Verifying`,
+/// `Installing` follows only a matching signature, and the relaunch happens
+/// only after the installer returned Ok.
 pub fn next_step(p: Progress) -> Step {
-    let clamp =
-        |downloaded: u64, total: Option<u64>| total.map_or(downloaded, |t| downloaded.min(t));
+    let step = |emit: Vec<Phase>| Step {
+        emit,
+        restart: false,
+    };
     match p {
-        Progress::Chunk { downloaded, total } => Step {
-            emit: vec![Phase::Downloading {
-                downloaded: clamp(downloaded, total),
+        Progress::Chunk { downloaded, total } => step(vec![Phase::Downloading {
+            downloaded: total.map_or(downloaded, |t| downloaded.min(t)),
+            total,
+        }]),
+        Progress::DownloadFinished { downloaded, total } => step(vec![
+            Phase::Downloading {
+                downloaded: total.unwrap_or(downloaded),
                 total,
-            }],
-            restart: false,
-        },
-        Progress::DownloadFinished { downloaded, total } => Step {
-            emit: vec![
-                Phase::Downloading {
-                    downloaded: total.unwrap_or(downloaded),
-                    total,
-                },
-                Phase::Installing,
-            ],
-            restart: false,
-        },
+            },
+            Phase::Verifying,
+        ]),
+        Progress::Verified => step(vec![Phase::Installing]),
         Progress::Installed(Ok(())) => Step {
             emit: vec![Phase::Restarting],
             restart: true,
         },
-        Progress::Installed(Err(e)) => Step {
-            emit: vec![classify_error(&e)],
-            restart: false,
-        },
+        Progress::Installed(Err(e)) => step(vec![classify_error(&e)]),
     }
 }
 
-/// The app's memory of the update: the last release found and the version
-/// put off with Later. Kept for windows opened later; lost on relaunch.
+/// The app's memory of the update: the last release found, the version put
+/// off with Later and the install's last phase. Kept for windows opened
+/// later; lost on relaunch.
 #[derive(Debug, Default)]
 pub struct UpdateState {
     inner: Mutex<Snapshot>,
@@ -217,6 +284,10 @@ pub struct UpdateState {
 pub struct Snapshot {
     pub available: Option<UpdateInfo>,
     pub dismissed: Option<String>,
+    /// The last phase sent, so a window opened mid-download shows progress.
+    pub phase: Option<Phase>,
+    /// True while Update now is running.
+    pub installing: bool,
 }
 
 fn info_of(u: &Update) -> UpdateInfo {
@@ -233,15 +304,45 @@ fn current(app: &AppHandle) -> String {
     app.package_info().version.to_string()
 }
 
+fn with_state(app: &AppHandle, f: impl FnOnce(&mut Snapshot)) {
+    if let Some(state) = app.try_state::<UpdateState>() {
+        if let Ok(mut s) = state.inner.lock() {
+            f(&mut s);
+        }
+    }
+}
+
+/// Sends `phase` to every window and remembers it; a background notice does
+/// not replace an install's phase.
 fn emit(app: &AppHandle, phase: &Phase) {
+    with_state(app, |s| {
+        if let Phase::Available {
+            version,
+            notes,
+            date,
+        } = phase
+        {
+            s.available = Some(UpdateInfo {
+                version: version.clone(),
+                notes: notes.clone(),
+                date: date.clone(),
+            });
+        }
+        if !(matches!(phase, Phase::Available { .. }) && s.phase.as_ref().is_some_and(Phase::busy))
+        {
+            s.phase = Some(phase.clone());
+        }
+    });
     let _ = app.emit(EVENT, phase);
 }
 
-fn remember(app: &AppHandle, available: Option<UpdateInfo>) {
-    if let Some(state) = app.try_state::<UpdateState>() {
-        if let Ok(mut s) = state.inner.lock() {
-            s.available = available;
-        }
+/// What the app closes on a normal exit. The Windows installer path exits
+/// the process directly, so the updater runs this first.
+fn before_exit(app: &AppHandle) {
+    app.cleanup_before_exit();
+    crate::socket::cleanup(app);
+    if let Some(recorder) = app.try_state::<crate::frame_ring::Recorder>() {
+        recorder.stop();
     }
 }
 
@@ -249,7 +350,13 @@ fn remember(app: &AppHandle, available: Option<UpdateInfo>) {
 async fn fetch(
     app: &AppHandle,
 ) -> Result<Option<(Update, UpdateInfo)>, tauri_plugin_updater::Error> {
-    let found = app.updater()?.check().await?;
+    let handle = app.clone();
+    let found = app
+        .updater_builder()
+        .on_before_exit(move || before_exit(&handle))
+        .build()?
+        .check()
+        .await?;
     let current = current(app);
     Ok(found
         .map(|u| {
@@ -272,35 +379,21 @@ pub fn spawn_background_checks(app: &AppHandle, enabled: bool) {
         tokio::time::sleep(FIRST_CHECK).await;
         loop {
             // Switched off since launch: skip the checks until it is back on.
-            if !still_enabled(&app) {
-                tokio::time::sleep(CHECK_EVERY).await;
-                continue;
-            }
-            let result = fetch(&app)
-                .await
-                .map(|found| found.map(|(_, info)| info))
-                .map_err(|e| e.to_string());
-            let (phase, line) = background_outcome(&current(&app), result, &mut log);
-            if let Some(line) = line {
-                eprintln!("hairline: {line}");
-            }
-            if let Some(phase) = phase {
-                if let Phase::Available {
-                    version,
-                    notes,
-                    date,
-                } = phase.clone()
-                {
-                    remember(
-                        &app,
-                        Some(UpdateInfo {
-                            version,
-                            notes,
-                            date,
-                        }),
-                    );
+            if still_enabled(&app) {
+                let result = fetch(&app)
+                    .await
+                    .map(|found| found.map(|(_, info)| info))
+                    .map_err(|e| e.to_string());
+                let outcome = background_outcome(&current(&app), result, &mut log);
+                if let Some(line) = outcome.log {
+                    eprintln!("hairline: {line}");
                 }
-                emit(&app, &phase);
+                if outcome.forget {
+                    with_state(&app, |s| s.available = None);
+                }
+                if let Some(phase) = outcome.emit {
+                    emit(&app, &phase);
+                }
             }
             tokio::time::sleep(CHECK_EVERY).await;
         }
@@ -320,10 +413,13 @@ pub fn current_version(app: AppHandle) -> String {
     current(&app)
 }
 
-/// The last release found and the version put off with Later.
+/// The last release found, the version put off with Later and the install's
+/// progress (no network).
 #[tauri::command]
 pub fn update_status(state: State<'_, UpdateState>) -> Snapshot {
-    state.inner.lock().map(|s| s.clone()).unwrap_or_default()
+    let mut snapshot = state.inner.lock().map(|s| s.clone()).unwrap_or_default();
+    snapshot.installing = state.installing.load(Ordering::SeqCst);
+    snapshot
 }
 
 /// Later: hides this version's notice in every window until the next launch.
@@ -356,18 +452,22 @@ pub async fn check_update(
         }
         Err(e) => {
             eprintln!("hairline: update check failed: {e}");
-            let phase = classify(&e);
-            emit(&app, &phase);
-            Err(match phase {
-                Phase::Failed { error } => error,
-                _ => e.to_string(),
-            })
+            Err(fail(&app, classify(&e)))
         }
     }
 }
 
+/// Emits a failure and returns its text.
+fn fail(app: &AppHandle, phase: Phase) -> String {
+    emit(app, &phase);
+    match phase {
+        Phase::Failed { error } => error,
+        other => format!("{other:?}"),
+    }
+}
+
 /// Update now: checks again, downloads with progress, lets the plugin verify
-/// the signature and install, then relaunches as the new version. Only ever
+/// the signature, installs, then relaunches as the new version. Only ever
 /// called from the user's click. On Windows the installer takes over and
 /// relaunches the app itself.
 #[tauri::command]
@@ -377,20 +477,14 @@ pub async fn install_update(app: AppHandle, state: State<'_, UpdateState>) -> Re
     }
     let result = install(&app).await;
     state.installing.store(false, Ordering::SeqCst);
-    if let Err(phase) = &result {
-        emit(&app, phase);
-    }
-    result.map_err(|phase| match phase {
-        Phase::Failed { error } => error,
-        other => format!("{other:?}"),
-    })
+    result.map_err(|phase| fail(&app, phase))
 }
 
 async fn install(app: &AppHandle) -> Result<(), Phase> {
     let (update, _) = match fetch(app).await {
         Ok(Some(found)) => found,
         Ok(None) => {
-            remember(app, None);
+            with_state(app, |s| s.available = None);
             emit(app, &Phase::UpToDate);
             return Ok(());
         }
@@ -399,31 +493,37 @@ async fn install(app: &AppHandle) -> Result<(), Phase> {
             return Err(classify(&e));
         }
     };
-    // Bytes so far and the total, shared by the two callbacks.
-    let sofar = Mutex::new((0u64, None::<u64>));
-    let progress = |p: Progress| next_step(p).emit.iter().for_each(|ph| emit(app, ph));
-    let installed = update
-        .download_and_install(
+    let send = |p: Progress| next_step(p).emit.iter().for_each(|ph| emit(app, ph));
+    // Bytes so far, the total and the progress gate, shared by the callbacks.
+    let sofar = Mutex::new((0u64, None::<u64>, PercentGate::default()));
+    // `download` calls the finish callback, then checks the signature.
+    let bytes = update
+        .download(
             |chunk, length| {
-                let (downloaded, total) = match sofar.lock() {
-                    Ok(mut s) => {
-                        s.0 += chunk as u64;
-                        s.1 = length;
-                        *s
-                    }
-                    Err(_) => return,
-                };
-                progress(Progress::Chunk { downloaded, total });
+                let Ok(mut s) = sofar.lock() else { return };
+                s.0 += chunk as u64;
+                s.1 = length;
+                let (downloaded, total) = (s.0, s.1);
+                if s.2.pass(downloaded, total) {
+                    drop(s);
+                    send(Progress::Chunk { downloaded, total });
+                }
             },
             || {
-                let (downloaded, total) = sofar.lock().map(|s| *s).unwrap_or_default();
-                progress(Progress::DownloadFinished { downloaded, total });
+                let (downloaded, total) = sofar.lock().map(|s| (s.0, s.1)).unwrap_or_default();
+                send(Progress::DownloadFinished { downloaded, total });
             },
         )
-        .await;
-    if let Err(e) = &installed {
+        .await
+        .map_err(|e| {
+            eprintln!("hairline: update not downloaded: {e}");
+            classify(&e)
+        })?;
+    send(Progress::Verified);
+    // `install` checks the signature once more before it touches anything.
+    if let Err(e) = update.install(&bytes) {
         eprintln!("hairline: update not installed: {e}");
-        return Err(classify(e));
+        return Err(classify(&e));
     }
     let step = next_step(Progress::Installed(Ok(())));
     step.emit.iter().for_each(|ph| emit(app, ph));

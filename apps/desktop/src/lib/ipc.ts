@@ -160,9 +160,11 @@ export const onRecording = (handler: (e: RecordingEvent) => void): Promise<Unlis
 /** The running app's version. */
 export const currentVersion = () => invoke<string>("current_version");
 
-/** The release the app last found and the version put off with Later (no network). */
+/** The release the app last found, the version put off with Later and the install's last phase (no network). */
 export const updateStatus = () =>
-  invoke<{ available: UpdateInfo | null; dismissed: string | null }>("update_status");
+  invoke<{ available: UpdateInfo | null; dismissed: string | null; phase: UpdatePhase | null; installing: boolean }>(
+    "update_status",
+  );
 
 /** Asks GitHub now; an "update" event follows (available or up to date). Rejects with the reason. */
 export const checkUpdate = () => invoke<UpdateInfo | null>("check_update");

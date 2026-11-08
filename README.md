@@ -42,7 +42,7 @@ Phase 4: the Advanced panel, the opcode probe, battery history with a time-left 
 
 Phase 5: the Advanced equalizer, described below, and a redesigned Sound fader (21 segments with a zero line, an orange knob and a dot-matrix value). It is verified against the fake device and the unit tests; the checklist for the real headphones is section 9 of `docs/hardware-validation.md`.
 
-Phase 7a: the app builds and its tests pass on Windows CI. The tray popover is a plain window there; audio 'playing' and the microphone trigger are blank until Windows modules exist. Not run against the headphones on Windows. The checklist for a Windows machine is section 10 of `docs/hardware-validation.md`.
+Phase 7a: the app builds and its tests pass on Windows CI. The tray popover is a plain window there, placed just above the taskbar and centred on the tray icon from the monitor's work area (0.3.2; the first Windows run put it far up the screen); audio 'playing' and the microphone trigger are blank until Windows modules exist. Not run against the headphones on Windows. The checklist for a Windows machine is section 10 of `docs/hardware-validation.md`.
 
 Phase 8a: the Linux transport and the app build and pass tests on Linux CI; not run against the headphones on Linux. The tray needs libayatana-appindicator; audio 'playing' and the microphone trigger are blank until Linux modules exist. The checklist for a Linux machine is section 11 of `docs/hardware-validation.md`.
 

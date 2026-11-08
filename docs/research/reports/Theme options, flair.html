@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flair themes</title>
+<meta name="description" content="Six loud, multi-colour appearance themes for SHDC that go beyond a palette swap: gradients, per-band colours and glow, previewed on the popover and the Sound screen.">
+<style>
+  @font-face { font-family: "Instrument Sans"; src: url("../../../apps/desktop/src/assets/fonts/instrument-sans/InstrumentSans[wdth,wght].ttf") format("truetype"); font-weight: 400 700; }
+  @font-face { font-family: "Doto"; src: url("../../../apps/desktop/src/assets/fonts/doto/Doto[ROND,wght].ttf") format("truetype"); font-weight: 100 900; }
+  @font-face { font-family: "DM Mono"; src: url("../../../apps/desktop/src/assets/fonts/dm-mono/DMMono-Regular.ttf") format("truetype"); font-weight: 400; }
+  @font-face { font-family: "DM Mono"; src: url("../../../apps/desktop/src/assets/fonts/dm-mono/DMMono-Medium.ttf") format("truetype"); font-weight: 500; }
+
+  :root { --page: #efede6; --text: #161614; --rule: #cfccc2; --dim: #6f726d; color-scheme: light; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --page: #161614; --text: #efede6; --rule: #3a3a36; --dim: #9a9a92; color-scheme: dark; } }
+  :root[data-theme="dark"] { --page: #161614; --text: #efede6; --rule: #3a3a36; --dim: #9a9a92; color-scheme: dark; }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text); font: 15px/1.5 "Instrument Sans", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+  main { max-width: 1180px; margin: 0 auto; padding: 44px max(16px, env(safe-area-inset-left, 0px)) 72px max(16px, env(safe-area-inset-right, 0px)); }
+  h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 4px; }
+  .sub { color: var(--dim); margin: 0 0 28px; max-width: 72ch; }
+  h2 { font: 400 11px/1 "DM Mono", ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin: 40px 0 14px; padding-top: 12px; border-top: 1px solid var(--rule); }
+  p { margin: 0 0 12px; max-width: 72ch; }
+  ul { margin: 0 0 12px; padding-left: 18px; max-width: 72ch; }
+  li { margin: 0 0 6px; }
+  code { font: 13px "DM Mono", ui-monospace, monospace; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 0 0 12px; }
+  td, th { text-align: left; padding: 7px 8px 7px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font: 400 11px/1 "DM Mono", ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(540px, 1fr)); gap: 22px; }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+
+  /* One theme card. The paper is a flat colour with an optional wash (gradient
+     or texture) laid over it; text never sits on the wash alone. */
+  .theme { position: relative; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); min-width: 0; overflow: hidden; }
+  .theme::before { content: ""; position: absolute; inset: 0; background: var(--wash, none); pointer-events: none; }
+  .theme > * { position: relative; }
+  .theme .head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 14px 18px 10px; border-bottom: 1px solid var(--hair); }
+  .theme .head h3 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+  .theme .head .num { font-family: "Doto", monospace; font-weight: 900; font-size: 22px; margin-right: 8px; color: var(--ult); text-shadow: var(--glow, none); }
+  .theme .why { padding: 10px 18px 0; font-size: 13px; color: var(--muted); max-width: none; }
+  .theme .preview { display: grid; grid-template-columns: 230px 1fr; gap: 18px; padding: 16px 18px 18px; }
+  @media (max-width: 600px) { .theme .preview { grid-template-columns: 1fr; } }
+
+  .lab { font-family: "DM Mono", monospace; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .dot { font-family: "Doto", monospace; font-weight: 900; }
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--hair); font-size: 12px; gap: 10px; }
+  .row:last-child { border-bottom: none; }
+  .name { font-weight: 600; font-size: 12px; }
+  .big { font-size: 34px; line-height: 1; color: var(--accent-2, var(--ink)); text-shadow: var(--glow, none); }
+  .big small { font-family: "Instrument Sans", system-ui, sans-serif; font-size: 11px; color: var(--muted); text-shadow: none; }
+  .boxes { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; }
+  .boxes button { background: var(--box); color: var(--ink); border: 1px solid var(--ink); border-radius: 0; text-align: center; font-family: "DM Mono", monospace; font-size: 10px; padding: 5px 3px; white-space: nowrap; cursor: default; }
+  .boxes button.on { background: var(--ink); color: var(--paper); }
+  .boxes button.on.orange { background: var(--ult); color: var(--on-ult); font-weight: 500; box-shadow: var(--glow, none); border-color: var(--ult); }
+  .boxes button.on.two { background: var(--accent-2); color: var(--on-ult); border-color: var(--accent-2); }
+  .boxes.pending button.on { background: repeating-linear-gradient(45deg, var(--ink) 0 4px, var(--stripe) 4px 8px); color: var(--paper); }
+  .ticks { display: flex; gap: 3px; }
+  .ticks i { display: block; width: 5px; height: 12px; background: var(--box); border: 1px solid var(--ink); }
+  .ticks i.on { background: var(--accent-3, var(--ink)); border-color: var(--accent-3, var(--ink)); }
+  .footer { padding-top: 8px; border-top: 1px solid var(--hair); display: flex; justify-content: space-between; }
+
+  .pop { background: var(--box); border: 1px solid var(--hair); padding: 12px 14px; }
+  .sound { min-width: 0; background: var(--box); border: 1px solid var(--hair); padding: 12px 14px; }
+  .sound .title { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .sound .title b { font-size: 13px; font-weight: 600; }
+  .faders { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin: 10px 0 12px; }
+  .fader { display: grid; justify-items: center; gap: 4px; --band: var(--ult); }
+  .fader .val { font-family: "Doto", monospace; font-weight: 900; font-size: 13px; color: var(--band); text-shadow: var(--glow, none); }
+  .rail { position: relative; width: 22px; height: 92px; display: grid; grid-template-rows: repeat(21, 1fr); gap: 1px; }
+  .rail i { display: block; background: var(--hair); height: 2px; align-self: center; width: 100%; }
+  .rail i.zero { background: var(--ink); }
+  .rail .fill { position: absolute; left: 9px; width: 4px; background: var(--band); box-shadow: var(--glow, none); }
+  .rail .knob { position: absolute; left: 2px; width: 18px; height: 8px; background: var(--band); border: 1px solid var(--ink); box-shadow: var(--glow, none); }
+
+  .swatches { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 0 18px 16px; }
+  .sw { display: flex; align-items: center; gap: 6px; font: 10px "DM Mono", ui-monospace, monospace; color: var(--muted); }
+  .sw i { display: block; width: 14px; height: 14px; border: 1px solid var(--hair); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Flair themes</h1>
+  <p class="sub">Six louder appearances for SHDC, Saturday 8 November 2026. Unlike the ten palette themes, these change more than colours: a wash over the paper, a colour per equalizer band, a second and third accent, and a glow on live controls. The type, the rules and the controls stay Hairline underneath, so they still read as the same app.</p>
+
+  <div class="grid" id="grid"></div>
+
+  <h2>What these need beyond a palette</h2>
+  <p>The ten themes shipped in 0.4.0 are eight tokens each. A flair theme adds up to eleven more and a few component rules, all optional, so every existing theme keeps working unchanged:</p>
+  <table>
+    <tr><th>Token</th><th>What it does</th><th>Used by</th></tr>
+    <tr><td><code>--wash</code></td><td>A gradient or texture laid over the paper, behind every surface. Text never sits on it directly: rows, the popover and the screens keep a flat <code>--box</code> behind them.</td><td>Synthwave, Riso, Aurora, Sunset</td></tr>
+    <tr><td><code>--accent-2</code>, <code>--accent-3</code></td><td>Second and third live colours: the battery numeral, the ambient ticks, the second-state box.</td><td>all six</td></tr>
+    <tr><td><code>--band-1</code> … <code>--band-6</code></td><td>One colour per equalizer band (knob, fill, value). Defaults to the accent.</td><td>all six</td></tr>
+    <tr><td><code>--glow</code></td><td>A soft shadow in the accent colour behind live controls and numerals. Off (none) in every palette theme.</td><td>Synthwave, Aurora, Acid</td></tr>
+  </table>
+  <ul>
+    <li>The Advanced equalizer's ten bands take their colours from the six band tokens, interpolated, so a rainbow runs across all ten.</li>
+    <li>Pending stripes and refused outlines keep their meaning: stripes stay ink and stripe, refused stays the first accent. Nothing live loses its signal to decoration.</li>
+    <li>Riso's grain and Synthwave's grid are CSS gradients, no images, so the bundle does not grow.</li>
+    <li>Contrast: Acid and Sunset were tuned so ink on paper stays above 7:1 and muted text above 4.5:1; the wash never sits behind text.</li>
+    <li>Cost: one day of work including tests; the ten palette themes needed none of these rules, so this is a separate step after you pick.</li>
+  </ul>
+
+  <h2>Pick</h2>
+  <p>Say which numbers to add, any names to change, and anything to turn up or down (more glow, a stronger wash, different band hues). I will build the flair tier, add the chosen themes with tests and ship them in the release after 0.4.0.</p>
+</main>
+
+<script>
+  // The eight palette tokens plus the flair ones.
+  const THEMES = [
+    { n: 1, name: "Synthwave", kind: "dark", why: "Outrun at night: near-black violet paper under a magenta-to-cyan horizon, a perspective grid, neon pink for everything live and cyan for the numerals. Glow on.",
+      t: { paper: "#120a1f", ink: "#f6ecff", hair: "#3b2358", muted: "#b592d9", box: "#1a0f2c", stripe: "#7a4fb0", ult: "#ff2d95", onUlt: "#120a1f", a2: "#00e5ff", a3: "#ffd166",
+           bands: ["#ff2d95", "#ff4fc0", "#c05cff", "#7d7bff", "#3fb8ff", "#00e5ff"], glow: "0 0 10px rgba(255, 45, 149, 0.55)",
+           wash: "linear-gradient(180deg, rgba(255,45,149,0.28) 0%, rgba(0,229,255,0.18) 38%, rgba(18,10,31,0) 60%), repeating-linear-gradient(90deg, rgba(0,229,255,0.07) 0 1px, transparent 1px 44px), repeating-linear-gradient(180deg, rgba(0,229,255,0.07) 0 1px, transparent 1px 44px)" } },
+    { n: 2, name: "Riso", kind: "light", why: "A risograph print: uncoated off-white stock, grainy, two fluorescent inks that never quite line up. Riso blue for text, fluorescent pink and orange for everything live, a yellow third.",
+      t: { paper: "#f3ecdd", ink: "#1f2e8a", hair: "#c9bfab", muted: "#5b5a7e", box: "#f8f3e6", stripe: "#9a92b8", ult: "#ff48b0", onUlt: "#1f2e8a", a2: "#d64400", a3: "#ffdd1f",
+           bands: ["#ff48b0", "#ff6a1f", "#ff48b0", "#1f2e8a", "#ff6a1f", "#ffdd1f"], glow: "none",
+           wash: "radial-gradient(rgba(31,46,138,0.10) 0.6px, transparent 0.7px) 0 0 / 3px 3px, radial-gradient(rgba(255,72,176,0.10) 0.6px, transparent 0.7px) 1px 2px / 4px 4px" } },
+    { n: 3, name: "Acid", kind: "light", why: "Loud by design: chartreuse paper, black ink, hot magenta and electric blue for live controls. Thick, flat, brutalist. Reads from across the room.",
+      t: { paper: "#d4ff3a", ink: "#0b0b0b", hair: "#8fb81c", muted: "#3f5212", box: "#e3ff74", stripe: "#5f7a16", ult: "#ff00a8", onUlt: "#0b0b0b", a2: "#1f3bff", a3: "#ff5500",
+           bands: ["#ff00a8", "#1f3bff", "#ff00a8", "#1f3bff", "#ff00a8", "#1f3bff"], glow: "none", wash: "none" } },
+    { n: 4, name: "Aurora", kind: "dark", why: "Northern lights: deep navy paper with a mint-teal-violet band drifting across the top. Mint for live, violet for numerals, teal ticks. Soft glow.",
+      t: { paper: "#06101c", ink: "#e7f2ff", hair: "#1a3147", muted: "#8fb0cf", box: "#0b1b2c", stripe: "#4b6f8e", ult: "#2ee6a6", onUlt: "#06101c", a2: "#a78bff", a3: "#19b3d6",
+           bands: ["#2ee6a6", "#27d8c0", "#19b3d6", "#4f98f0", "#7f85ff", "#a78bff"], glow: "0 0 10px rgba(46, 230, 166, 0.45)",
+           wash: "radial-gradient(60% 40% at 30% 0%, rgba(46,230,166,0.35), transparent 70%), radial-gradient(60% 40% at 70% 10%, rgba(167,139,255,0.30), transparent 70%), radial-gradient(40% 30% at 50% 5%, rgba(25,179,214,0.30), transparent 70%)" } },
+    { n: 5, name: "Sunset", kind: "light", why: "Peach to coral to plum from top to bottom, plum ink, hot coral for live, lemon for numerals. Warm the whole way down, like the last ten minutes of light.",
+      t: { paper: "#ffe6cc", ink: "#3a1030", hair: "#e8b792", muted: "#7a3a52", box: "#fff3e3", stripe: "#b4647f", ult: "#ff3d6e", onUlt: "#fff3e3", a2: "#8e4b00", a3: "#6b2d5c",
+           bands: ["#ff8a3d", "#ff6b4a", "#ff4f5e", "#ff3d6e", "#c93a7a", "#6b2d5c"], glow: "none",
+           wash: "linear-gradient(180deg, rgba(255,184,107,0.55) 0%, rgba(255,107,138,0.45) 55%, rgba(107,45,92,0.45) 100%)" } },
+    { n: 6, name: "Spectrum", kind: "light", why: "White paper, black ink, and every band its own hue so the equalizer is a rainbow. Violet for live, green for numerals, blue ticks. The calm one of the six.",
+      t: { paper: "#fbfbf7", ink: "#111111", hair: "#dededa", muted: "#62625e", box: "#ffffff", stripe: "#9a9a96", ult: "#6f3cff", onUlt: "#ffffff", a2: "#00805a", a3: "#1e7bff",
+           bands: ["#ff3b30", "#ff9500", "#e6b800", "#00a870", "#1e7bff", "#6f3cff"], glow: "none", wash: "none" } },
+  ];
+
+  const BANDS = [["CLEAR BASS", 6], ["400", 2], ["1K", 0], ["2.5K", -1], ["6.3K", 3], ["16K", 4]];
+
+  const fader = ([label, v], i, bands) => {
+    const segs = Array.from({ length: 21 }, (_, k) => `<i class="${k === 10 ? "zero" : ""}"></i>`).join("");
+    const top = 50 - v * 4.3;
+    const fillTop = Math.min(50, top), fillH = Math.abs(50 - top);
+    return `<div class="fader" style="--band:${bands[i]}">
+      <span class="val">${v > 0 ? "+" + v : v}</span>
+      <div class="rail">${segs}<span class="fill" style="top:${fillTop}%;height:${fillH}%"></span><span class="knob" style="top:calc(${top}% - 4px)"></span></div>
+      <span class="lab">${label}</span>
+    </div>`;
+  };
+
+  const card = (th) => {
+    const t = th.t;
+    const vars = `--paper:${t.paper};--ink:${t.ink};--hair:${t.hair};--muted:${t.muted};--box:${t.box};--stripe:${t.stripe};--ult:${t.ult};--on-ult:${t.onUlt};--accent-2:${t.a2};--accent-3:${t.a3};--glow:${t.glow};--wash:${t.wash}`;
+    const sw = [["paper", t.paper], ["ink", t.ink], ["hair", t.hair], ["muted", t.muted], ["box", t.box], ["accent", t.ult], ["accent-2", t.a2], ["accent-3", t.a3]]
+      .map(([k, v]) => `<span class="sw"><i style="background:${v}"></i>${k} ${v}</span>`).join("")
+      + `<span class="sw">bands ${t.bands.map((b) => `<i style="background:${b}"></i>`).join("")}</span>`;
+    return `<section class="theme" style="${vars}">
+      <div class="head"><h3><span class="num">${String(th.n).padStart(2, "0")}</span>${th.name}</h3><span class="lab">${th.kind} · wash ${t.wash === "none" ? "off" : "on"} · glow ${t.glow === "none" ? "off" : "on"}</span></div>
+      <p class="why">${th.why}</p>
+      <div class="preview">
+        <div class="pop">
+          <div class="row"><span class="name">WH-ULT900N</span><span class="lab">Connected · AAC</span></div>
+          <div class="row"><span class="lab">Battery</span><span class="dot big">72<small>%</small></span></div>
+          <div class="row"><span class="lab">Noise</span><div class="boxes" style="width:150px"><button class="on">NC</button><button>Ambient</button><button>Off</button></div></div>
+          <div class="row"><span class="lab">Ambient</span><div class="ticks">${Array.from({ length: 20 }, (_, i) => `<i class="${i < 12 ? "on" : ""}"></i>`).join("")}</div></div>
+          <div class="row"><span class="lab">ULT</span><div class="boxes" style="width:150px"><button>Off</button><button class="on two">1</button><button class="on orange">2</button></div></div>
+          <div class="row"><span class="lab">Mode</span><div class="boxes pending" style="width:150px"><button class="on">Late</button><button>Desk</button><button>…</button></div></div>
+          <div class="footer"><span class="lab">Open window</span><span class="lab">⌥⌘N</span></div>
+        </div>
+        <div class="sound">
+          <div class="title"><b>Equalizer</b><span class="lab">Custom 1 · 21 steps</span></div>
+          <div class="boxes" style="margin-bottom:6px"><button>Off</button><button>Bright</button><button>Bass</button><button>Manual</button><button class="on orange">Custom 1</button><button>Custom 2</button></div>
+          <div class="faders">${BANDS.map((b, i) => fader(b, i, t.bands)).join("")}</div>
+          <div class="row"><span class="lab">DSEE Extreme</span><div class="boxes" style="width:120px"><button class="on">Auto</button><button>Off</button></div></div>
+          <div class="row"><span class="lab">Codec</span><span class="dot" style="font-size:14px;color:var(--accent-2)">AAC</span></div>
+        </div>
+      </div>
+      <div class="swatches">${sw}</div>
+    </section>`;
+  };
+
+  document.getElementById("grid").innerHTML = THEMES.map(card).join("");
+</script>
+</body>
+</html>

@@ -134,16 +134,16 @@
   // Six tokens per theme, exactly the ones tokens.css defines, plus the
   // theme's own accent and the ink colour that reads on it.
   const THEMES = [
-    { n: 1, name: "Catppuccin Latte", kind: "light", why: "The light flavour of the most installed Neovim and terminal palette of the last two years. Soft grey-blue paper, lavender-grey ink, peach accent.",
-      t: { paper: "#eff1f5", ink: "#4c4f69", hair: "#ccd0da", muted: "#6c6f85", box: "#e6e9ef", stripe: "#9ca0b0", accent: "#fe640b", onAccent: "#eff1f5" } },
+    { n: 1, name: "Catppuccin Latte", kind: "light", why: "The light flavour of the most installed Neovim and terminal palette of the last two years. Soft grey-blue paper, lavender-grey ink, mauve accent (peach measured 2.6:1 on this paper, too faint for live text).",
+      t: { paper: "#eff1f5", ink: "#4c4f69", hair: "#ccd0da", muted: "#6c6f85", box: "#e6e9ef", stripe: "#9ca0b0", accent: "#8839ef", onAccent: "#eff1f5" } },
     { n: 2, name: "Solarized Light", kind: "light", why: "Ethan Schoonover's 2011 palette, still the reference for a calibrated warm light theme. Cream paper, deep teal ink, its own orange sits close to ULT.",
       t: { paper: "#fdf6e3", ink: "#073642", hair: "#d6cfb8", muted: "#657b83", box: "#eee8d5", stripe: "#93a1a1", accent: "#cb4b16", onAccent: "#fdf6e3" } },
-    { n: 3, name: "Rosé Pine Dawn", kind: "light", why: "The warm light variant of Rosé Pine. Blush paper, muted violet ink, rose accent. The gentlest of the light set.",
-      t: { paper: "#faf4ed", ink: "#575279", hair: "#dfd9d3", muted: "#797593", box: "#fffaf3", stripe: "#9893a5", accent: "#d7827e", onAccent: "#faf4ed" } },
+    { n: 3, name: "Rosé Pine Dawn", kind: "light", why: "The warm light variant of Rosé Pine. Blush paper, muted violet ink, the deeper of Rosé Pine's two roses as the accent (the lighter one measured 2.6:1, too faint for live text). The gentlest of the light set.",
+      t: { paper: "#faf4ed", ink: "#575279", hair: "#dfd9d3", muted: "#797593", box: "#fffaf3", stripe: "#9893a5", accent: "#b4637a", onAccent: "#faf4ed" } },
     { n: 4, name: "Sepia", kind: "light", why: "The reading theme people ask every app for: less glare than white, no inversion. Aged-paper tan, brown-black ink, rust accent.",
       t: { paper: "#f1e6d0", ink: "#3b2f23", hair: "#d8c9a8", muted: "#7d6b55", box: "#f7efdf", stripe: "#a08c6c", accent: "#b5451b", onAccent: "#f7efdf" } },
-    { n: 5, name: "Kraft", kind: "light", why: "This app's own idea taken further: brown packing paper with near-black ink, like a printed label. Orange reads loud on it, so the live accent stays ULT.",
-      t: { paper: "#cfbb94", ink: "#231c15", hair: "#b39f78", muted: "#665441", box: "#dccba8", stripe: "#8a7656", accent: "#ff6600", onAccent: "#231c15" } },
+    { n: 5, name: "Kraft", kind: "light", why: "This app's own idea taken further: brown packing paper with near-black ink, like a printed label. ULT orange all but vanishes on this brown (1.6:1), so the live accent is a brick-red stamp.",
+      t: { paper: "#cfbb94", ink: "#231c15", hair: "#b39f78", muted: "#574634", box: "#dccba8", stripe: "#8a7656", accent: "#8b1a1a", onAccent: "#f3e9d6" } },
     { n: 6, name: "Nord", kind: "dark", why: "Arctic blue-grey, one of the most installed dark themes anywhere. Polar night paper, snow ink, frost accent.",
       t: { paper: "#2e3440", ink: "#eceff4", hair: "#434c5e", muted: "#9aa3b5", box: "#3b4252", stripe: "#81a1c1", accent: "#88c0d0", onAccent: "#2e3440" } },
     { n: 7, name: "Catppuccin Mocha", kind: "dark", why: "The dark flavour that most 2026 guides name as the comfortable default. Deep indigo paper, pale lavender ink, peach accent.",

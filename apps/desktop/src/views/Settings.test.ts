@@ -94,7 +94,7 @@ describe("Settings", () => {
 
   it("checks now and says up to date, or why not", async () => {
     const r = render(Settings, { st: emptyState() });
-    await waitFor(() => expect(r.getByText("Hairline 0.2.0")).toBeInTheDocument());
+    await waitFor(() => expect(r.getByText("SHDC 0.2.0")).toBeInTheDocument());
     backend.check = { phase: "up_to_date" };
     await fireEvent.click(r.getByRole("button", { name: "Check now" }));
     await waitFor(() => expect(r.getByText("Up to date")).toBeInTheDocument());
@@ -108,7 +108,7 @@ describe("Settings", () => {
     const r = render(Settings, { st: emptyState() });
     await waitFor(() => expect(backend.update).not.toBeNull());
     backend.update!({ payload: { phase: "available", version: "0.2.1", notes: "Fixes the tray", date: "2026-11-08" } });
-    await waitFor(() => expect(r.getByText(/Hairline 0.2.1 is available/)).toBeInTheDocument());
+    await waitFor(() => expect(r.getByText(/SHDC 0.2.1 is available/)).toBeInTheDocument());
     expect(r.getByText("Fixes the tray")).toBeInTheDocument();
     await fireEvent.click(r.getByRole("button", { name: "Update now" }));
     expect(vi.mocked(invoke)).toHaveBeenCalledWith("install_update");
@@ -132,7 +132,7 @@ describe("Settings", () => {
     backend.update!({ payload: { phase: "available", version: "0.2.3", notes: "", date: null } });
     await waitFor(() => expect(r.getByRole("button", { name: "Later" })).toBeInTheDocument());
     await fireEvent.click(r.getByRole("button", { name: "Later" }));
-    await waitFor(() => expect(r.queryByText(/Hairline 0.2.3 is available/)).toBeNull());
+    await waitFor(() => expect(r.queryByText(/SHDC 0.2.3 is available/)).toBeNull());
     expect(vi.mocked(invoke)).toHaveBeenCalledWith("dismiss_update", { version: "0.2.3" });
     r.unmount();
   });

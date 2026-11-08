@@ -239,12 +239,12 @@ impl<'a> FrameTap<'a> {
         match self.recorder.set(&self.log_dir, on) {
             Ok(path) => {
                 if let Some(path) = &path {
-                    eprintln!("hairline: frame log at {}", path.display());
+                    eprintln!("shdc: frame log at {}", path.display());
                 }
                 (self.emit_recording)(path.as_deref());
             }
             Err(e) => {
-                eprintln!("hairline: frame log not started ({e})");
+                eprintln!("shdc: frame log not started ({e})");
                 (self.emit_recording)(self.recorder.path().as_deref());
             }
         }

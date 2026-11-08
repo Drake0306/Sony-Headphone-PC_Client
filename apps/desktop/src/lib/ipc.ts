@@ -182,7 +182,7 @@ export const onUpdateDismissed = (handler: (version: string | null) => void): Pr
   listen<string | null>("update-dismissed", (event) => handler(event.payload));
 
 /** Where the popover leaves the tab for a main window it has just created (not listening yet). */
-export const OPEN_TAB_KEY = "hairline.openTab";
+export const OPEN_TAB_KEY = "shdc.openTab";
 
 /** Opens the main window on `tab`: the "navigate" event for an open window, localStorage for a new one. */
 export async function openMainWindowOn(tab: string) {

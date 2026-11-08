@@ -279,7 +279,7 @@ impl<'a> BatteryHost<'a> {
                 self.emit_current();
             }
             Ok(false) => {}
-            Err(e) => eprintln!("hairline: battery sample not saved: {e}"),
+            Err(e) => eprintln!("shdc: battery sample not saved: {e}"),
         }
     }
 

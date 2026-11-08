@@ -3,7 +3,7 @@
 //! The plugin's real check needs the network and a running app, so it is not
 //! exercised here.
 
-use hairline_lib::updater::{
+use shdc_lib::updater::{
     background_outcome, classify, classify_error, is_newer, next_step, Background, BackgroundLog,
     PercentGate, Phase, Progress, UpdateInfo,
 };
@@ -48,7 +48,7 @@ fn newer_is_a_semver_comparison() {
 
 #[test]
 fn update_without_valid_signature_is_refused() {
-    // A real minisign check of tampered bytes against Hairline's key fails...
+    // A real minisign check of tampered bytes against SHDC's key fails...
     let key_text = String::from_utf8(base64_decode(PUBKEY)).unwrap();
     let key = minisign_verify::PublicKey::decode(&key_text).unwrap();
     // A well-formed signature made by some other key for other bytes.

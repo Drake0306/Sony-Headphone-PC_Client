@@ -23,7 +23,7 @@ pub fn frontmost_app_name() -> Option<String> {
             .map(|name| name.to_string())
     });
     if name.is_none() {
-        FAILED.call_once(|| eprintln!("hairline: frontmost app unknown; app triggers stay off"));
+        FAILED.call_once(|| eprintln!("shdc: frontmost app unknown; app triggers stay off"));
     }
     name
 }
@@ -42,7 +42,7 @@ pub fn mic_in_use() -> bool {
     static FAILED: Once = Once::new();
     let fail = |what: &str, status: i32| {
         FAILED.call_once(|| {
-            eprintln!("hairline: {what} (CoreAudio {status}); microphone triggers stay off")
+            eprintln!("shdc: {what} (CoreAudio {status}); microphone triggers stay off")
         });
         false
     };

@@ -201,7 +201,7 @@ export function codecLabel(codec: Codec | null): string {
 /** Marketing model number for the name the device reports. */
 export const modelNumber = (model: string | null): string => (model === "ULT WEAR" ? "WH-ULT900N" : (model ?? ""));
 
-/** EQ preset ids Hairline acts on by name: Off, and the three the user shapes. */
+/** EQ preset ids SHDC acts on by name: Off, and the three the user shapes. */
 export const PRESET_OFF = 0x00;
 export const PRESET_MANUAL = 0xa0;
 export const PRESET_CUSTOM_1 = 0xa1;

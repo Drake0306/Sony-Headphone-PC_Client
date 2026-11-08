@@ -1,4 +1,4 @@
-//! `hairlinectl`: talks to the running Hairline app over its local socket.
+//! `shdcctl`: talks to the running SHDC app over its local socket.
 
 mod proto;
 
@@ -32,21 +32,21 @@ fn run(cli: &Cli) -> Result<String, String> {
     let home = std::env::var_os("HOME")
         .map(PathBuf::from)
         .unwrap_or_default();
-    let env_socket = std::env::var("HAIRLINE_SOCKET").ok();
+    let env_socket = std::env::var("SHDC_SOCKET").ok();
     let path = proto::socket_path(env_socket.as_deref(), &home);
     let stream = UnixStream::connect(&path)
-        .map_err(|_| format!("Hairline is not running (no socket at {})", path.display()))?;
+        .map_err(|_| format!("SHDC is not running (no socket at {})", path.display()))?;
     let mut writer = stream
         .try_clone()
         .map_err(|e| format!("socket error: {e}"))?;
     writeln!(writer, "{}", proto::request(&cli.command))
-        .map_err(|e| format!("could not send to Hairline: {e}"))?;
+        .map_err(|e| format!("could not send to SHDC: {e}"))?;
     let mut line = String::new();
     BufReader::new(stream)
         .read_line(&mut line)
-        .map_err(|e| format!("no answer from Hairline: {e}"))?;
+        .map_err(|e| format!("no answer from SHDC: {e}"))?;
     let answer: serde_json::Value = serde_json::from_str(line.trim())
-        .map_err(|_| format!("Hairline answered something unreadable: {}", line.trim()))?;
+        .map_err(|_| format!("SHDC answered something unreadable: {}", line.trim()))?;
     let ok = answer["ok"].as_bool() == Some(true);
     let text = if cli.json {
         answer.to_string()
@@ -55,7 +55,7 @@ fn run(cli: &Cli) -> Result<String, String> {
     } else {
         answer["error"]
             .as_str()
-            .unwrap_or("Hairline refused the request")
+            .unwrap_or("SHDC refused the request")
             .to_string()
     };
     if ok {

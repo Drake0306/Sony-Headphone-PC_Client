@@ -136,7 +136,7 @@ describe("Popover update notice", () => {
     await waitFor(() => expect(backend.update).not.toBeNull());
     expect(r.queryByText(/Update available/)).toBeNull();
     backend.update!({ payload: { phase: "available", version: "0.2.1", notes: "", date: null } });
-    const notice = await r.findByRole("button", { name: /Update available · open Hairline/ });
+    const notice = await r.findByRole("button", { name: /Update available · open SHDC/ });
     await fireEvent.click(notice);
     await waitFor(() => expect(vi.mocked(emitTo)).toHaveBeenCalledWith("main", "navigate", "settings"));
     // Later in Settings (another window) hides it here too.

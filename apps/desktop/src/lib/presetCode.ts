@@ -34,7 +34,7 @@ const RAW_MAX = 20;
 const LEVEL_MIN = -10;
 const LEVEL_MAX = 10;
 
-export const NOT_A_CODE = "That code is not a Hairline preset.";
+export const NOT_A_CODE = "That code is not an SHDC preset.";
 export const BAD_CHECK = "That code has a typo (check failed).";
 
 export type Ult = 0 | 1 | 2;

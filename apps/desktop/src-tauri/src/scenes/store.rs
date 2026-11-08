@@ -88,9 +88,11 @@ pub fn load(dir: &Path) -> Vec<Scene> {
         Ok(scenes) => disable_invalid(scenes),
         Err(e) if e.kind() == io::ErrorKind::NotFound => seed_scenes(),
         Err(e) => {
-            eprintln!("hairline: scenes.json unreadable ({e}); kept as scenes.json.bad, using the examples");
+            eprintln!(
+                "shdc: scenes.json unreadable ({e}); kept as scenes.json.bad, using the examples"
+            );
             if let Err(e) = std::fs::rename(&path, dir.join(BAD_NAME)) {
-                eprintln!("hairline: could not rename scenes.json: {e}");
+                eprintln!("shdc: could not rename scenes.json: {e}");
             }
             seed_scenes()
         }
@@ -118,9 +120,9 @@ fn disable_invalid(mut scenes: Vec<Scene>) -> Vec<Scene> {
         if let Some(why) = problem {
             if s.enabled {
                 s.enabled = false;
-                eprintln!("hairline: {why}; scene disabled");
+                eprintln!("shdc: {why}; scene disabled");
             } else {
-                eprintln!("hairline: {why}");
+                eprintln!("shdc: {why}");
             }
         }
     }

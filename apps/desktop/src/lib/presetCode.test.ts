@@ -14,7 +14,7 @@ const SOUND_CODE = "SFB8B-DGA00-000W7";
 const ADVANCED_VECTOR = [8, 6, 4, 2, 0, -2, 0, 2, 4, -10];
 const ADVANCED_CODE = "AJGEC-A8ACE-000ND";
 
-const NOT_OURS = "That code is not a Hairline preset.";
+const NOT_OURS = "That code is not an SHDC preset.";
 const TYPO = "That code has a typo (check failed).";
 
 describe("preset share codes", () => {

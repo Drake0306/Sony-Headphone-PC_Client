@@ -1,4 +1,4 @@
-//! Hairline desktop app: wires the broker, the tray, the popover and the commands.
+//! SHDC desktop app: wires the broker, the tray, the popover and the commands.
 
 #[cfg(not(target_os = "windows"))]
 mod audio_macos;
@@ -28,10 +28,10 @@ use std::sync::Mutex;
 use mdr_session::DeviceState;
 use tauri::Manager;
 
-/// `--fake-device` or `HAIRLINE_FAKE=1` selects the scripted fake headphones.
+/// `--fake-device` or `SHDC_FAKE=1` selects the scripted fake headphones.
 fn wants_fake_device() -> bool {
     std::env::args().any(|a| a == "--fake-device")
-        || std::env::var("HAIRLINE_FAKE").is_ok_and(|v| v == "1")
+        || std::env::var("SHDC_FAKE").is_ok_and(|v| v == "1")
 }
 
 pub fn run() {
@@ -103,7 +103,7 @@ pub fn run() {
             let app_settings = match &dir {
                 Ok(dir) => settings::load(dir),
                 Err(e) => {
-                    eprintln!("hairline: no settings directory ({e}); using defaults");
+                    eprintln!("shdc: no settings directory ({e}); using defaults");
                     settings::AppSettings::default()
                 }
             };
@@ -144,7 +144,7 @@ pub fn run() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("error while building Hairline")
+        .expect("error while building SHDC")
         .run(|app, event| {
             if matches!(event, tauri::RunEvent::Exit) {
                 socket::cleanup(app);

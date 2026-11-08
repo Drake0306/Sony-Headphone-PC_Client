@@ -2,7 +2,7 @@
 //! `AF_BLUETOOTH` / `BTPROTO_RFCOMM` socket for the link.
 //!
 //! BlueZ no longer offers SDP browsing over D-Bus, so the RFCOMM channel comes
-//! from `HAIRLINE_RFCOMM_CHANNEL` when set, else from the channel recorded for
+//! from `SHDC_RFCOMM_CHANNEL` when set, else from the channel recorded for
 //! this device after an earlier connect, else from a bounded scan of channels
 //! 1..=30. Those first two are trusted: the first of them that accepts the
 //! connection is used without a probe, and the session's own handshake proves
@@ -40,7 +40,7 @@ pub(crate) const ECONNREFUSED: i32 = 111;
 pub(crate) const EINPROGRESS: i32 = 115;
 
 /// Environment variable that names the RFCOMM channel and skips the scan.
-pub(crate) const CHANNEL_ENV: &str = "HAIRLINE_RFCOMM_CHANNEL";
+pub(crate) const CHANNEL_ENV: &str = "SHDC_RFCOMM_CHANNEL";
 /// Highest RFCOMM channel number.
 pub(crate) const MAX_CHANNEL: u8 = 30;
 /// Upper bound on one RFCOMM `connect` (`SO_SNDTIMEO`).
@@ -98,7 +98,7 @@ pub(crate) fn sockaddr_rc(bdaddr: [u8; 6], channel: u8) -> SockaddrRc {
     }
 }
 
-/// A channel number from `HAIRLINE_RFCOMM_CHANNEL`: 1..=30, else `None`.
+/// A channel number from `SHDC_RFCOMM_CHANNEL`: 1..=30, else `None`.
 pub(crate) fn parse_channel(value: &str) -> Option<u8> {
     value
         .trim()
@@ -117,7 +117,7 @@ pub(crate) fn env_channel(value: Option<&str>) -> (Option<u8>, Option<String>) {
             None => (
                 None,
                 Some(format!(
-                    "hairline: ignoring {CHANNEL_ENV}={v:?} (not a channel 1..=30)"
+                    "shdc: ignoring {CHANNEL_ENV}={v:?} (not a channel 1..=30)"
                 )),
             ),
         },
@@ -450,7 +450,7 @@ mod platform {
             PROBE_WAIT,
         )?;
         eprintln!(
-            "hairline: RFCOMM channel {} ({})",
+            "shdc: RFCOMM channel {} ({})",
             found.channel,
             channel_source(found.channel, env, recorded)
         );
@@ -710,7 +710,7 @@ mod tests {
         assert_eq!(ch, None);
         assert_eq!(
             warning.as_deref(),
-            Some("hairline: ignoring HAIRLINE_RFCOMM_CHANNEL=\"99\" (not a channel 1..=30)")
+            Some("shdc: ignoring SHDC_RFCOMM_CHANNEL=\"99\" (not a channel 1..=30)")
         );
 
         assert_eq!(parse_channel("18"), Some(18));

@@ -78,9 +78,9 @@ jobs:
         run: pnpm build
         working-directory: apps/desktop
       - name: Test
-        run: cargo test -p hairline
+        run: cargo test -p shdc
       - name: Clippy
-        run: cargo clippy -p hairline --all-targets -- -D warnings
+        run: cargo clippy -p shdc --all-targets -- -D warnings
 
   linux-app:
     # The crates, the Linux transport and the whole Tauri app on Linux:

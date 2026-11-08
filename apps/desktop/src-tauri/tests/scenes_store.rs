@@ -2,12 +2,12 @@
 
 use std::path::PathBuf;
 
-use hairline_lib::scenes::eval::active_scene;
-use hairline_lib::scenes::model::{Inputs, Nc, Trigger};
-use hairline_lib::scenes::store::{load, save, seed_scenes};
+use shdc_lib::scenes::eval::active_scene;
+use shdc_lib::scenes::model::{Inputs, Nc, Trigger};
+use shdc_lib::scenes::store::{load, save, seed_scenes};
 
 fn temp_dir(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("hairline-scenes-{name}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("shdc-scenes-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     dir
 }

@@ -1,10 +1,12 @@
-# Hairline
+# SHDC
 
-Hairline is a desktop client for Sony ULT WEAR (WH-ULT900N) headphones. It talks to the headphones directly over Bluetooth, without the official phone app, and puts the everyday controls in a small menu-bar popover.
+**Sony Headphone Desktop Client.**
+
+SHDC is a desktop client for Sony ULT WEAR (WH-ULT900N) headphones. It talks to the headphones directly over Bluetooth, without the official phone app, and puts the everyday controls in a small menu-bar popover.
 
 ## What it looks like
 
-The Hairline design: off-white paper, one-pixel rules, dot-matrix numerals, boxed switches, and orange only where something is live. The popover is what you use every day from the menu bar; the window is where you set everything else up.
+The interface keeps its design name, Hairline: off-white paper, one-pixel rules, dot-matrix numerals, boxed switches, and orange only where something is live. The popover is what you use every day from the menu bar; the window is where you set everything else up.
 
 <table>
   <tr>
@@ -30,13 +32,13 @@ The popover shipped in Phase 1 and is validated on real hardware; the window scr
 
 Phase 1: a macOS menu-bar popover for the WH-ULT900N with battery level, noise control, ambient sound level and ULT level.
 
-Phase 2: the full window, opened from the popover footer (it loads the app with `?view=main`). It has five screens: Overview, Sound (a draggable six-band equalizer, presets, ULT, codec and DSEE), Noise, Devices and Settings. It also adds Paper, Ink and System themes and launch at login. By default Hairline shows a Dock icon only while the window is open (Settings can keep it there).
+Phase 2: the full window, opened from the popover footer (it loads the app with `?view=main`). It has five screens: Overview, Sound (a draggable six-band equalizer, presets, ULT, codec and DSEE), Noise, Devices and Settings. It also adds Paper, Ink and System themes and launch at login. By default SHDC shows a Dock icon only while the window is open (Settings can keep it there).
 
 Phase 2b: Modes (Scenes), described below. It is verified against the fake device and still needs a session with the real headphones.
 
 Phase 3a: Windows transport compiles and is unit-tested on Windows CI; the Windows tray app and hardware validation are next. It has not yet been run against the headphones on Windows.
 
-Phase 4: the Advanced panel, the opcode probe, battery history with a time-left estimate, and a local socket with the `hairlinectl` command-line tool, all described below. It is verified against the fake device and the unit tests; the checklist for the real headphones is section 8 of `docs/hardware-validation.md`.
+Phase 4: the Advanced panel, the opcode probe, battery history with a time-left estimate, and a local socket with the `shdcctl` command-line tool, all described below. It is verified against the fake device and the unit tests; the checklist for the real headphones is section 8 of `docs/hardware-validation.md`.
 
 Phase 5: the Advanced equalizer, described below, and a redesigned Sound fader (21 segments with a zero line, an orange knob and a dot-matrix value). It is verified against the fake device and the unit tests; the checklist for the real headphones is section 9 of `docs/hardware-validation.md`.
 
@@ -64,21 +66,21 @@ Every 2 seconds the broker thread checks the enabled scenes in list order, and t
 
 Actions use the existing controls only: noise control, ambient level and voice focus (sent as one request), ULT and an EQ preset (also one request), volume, and DSEE auto or off. "Keep" leaves a setting as it is. A setting the headphones refuse shows on the normal controls like any other refusal. Scenes send nothing new on the wire.
 
-Hotkeys are recorded in the scene editor as Tauri accelerators and registered with the global-shortcut plugin only while Hairline runs. If one conflicts or the OS refuses it, it shows as refused, with the reason, in the editor and in Settings. A scene hotkey needs Ctrl, Alt or Super (or is a lone F1–F24 key), so it cannot take over typing. `⌥⌘N` opens the window when macOS allows the shortcut; Settings shows it refused otherwise.
+Hotkeys are recorded in the scene editor as Tauri accelerators and registered with the global-shortcut plugin only while SHDC runs. If one conflicts or the OS refuses it, it shows as refused, with the reason, in the editor and in Settings. A scene hotkey needs Ctrl, Alt or Super (or is a lone F1–F24 key), so it cannot take over typing. `⌥⌘N` opens the window when macOS allows the shortcut; Settings shows it refused otherwise.
 
 ## Sound
 
-The Sound screen shows the headphones' six EQ bands as faders, the preset grid, ULT, the codec and DSEE, all as the headphones report them. The faders can be moved only on Manual, Custom 1 and Custom 2. On Sony's fixed presets (Bright, Excited, Mellow, Relaxed, Vocal, Treble Boost, Bass Boost, Speech) the headphones apply the curve inside and report every band at 0, so the faders are read-only and say so: "Sony applies this preset inside the headphones and does not report its band values. Choose Manual, Custom 1 or Custom 2 to shape your own." On Off the faders are disabled ("Equalizer off."). Hairline never makes up band values for a fixed preset.
+The Sound screen shows the headphones' six EQ bands as faders, the preset grid, ULT, the codec and DSEE, all as the headphones report them. The faders can be moved only on Manual, Custom 1 and Custom 2. On Sony's fixed presets (Bright, Excited, Mellow, Relaxed, Vocal, Treble Boost, Bass Boost, Speech) the headphones apply the curve inside and report every band at 0, so the faders are read-only and say so: "Sony applies this preset inside the headphones and does not report its band values. Choose Manual, Custom 1 or Custom 2 to shape your own." On Off the faders are disabled ("Equalizer off."). SHDC never makes up band values for a fixed preset.
 
 ## Advanced equalizer
 
-The headphones have six EQ bands. The Advanced equalizer is a ten-band curve (31 Hz to 16 kHz) that Hairline keeps itself. Open it with the "Advanced" button next to the Equalizer heading on the Sound screen; it takes the whole content area and "‹ Sound" returns. It shows four of the ten bands at a time, and ‹ and › page through them (1–4, 5–8, 7–10).
+The headphones have six EQ bands. The Advanced equalizer is a ten-band curve (31 Hz to 16 kHz) that SHDC keeps itself. Open it with the "Advanced" button next to the Equalizer heading on the Sound screen; it takes the whole content area and "‹ Sound" returns. It shows four of the ten bands at a time, and ‹ and › page through them (1–4, 5–8, 7–10).
 
-Every change is saved to `eq_curve.json`, next to `settings.json` in the app's config directory. Nothing is sent to the headphones while you edit. These bands run in Hairline only; the headphones keep their six-band curve.
+Every change is saved to `eq_curve.json`, next to `settings.json` in the app's config directory. Nothing is sent to the headphones while you edit. These bands run in SHDC only; the headphones keep their six-band curve.
 
 "Send best fit to headphones" fits the ten bands onto the six: Clear Bass is the mean of the four lowest bands, 1 kHz and 16 kHz are taken directly, and 400 Hz, 2.5 kHz and 6.3 kHz are interpolated in log frequency between their neighbours (rounded half away from zero, clamped to −10..+10). The view shows the headphones' current six values beside the fit.
 
-Send asks first. A dialog, "Send best fit to the headphones?", says that the headphones hold six bands (Clear Bass, 400 Hz, 1 kHz, 2.5 kHz, 6.3 kHz, 16 kHz), not ten, that Hairline fits the ten onto those six, which preset they go into, and lists the six fitted values. Nothing is sent until you press Send in the dialog; Cancel, Escape or a click outside it sends nothing.
+Send asks first. A dialog, "Send best fit to the headphones?", says that the headphones hold six bands (Clear Bass, 400 Hz, 1 kHz, 2.5 kHz, 6.3 kHz, 16 kHz), not ten, that SHDC fits the ten onto those six, which preset they go into, and lists the six fitted values. Nothing is sent until you press Send in the dialog; Cancel, Escape or a click outside it sends nothing.
 
 Which preset: if the headphones are on Manual, Custom 1 or Custom 2, the fit is written into that preset. On any other preset (a fixed Sony preset or Off) it is written into Custom 1, and the dialog says "Custom 1 (the headphones will switch to it)". The write is one normal EQ command (`58 03`) that carries the target preset and the six bands together and keeps ULT as it is; no new command goes on the wire.
 
@@ -90,7 +92,7 @@ An equalizer setting can be passed to someone else as a 15-character code, shown
 
 **Share.** On the Sound screen, "Share" (in the Presets block) is available on Manual, Custom 1 and Custom 2 while the headphones are connected; it encodes the six bands the headphones report, the ULT level and which of the three presets it came from. It is unavailable on a fixed Sony preset or Off (Sony does not report a fixed preset's bands), with no headphones, while an EQ change is still pending, and on headphones whose equalizer is not six bands of 21 steps. In the Advanced equalizer, "Share" and "Paste a code" sit at the right of the top row; "Share" encodes the ten-band curve. Either opens "Share this preset" / "Share this curve" with the QR, the code and Copy.
 
-**Paste.** "Paste a code" (on the Sound screen and in the Advanced equalizer) opens a field. The code is checked as you type, with or without dashes (any kind of dash), in any case; the values it carries are shown under it, or "That code is not a Hairline preset." / "That code has a typo (check failed).". Apply then:
+**Paste.** "Paste a code" (on the Sound screen and in the Advanced equalizer) opens a field. The code is checked as you type, with or without dashes (any kind of dash), in any case; the values it carries are shown under it, or "That code is not an SHDC preset." / "That code has a typo (check failed).". Apply then:
 
 - a Sound code goes to the headphones only after the dialog "Apply this preset to the headphones?", which names the target preset and the ULT level and lists the six values. The target is the preset the code came from (Manual, Custom 1 or Custom 2); a code without one follows the Send best fit rule (the current preset if it is Manual, Custom 1 or Custom 2, otherwise Custom 1). The write is the same single `58 03 <preset> <ULT> 06 <six bands>` frame the app already uses; Cancel or Escape sends nothing.
 - an Advanced code is saved as the ten-band curve (drawn once the save succeeds) and opens the Advanced equalizer. Nothing is sent to the headphones.
@@ -103,7 +105,7 @@ An equalizer setting can be passed to someone else as a 15-character code, shown
 | 2–13 | 60 | Sound: six raw bands 0..20 (10 is flat; Clear Bass, 400 Hz, 1 kHz, 2.5 kHz, 6.3 kHz, 16 kHz), 5 bits each; ULT 0..2 in 2 bits; slot in 2 bits (0 Manual, 1 Custom 1, 2 Custom 2, 3 none); then 26 zero bits. Advanced: ten bands −10..+10 stored as level + 10 (31 Hz .. 16 kHz), 5 bits each; then 10 zero bits. |
 | 14–15 | 10 | CRC-10 over the 65 bits of symbols 1–13: polynomial 0x233, initial value 0, no reflection, no final xor. |
 
-The dashes go after symbols 5 and 10. A band above 20, ULT 3, or padding that is not zero is "not a Hairline preset". A ten-bit CRC catches every error within ten consecutive bits, so any single wrong symbol and any swapped neighbouring pair fail the check. For example, Custom 1 with bands 15 11 8 11 13 16 and ULT 1 is `SFB8B-DGA00-000W7`, and the curve 8 6 4 2 0 −2 0 2 4 −10 is `AJGEC-A8ACE-000ND`. The codec is `apps/desktop/src/lib/presetCode.ts`.
+The dashes go after symbols 5 and 10. A band above 20, ULT 3, or padding that is not zero is "not an SHDC preset". A ten-bit CRC catches every error within ten consecutive bits, so any single wrong symbol and any swapped neighbouring pair fail the check. For example, Custom 1 with bands 15 11 8 11 13 16 and ULT 1 is `SFB8B-DGA00-000W7`, and the curve 8 6 4 2 0 −2 0 2 4 −10 is `AJGEC-A8ACE-000ND`. The codec is `apps/desktop/src/lib/presetCode.ts`.
 
 The QR holds just the code text (no URL), at error-correction level M, drawn with qrcode-generator (MIT, see `THIRD_PARTY.md`).
 
@@ -119,48 +121,48 @@ Settings has an "Advanced panel" switch; turning it on adds the Advanced screen.
 
 The probe, on the Advanced screen, walks the read-only requests of the protocol to find functions the headphones answer but do not declare. It sends 46 GET opcodes, 441 requests in all, one at a time, waiting 1.5 s for a reply and 150 ms between requests. That is up to about 13 minutes (less when requests are answered). You start it by typing `RUN`, and Stop ends it at any time. It never sends a SET.
 
-Results go to `~/Library/Logs/com.drake0306.hairline/captures/probe-<secs>.json`. A function that answered although the headphones did not declare it becomes "proven" for this unit and is remembered in `devices/<address>.json`. Hairline may then read it, but never changes it. Two reads are left out: reset settings, and the LE Audio identity key (its reply is a pairing secret). The catalogue is in `crates/mdr-proto/src/probe.rs`.
+Results go to `~/Library/Logs/com.drake0306.hairline/captures/probe-<secs>.json`. A function that answered although the headphones did not declare it becomes "proven" for this unit and is remembered in `devices/<address>.json`. SHDC may then read it, but never changes it. Two reads are left out: reset settings, and the LE Audio identity key (its reply is a pairing secret). The catalogue is in `crates/mdr-proto/src/probe.rs`.
 
 ## Battery history
 
-While the headphones are connected, Hairline records the battery level to `battery.jsonl`, next to `settings.json`. The time left comes from a least-squares fit over the current discharge segment. It shows only after at least 30 minutes of discharge and a drop of at least 2 %. A gap of more than 2 hours, or charging, starts a new segment. The estimate is refreshed every 60 seconds. Clear in Settings deletes the history.
+While the headphones are connected, SHDC records the battery level to `battery.jsonl`, next to `settings.json`. The time left comes from a least-squares fit over the current discharge segment. It shows only after at least 30 minutes of discharge and a drop of at least 2 %. A gap of more than 2 hours, or charging, starts a new segment. The estimate is refreshed every 60 seconds. Clear in Settings deletes the history.
 
 ## Command line
 
-While Hairline runs, it listens on a local socket, `hairline.sock`, in the app's config directory, next to `settings.json` (on macOS that is the same as the data directory, `~/Library/Application Support/com.drake0306.hairline/`). The protocol is JSON lines, and the commands are state, set, scene, scenes and battery. The socket has no raw, power or probe command. `hairlinectl` (crate `crates/mdr-cli`) talks to it. Install it once, then use it from any terminal:
+While SHDC runs, it listens on a local socket, `shdc.sock`, in the app's config directory, next to `settings.json` (on macOS that is the same as the data directory, `~/Library/Application Support/com.drake0306.hairline/`). The protocol is JSON lines, and the commands are state, set, scene, scenes and battery. The socket has no raw, power or probe command. `shdcctl` (crate `crates/mdr-cli`) talks to it. Install it once, then use it from any terminal:
 
 ```
 cargo install --path crates/mdr-cli
-hairlinectl state
-hairlinectl nc ambient --level 12 --voice on
-hairlinectl ult 2
-hairlinectl volume 20
-hairlinectl eq "bass boost"
-hairlinectl scenes
-hairlinectl scene "At the desk"
-hairlinectl battery
-hairlinectl --json state
+shdcctl state
+shdcctl nc ambient --level 12 --voice on
+shdcctl ult 2
+shdcctl volume 20
+shdcctl eq "bass boost"
+shdcctl scenes
+shdcctl scene "At the desk"
+shdcctl battery
+shdcctl --json state
 ```
 
-`state`, `nc`, `ult`, `volume`, `eq`, `scene`, `scenes` and `battery` are the subcommands. `--json` prints the app's raw answer, and `$HAIRLINE_SOCKET` points it at another socket. It exits with 1 when the app is not running or refuses the request. On Windows it prints that it is not supported yet.
+`state`, `nc`, `ult`, `volume`, `eq`, `scene`, `scenes` and `battery` are the subcommands. `--json` prints the app's raw answer, and `$SHDC_SOCKET` points it at another socket. It exits with 1 when the app is not running or refuses the request. On Windows it prints that it is not supported yet.
 
 ## Install
 
 Builds for macOS and Windows are on the [Releases page](https://github.com/Drake0306/Sony-Headphone-PC_Client/releases).
 
-macOS: open the `.dmg` and drag Hairline to Applications. Open it once; macOS says it could not verify the app because it is not signed with an Apple Developer certificate yet. Click Done, then go to System Settings → Privacy & Security, scroll to Security, click Open Anyway, enter your password and click Open. After that it opens normally. Terminal alternative: `xattr -dr com.apple.quarantine /Applications/Hairline.app`. Pair the headphones in System Settings → Bluetooth first.
+macOS: open the `.dmg` and drag SHDC to Applications. Open it once; macOS says it could not verify the app because it is not signed with an Apple Developer certificate yet. Click Done, then go to System Settings → Privacy & Security, scroll to Security, click Open Anyway, enter your password and click Open. After that it opens normally. Terminal alternative: `xattr -dr com.apple.quarantine /Applications/SHDC.app`. Pair the headphones in System Settings → Bluetooth first.
 
 Windows: run the `.msi` or the `-setup.exe`. If SmartScreen appears, choose More info → Run anyway. The Windows build compiles and passes its tests but has not been tried with real headphones on Windows.
 
 ## Updates
 
-Hairline checks the latest GitHub release for a newer version 15 seconds after it starts and every 6 hours while it runs. It reads `latest.json` from the release; nothing else is sent. A failed check (offline, GitHub down) shows nothing.
+SHDC checks the latest GitHub release for a newer version 15 seconds after it starts and every 6 hours while it runs. It reads `latest.json` from the release; nothing else is sent. A failed check (offline, GitHub down) shows nothing.
 
-When a newer version is out, Settings shows "Hairline 0.x.y is available" with the release notes, and the popover shows "Update available · open Hairline". Later hides that version until Hairline is next started. Update now downloads it with a progress bar, installs it and relaunches Hairline as the new version. On Windows the installer takes over and starts Hairline again when it is done; it may ask for permission. Nothing is downloaded or installed unless you click Update now. Check now in Settings asks at any time.
+When a newer version is out, Settings shows "SHDC 0.x.y is available" with the release notes, and the popover shows "Update available · open SHDC". Later hides that version until SHDC is next started. Update now downloads it with a progress bar, installs it and relaunches SHDC as the new version. On Windows the installer takes over and starts SHDC again when it is done; it may ask for permission. Nothing is downloaded or installed unless you click Update now. Check now in Settings asks at any time.
 
-Every update is signed in the release workflow, and Hairline carries the public key. A download whose signature does not match is not installed, and Settings says "Update could not be verified".
+Every update is signed in the release workflow, and SHDC carries the public key. A download whose signature does not match is not installed, and Settings says "Update could not be verified".
 
-To stop the automatic checks, switch off "Check for updates automatically" in Settings. Check now still works. Switching it back on takes effect the next time Hairline starts.
+To stop the automatic checks, switch off "Check for updates automatically" in Settings. Check now still works. Switching it back on takes effect the next time SHDC starts.
 
 ## Run it
 
@@ -175,7 +177,7 @@ pnpm tauri dev -- -- --fake-device
 The double `--` is intentional: the Tauri CLI forwards the first one to cargo, and the second hands `--fake-device` to the app. Setting the environment variable also works:
 
 ```
-HAIRLINE_FAKE=1 pnpm tauri dev
+SHDC_FAKE=1 pnpm tauri dev
 ```
 
 `--fake-device` runs the app against a simulated headphone instead of a real Bluetooth connection, so you can try the popover without the hardware.
@@ -187,7 +189,7 @@ sudo apt-get install libdbus-1-dev pkg-config libwebkit2gtk-4.1-dev \
   libayatana-appindicator3-dev librsvg2-dev patchelf libgtk-3-dev libxdo-dev libssl-dev
 ```
 
-The tray icon needs a desktop with StatusNotifierItem support (on GNOME, the AppIndicator extension). Linux trays report no clicks, so the popover opens from the tray menu's "Show Hairline". BlueZ does not expose SDP over D-Bus, so the transport finds the MDR v2 RFCOMM channel itself: `HAIRLINE_RFCOMM_CHANNEL=18` names it; otherwise it uses the channel recorded at the last connect. Either is used as soon as it accepts the connection, and the session's handshake proves it. If neither connects, it scans the other channels 1 to 30, sending each only the protocol-info GET (`00 00`) and keeping the first that answers as v2. A channel that refuses, is busy (held by HFP or another program) or does not connect within 5 seconds is skipped. The channel used is printed (`hairline: RFCOMM channel 18 (channel scan)`) and recorded in `devices/<address>.json`.
+The tray icon needs a desktop with StatusNotifierItem support (on GNOME, the AppIndicator extension). Linux trays report no clicks, so the popover opens from the tray menu's "Show SHDC". BlueZ does not expose SDP over D-Bus, so the transport finds the MDR v2 RFCOMM channel itself: `SHDC_RFCOMM_CHANNEL=18` names it; otherwise it uses the channel recorded at the last connect. Either is used as soon as it accepts the connection, and the session's handshake proves it. If neither connects, it scans the other channels 1 to 30, sending each only the protocol-info GET (`00 00`) and keeping the first that answers as v2. A channel that refuses, is busy (held by HFP or another program) or does not connect within 5 seconds is skipped. The channel used is printed (`hairline: RFCOMM channel 18 (channel scan)`) and recorded in `devices/<address>.json`.
 
 ## Tests
 
@@ -199,7 +201,7 @@ cd apps/desktop && pnpm check && pnpm test
 
 ## Debugging
 
-`HAIRLINE_FRAME_LOG=1` writes every frame and session log line to `<YYYY-MM-DD-HHMMSS>.log` (time in UTC) in the capture directory: `~/Library/Logs/com.drake0306.hairline/captures/` on macOS, `captures` in the app's `logs` directory under the local data directory on Windows and Linux (for example `%LOCALAPPDATA%\com.drake0306.hairline\logs\captures\`). The probe results and the Record button write there too.
+`SHDC_FRAME_LOG=1` writes every frame and session log line to `<YYYY-MM-DD-HHMMSS>.log` (time in UTC) in the capture directory: `~/Library/Logs/com.drake0306.hairline/captures/` on macOS, `captures` in the app's `logs` directory under the local data directory on Windows and Linux (for example `%LOCALAPPDATA%\com.drake0306.hairline\logs\captures\`). The probe results and the Record button write there too.
 To record from a running app instead, turn on the Advanced panel and press Record in the frame log. Raw commands are sent from the same screen; the deny-list still applies.
 
 ## Layout
@@ -212,7 +214,7 @@ To record from a running app instead, turn on the Advanced panel and press Recor
 
 ## Safety
 
-Hairline never sends commands on the deny-list. The app, the scenes and the socket change a setting only when the headphones declare its function; a function the probe proved (it answered although it was not declared) unlocks reads, never changes. The only way to send a SET for anything else is a raw command in the Advanced panel, which asks you to type `SEND` first and cannot get past the deny-list. The probe sends only GETs, and neither the probe nor the socket can send a raw command. The one exception to the deny-list is power off, after the user confirms it. The details are in [docs/protocol-notes.md](docs/protocol-notes.md).
+SHDC never sends commands on the deny-list. The app, the scenes and the socket change a setting only when the headphones declare its function; a function the probe proved (it answered although it was not declared) unlocks reads, never changes. The only way to send a SET for anything else is a raw command in the Advanced panel, which asks you to type `SEND` first and cannot get past the deny-list. The probe sends only GETs, and neither the probe nor the socket can send a raw command. The one exception to the deny-list is power off, after the user confirms it. The details are in [docs/protocol-notes.md](docs/protocol-notes.md).
 
 ## Design
 

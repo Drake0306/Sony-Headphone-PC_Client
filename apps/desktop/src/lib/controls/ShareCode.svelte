@@ -70,7 +70,7 @@
       <path d={qrPath(qr.dark)} class="dark" />
     </svg>
     <p class="code" bind:this={codeText}>{code}</p>
-    <p class="hint">Anyone with Hairline can paste this code</p>
+    <p class="hint">Anyone with SHDC can paste this code</p>
     <div class="actions">
       {#if copied}<span class="lab" role="status">{copied}</span>{/if}
       <button class="btn" onclick={onclose}>Close</button>

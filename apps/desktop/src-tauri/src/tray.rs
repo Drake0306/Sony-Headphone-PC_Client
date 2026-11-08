@@ -1,6 +1,6 @@
 //! The menu-bar icon: left click toggles the popover, right click offers Quit.
 //! Linux trays (StatusNotifierItem through libayatana-appindicator) report no
-//! clicks, only the menu, so there the menu also offers "Show Hairline".
+//! clicks, only the menu, so there the menu also offers "Show SHDC".
 
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
@@ -10,12 +10,12 @@ use tauri::AppHandle;
 use crate::popover;
 
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
-    let quit = MenuItem::with_id(app, "quit", "Quit Hairline", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit SHDC", true, None::<&str>)?;
     #[cfg(not(target_os = "linux"))]
     let menu = Menu::with_items(app, &[&quit])?;
     #[cfg(target_os = "linux")]
     let menu = {
-        let show = MenuItem::with_id(app, "show", "Show Hairline", true, None::<&str>)?;
+        let show = MenuItem::with_id(app, "show", "Show SHDC", true, None::<&str>)?;
         Menu::with_items(app, &[&show, &quit])?
     };
     // macOS tints the monochrome template icon for the menu bar. Windows and
@@ -30,7 +30,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let builder = TrayIconBuilder::with_id("main")
         .icon(Image::from_bytes(include_bytes!("../icons/32x32.png"))?);
     builder
-        .tooltip("Hairline")
+        .tooltip("SHDC · Sony Headphone Desktop Client")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {

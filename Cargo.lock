@@ -1558,37 +1558,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hairline"
-version = "0.2.1"
-dependencies = [
- "chrono",
- "core-foundation 0.10.1",
- "coreaudio-sys",
- "log",
- "mdr-frame",
- "mdr-proto",
- "mdr-session",
- "mdr-transport",
- "minisign-verify",
- "objc2",
- "objc2-app-kit",
- "objc2-foundation",
- "semver",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-nspanel",
- "tauri-plugin-autostart",
- "tauri-plugin-global-shortcut",
- "tauri-plugin-positioner",
- "tauri-plugin-updater",
- "tokio",
- "uuid",
- "windows-sys 0.59.0",
-]
-
-[[package]]
 name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3676,6 +3645,37 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "digest",
+]
+
+[[package]]
+name = "shdc"
+version = "0.3.0"
+dependencies = [
+ "chrono",
+ "core-foundation 0.10.1",
+ "coreaudio-sys",
+ "log",
+ "mdr-frame",
+ "mdr-proto",
+ "mdr-session",
+ "mdr-transport",
+ "minisign-verify",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "semver",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-nspanel",
+ "tauri-plugin-autostart",
+ "tauri-plugin-global-shortcut",
+ "tauri-plugin-positioner",
+ "tauri-plugin-updater",
+ "tokio",
+ "uuid",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

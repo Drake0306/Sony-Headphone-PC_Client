@@ -1,4 +1,4 @@
-//! Whether Hairline shows a Dock icon: while the main window is open, or
+//! Whether SHDC shows a Dock icon: while the main window is open, or
 //! always when the user turns "hide Dock icon" off.
 
 use tauri::AppHandle;
@@ -42,11 +42,11 @@ pub fn apply(app: &AppHandle, kind: ActivationPolicyKind) {
         let handle = app.clone();
         let result = app.run_on_main_thread(move || {
             if let Err(e) = handle.set_activation_policy(kind.into()) {
-                eprintln!("hairline: activation policy not set: {e}");
+                eprintln!("shdc: activation policy not set: {e}");
             }
         });
         if let Err(e) = result {
-            eprintln!("hairline: activation policy not scheduled: {e}");
+            eprintln!("shdc: activation policy not scheduled: {e}");
         }
     }
     #[cfg(not(target_os = "macos"))]

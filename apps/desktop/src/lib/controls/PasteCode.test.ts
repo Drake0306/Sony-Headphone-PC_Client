@@ -40,7 +40,7 @@ describe("Paste a code", () => {
     const apply = r.getByRole("button", { name: "Apply" });
     expect(apply.getAttribute("aria-disabled")).toBe("true");
     await type(r, "hello");
-    expect(r.getByText("That code is not a Hairline preset.")).toBeTruthy();
+    expect(r.getByText("That code is not an SHDC preset.")).toBeTruthy();
     const code = encodeSound(SOUND);
     const typo = code.slice(0, 7) + (code[7] === "1" ? "2" : "1") + code.slice(8);
     await type(r, typo);
@@ -67,7 +67,7 @@ describe("Paste a code", () => {
     const dialog = r.getByRole("dialog", { name: "Apply this preset to the headphones?" });
     expect(
       within(dialog).getByText(
-        "Hairline writes these six bands and ULT 1 into Custom 1 (the headphones will switch to it).",
+        "SHDC writes these six bands and ULT 1 into Custom 1 (the headphones will switch to it).",
       ),
     ).toBeTruthy();
     expect(writes()).toEqual([]);

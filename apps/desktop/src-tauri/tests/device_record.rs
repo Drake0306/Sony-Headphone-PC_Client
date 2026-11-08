@@ -4,14 +4,14 @@ use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver};
 use std::time::{Duration, Instant};
 
-use hairline_lib::broker::{run_broker_logged, BrokerCmd, BrokerContext};
-use hairline_lib::device_record::{capability_rows, load, save, CapabilityRow, DeviceRecord};
 use mdr_proto::Table;
 use mdr_session::DeviceState;
 use mdr_transport::{Candidate, FakeDevice};
+use shdc_lib::broker::{run_broker_logged, BrokerCmd, BrokerContext};
+use shdc_lib::device_record::{capability_rows, load, save, CapabilityRow, DeviceRecord};
 
 fn temp_dir(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("hairline-devrec-{name}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("shdc-devrec-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     dir
 }

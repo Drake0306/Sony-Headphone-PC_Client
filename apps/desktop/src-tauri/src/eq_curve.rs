@@ -61,7 +61,7 @@ pub fn load(dir: &Path) -> EqCurve {
         Ok(text) => text,
         Err(e) if e.kind() == io::ErrorKind::NotFound => return EqCurve::default(),
         Err(e) => {
-            eprintln!("hairline: could not read eq_curve.json ({e}); using a flat curve");
+            eprintln!("shdc: could not read eq_curve.json ({e}); using a flat curve");
             return EqCurve::default();
         }
     };
@@ -72,10 +72,10 @@ pub fn load(dir: &Path) -> EqCurve {
         Ok(curve) => curve,
         Err(e) => {
             eprintln!(
-                "hairline: eq_curve.json is not a valid curve ({e}); kept as eq_curve.json.bad, using a flat curve"
+                "shdc: eq_curve.json is not a valid curve ({e}); kept as eq_curve.json.bad, using a flat curve"
             );
             if let Err(e) = std::fs::rename(&path, dir.join(BAD_NAME)) {
-                eprintln!("hairline: could not rename eq_curve.json: {e}");
+                eprintln!("shdc: could not rename eq_curve.json: {e}");
             }
             EqCurve::default()
         }

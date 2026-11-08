@@ -6,16 +6,16 @@ use std::sync::mpsc::{channel, Receiver};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
-use hairline_lib::battery_history::{
-    append, clear, estimate, load, push, BatteryEstimate, BatteryHost, Sample, CAP,
-};
-use hairline_lib::broker::{run_broker_logged, BrokerCmd, BrokerContext};
 use mdr_frame::FrameType;
 use mdr_session::DeviceState;
 use mdr_transport::FakeDevice;
+use shdc_lib::battery_history::{
+    append, clear, estimate, load, push, BatteryEstimate, BatteryHost, Sample, CAP,
+};
+use shdc_lib::broker::{run_broker_logged, BrokerCmd, BrokerContext};
 
 fn temp_dir(name: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("hairline-battery-{name}-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("shdc-battery-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     dir
 }

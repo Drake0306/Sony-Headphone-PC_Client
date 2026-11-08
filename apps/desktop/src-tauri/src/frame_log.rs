@@ -1,7 +1,7 @@
 //! Frame recording: every frame and session log line, appended to
 //! `<capture dir>/<YYYY-MM-DD-HHMMSS>.log`, where the capture dir is
 //! `captures` in the app's log directory (`capture_dir`). Started from the
-//! Advanced panel (`record_frames`), or at launch with `HAIRLINE_FRAME_LOG=1`.
+//! Advanced panel (`record_frames`), or at launch with `SHDC_FRAME_LOG=1`.
 //!
 //! Lines are `t_ms dir data`: `>` frames we sent, `<` bytes the device sent
 //! (as received, so a chunk can hold part of a frame or several), both as
@@ -93,7 +93,7 @@ pub const CAPTURES: &str = "captures";
 pub fn capture_dir(log_dir: Option<PathBuf>, config_dir: Option<PathBuf>) -> PathBuf {
     log_dir
         .or(config_dir)
-        .unwrap_or_else(|| std::env::temp_dir().join("hairline"))
+        .unwrap_or_else(|| std::env::temp_dir().join("shdc"))
         .join(CAPTURES)
 }
 

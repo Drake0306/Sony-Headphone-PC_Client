@@ -194,7 +194,7 @@
 {#if asking}
   <Confirm
     title="Apply this preset to the headphones?"
-    body={`Hairline writes these six bands and ${ultText(asking.ult)} into ${asking.target.label}.`}
+    body={`SHDC writes these six bands and ${ultText(asking.ult)} into ${asking.target.label}.`}
     details={DEVICE_BAND_LABELS.map((label, k) => ({ label, value: level(fromRaw(asking?.bands[k] ?? 10)) }))}
     confirmLabel="Apply"
     onconfirm={send}

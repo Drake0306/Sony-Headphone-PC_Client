@@ -16,7 +16,7 @@ describe("Share a code", () => {
     expect(r.getByRole("dialog")).toBeTruthy();
     expect(r.getByText("Share this preset")).toBeTruthy();
     expect(r.getByText(CODE)).toBeTruthy();
-    expect(r.getByText("Anyone with Hairline can paste this code")).toBeTruthy();
+    expect(r.getByText("Anyone with SHDC can paste this code")).toBeTruthy();
     const svg = r.container.querySelector("svg.qr")!;
     expect(svg).not.toBeNull();
     const { size, dark } = qrModules(CODE);

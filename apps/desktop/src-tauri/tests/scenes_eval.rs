@@ -1,7 +1,7 @@
 //! The scene evaluator: first enabled match in list order wins.
 
-use hairline_lib::scenes::eval::{active_id_after_delete, active_scene, parse_hhmm, time_in_range};
-use hairline_lib::scenes::model::{Actions, Inputs, Scene, Trigger};
+use shdc_lib::scenes::eval::{active_id_after_delete, active_scene, parse_hhmm, time_in_range};
+use shdc_lib::scenes::model::{Actions, Inputs, Scene, Trigger};
 
 fn scene(id: &str, enabled: bool, trigger: Trigger) -> Scene {
     Scene {

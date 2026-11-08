@@ -3,9 +3,9 @@
 
 use std::time::{Duration, Instant};
 
-use hairline_lib::audio_windows;
-use hairline_lib::popover::{tray_click_action, TrayAction};
-use hairline_lib::sensors_windows::app_name_from_path;
+use shdc_lib::audio_windows;
+use shdc_lib::popover::{tray_click_action, TrayAction};
+use shdc_lib::sensors_windows::app_name_from_path;
 
 #[test]
 fn tray_click_after_focus_loss_hide_does_not_reopen() {
@@ -93,9 +93,9 @@ fn frontmost_app_none_on_failure() {
 #[cfg(windows)]
 #[test]
 fn frontmost_app_sensor_does_not_panic() {
-    if let Some(name) = hairline_lib::sensors_windows::frontmost_app_name() {
+    if let Some(name) = shdc_lib::sensors_windows::frontmost_app_name() {
         assert!(!name.is_empty());
         assert!(!name.to_ascii_lowercase().ends_with(".exe"));
     }
-    assert!(!hairline_lib::sensors_windows::mic_in_use());
+    assert!(!shdc_lib::sensors_windows::mic_in_use());
 }

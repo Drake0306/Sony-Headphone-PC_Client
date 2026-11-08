@@ -472,13 +472,13 @@ impl<'a> ProbeHost<'a> {
                 }
             }
             if let Err(e) = device_record::save(dir, address, &record) {
-                eprintln!("hairline: device record not saved ({e})");
+                eprintln!("shdc: device record not saved ({e})");
             }
         }
         self.file = match write_results(&self.out_dir, address, &self.runner.event(None).results) {
             Ok(path) => Some(path.display().to_string()),
             Err(e) => {
-                eprintln!("hairline: probe results not written ({e})");
+                eprintln!("shdc: probe results not written ({e})");
                 None
             }
         };

@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
   <key>NSBluetoothAlwaysUsageDescription</key>
-  <string>Hairline talks to your headphones over Bluetooth.</string>
+  <string>SHDC talks to your headphones over Bluetooth.</string>
 </dict>
 </plist>

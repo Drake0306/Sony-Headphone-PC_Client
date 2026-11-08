@@ -22,6 +22,7 @@ fn load_defaults_when_missing() {
             launch_at_login: false,
             hide_dock_icon: true,
             show_advanced: false,
+            auto_check_updates: true,
         }
     );
     assert!(s == AppSettings::default());
@@ -35,6 +36,7 @@ fn round_trip_save_load() {
         launch_at_login: true,
         hide_dock_icon: false,
         show_advanced: true,
+        auto_check_updates: false,
     };
     save(&dir, &s).unwrap();
     let text = std::fs::read_to_string(dir.join("settings.json")).unwrap();
@@ -104,4 +106,25 @@ fn switching_advanced_off_stops_the_probe_and_the_recording() {
         ..AppSettings::default()
     };
     assert!(advanced_off_commands(&off, &ink).is_empty());
+}
+
+#[test]
+fn auto_check_setting_round_trip() {
+    // Files written before Phase 10 have no field: checking stays on.
+    let dir = temp_dir("auto-check");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("settings.json"),
+        r#"{ "theme": "paper", "launch_at_login": false, "hide_dock_icon": true }"#,
+    )
+    .unwrap();
+    assert!(load(&dir).auto_check_updates);
+    // Switched off, it is still off on the next launch (the next load).
+    let off = AppSettings {
+        auto_check_updates: false,
+        ..AppSettings::default()
+    };
+    save(&dir, &off).unwrap();
+    assert!(!load(&dir).auto_check_updates);
+    std::fs::remove_dir_all(&dir).unwrap();
 }

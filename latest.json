@@ -1,0 +1,35 @@
+{
+  "version": "0.3.0",
+  "notes": "SHDC (Sony Headphone Desktop Client) controls Sony ULT WEAR (WH-ULT900N) headphones from the menu bar or tray: noise control, ambient level, ULT, equalizer, battery, scenes with desktop triggers, hotkeys, an advanced ten-band equalizer with shareable codes, and a command-line tool.\n\n## What changed\n- The app is now called SHDC, short for Sony Headphone Desktop Client. The name appears in the menu bar tooltip, the window title, Settings, the installers and the command-line tool, which is now `shdcctl`.\n- Settings names the trademarks: Sony and ULT WEAR belong to Sony Group Corporation. SHDC is an independent project, not affiliated with or endorsed by Sony.\n- Your settings, scenes, curves and battery history carry over. Nothing moves.\n\n## Updating from Hairline 0.2.x\nSettings \u2192 Updates \u2192 Update now. The app downloads this release, installs it and restarts as SHDC.\nOn a Mac the file in Applications keeps its old name, `Hairline.app`, because the update replaces the contents, not the file. Rename it in Finder if you like, or drag `SHDC.app` from the `.dmg` over it.\n\n## Install on macOS\n1. Open the `.dmg` and drag SHDC to Applications.\n2. Open SHDC once. macOS says it could not verify the app, because it is not signed with an Apple Developer certificate yet. Click Done.\n3. Open System Settings \u2192 Privacy & Security, scroll to Security, and click Open Anyway next to the SHDC message. Enter your password, then click Open. After that it opens normally.\n   Terminal alternative: `xattr -dr com.apple.quarantine /Applications/SHDC.app`\n4. Pair the headphones in System Settings \u2192 Bluetooth first. SHDC connects on its own.\n\n## Install on Windows\n1. Run the `.msi` or the `-setup.exe`.\n2. If SmartScreen appears, choose More info \u2192 Run anyway. The installer is not signed yet.\n3. The Windows build compiles and passes its tests, but it has not been tried with real headphones on Windows.\n\n## Known limits\n- Tested on a real WH-ULT900N on macOS. Other Sony models connect but noise control and the equalizer show as unavailable on them.\n- The advanced equalizer runs its ten bands in SHDC; \"Send best fit\" writes the closest six-band match to the headphones.",
+  "pub_date": "2026-11-08T08:40:43.825Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdTdjd3lYMm9KRzExdFI4cjl6R1QyMG94a2htY3RLWjBrUUo1SitPS2hjRG94SGpsT2hSMm5zeGowd2NIT0NNRFJ1VGkwVk5sdDNRVFk3K2VmZ1FRREdGV3ZiQVZGNkE0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0MTI2OTIzCWZpbGU6U0hEQ18wLjMuMF94NjRfZW4tVVMubXNpCXZlcnNpb246MC4zLjAKRTVacUprcm13d1h4WFlnUGNRL2lBVzNjOUpQa0tyREt0dExrektpeHRhTlIyUzJJTm9jTk16UzlXME05M05vY1BXS001UjRkMXk0NXZyMTRrK2dOQnc9PQo=",
+      "url": "https://api.github.com/repos/Drake0306/Sony-Headphone-PC_Client/releases/assets/723388284"
+    },
+    "windows-x86_64-msi": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdTdjd3lYMm9KRzExdFI4cjl6R1QyMG94a2htY3RLWjBrUUo1SitPS2hjRG94SGpsT2hSMm5zeGowd2NIT0NNRFJ1VGkwVk5sdDNRVFk3K2VmZ1FRREdGV3ZiQVZGNkE0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0MTI2OTIzCWZpbGU6U0hEQ18wLjMuMF94NjRfZW4tVVMubXNpCXZlcnNpb246MC4zLjAKRTVacUprcm13d1h4WFlnUGNRL2lBVzNjOUpQa0tyREt0dExrektpeHRhTlIyUzJJTm9jTk16UzlXME05M05vY1BXS001UjRkMXk0NXZyMTRrK2dOQnc9PQo=",
+      "url": "https://api.github.com/repos/Drake0306/Sony-Headphone-PC_Client/releases/assets/723388284"
+    },
+    "windows-x86_64-nsis": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdTdjd3lYMm9KRzJ1NnVQbDc3UmdvVFZJZ25BSDkvKzRQRVB2T21vN2hOWlhoODVMaW03RUxoMHVmTFhJclJDaWk4c0pjWWFDWnV6NUIydUd4NUExcGpLWlhDcVg1SVF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0MTI2OTIzCWZpbGU6U0hEQ18wLjMuMF94NjQtc2V0dXAuZXhlCXZlcnNpb246MC4zLjAKcHVmalFBNTdUcXIxaVk3bGpvRnVzK2x1SVduUGtpSUNScW8xZko0Yk9QK256a1l5Y2RsSlNlRG90OWh2V1cwU0VwS0ZEVGlyVW5sTjN1YUhaQUNCRFE9PQo=",
+      "url": "https://api.github.com/repos/Drake0306/Sony-Headphone-PC_Client/releases/assets/723388361"
+    },
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdTdjd3lYMm9KRzZhSVlHMFhEMTd4NnBaQXpXejhqNlN6TlFmUGN6cy9jakN5d1U1SS95NDdyVkxFbjN4VE9YcXBXWlJpMUdHcEpqTzZCYkhuM0ZMRi9TR01KdW9IUkE4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0MTI3MjM5CWZpbGU6U0hEQy5hcHAudGFyLmd6CXZlcnNpb246MC4zLjAKK2d2U2kwdXlxUHhkbkxUTUI0VGVWVHRKK0JSQ0VzQTRabzkrTnFEYzNkUmt0aitrbWRWajk4MWxzRS9MUWI0Y2kvaUh5MDZ0bnBzYStUU0FDUXJyQUE9PQo=",
+      "url": "https://api.github.com/repos/Drake0306/Sony-Headphone-PC_Client/releases/assets/723401831"
+    },
+    "darwin-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdTdjd3lYMm9KRzZhSVlHMFhEMTd4NnBaQXpXejhqNlN6TlFmUGN6cy9jakN5d1U1SS95NDdyVkxFbjN4VE9YcXBXWlJpMUdHcEpqTzZCYkhuM0ZMRi9TR01KdW9IUkE4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0MTI3MjM5CWZpbGU6U0hEQy5hcHAudGFyLmd6CXZlcnNpb246MC4zLjAKK2d2U2kwdXlxUHhkbkxUTUI0VGVWVHRKK0JSQ0VzQTRabzkrTnFEYzNkUmt0aitrbWRWajk4MWxzRS9MUWI0Y2kvaUh5MDZ0bnBzYStUU0FDUXJyQUE9PQo=",
+      "url": "https://api.github.com/repos/Drake0306/Sony-Headphone-PC_Client/releases/assets/723401831"
+    },
+    "darwin-aarch64-app": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdTdjd3lYMm9KRzZhSVlHMFhEMTd4NnBaQXpXejhqNlN6TlFmUGN6cy9jakN5d1U1SS95NDdyVkxFbjN4VE9YcXBXWlJpMUdHcEpqTzZCYkhuM0ZMRi9TR01KdW9IUkE4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0MTI3MjM5CWZpbGU6U0hEQy5hcHAudGFyLmd6CXZlcnNpb246MC4zLjAKK2d2U2kwdXlxUHhkbkxUTUI0VGVWVHRKK0JSQ0VzQTRabzkrTnFEYzNkUmt0aitrbWRWajk4MWxzRS9MUWI0Y2kvaUh5MDZ0bnBzYStUU0FDUXJyQUE9PQo=",
+      "url": "https://api.github.com/repos/Drake0306/Sony-Headphone-PC_Client/releases/assets/723401831"
+    },
+    "darwin-x86_64-app": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSdTdjd3lYMm9KRzZhSVlHMFhEMTd4NnBaQXpXejhqNlN6TlFmUGN6cy9jakN5d1U1SS95NDdyVkxFbjN4VE9YcXBXWlJpMUdHcEpqTzZCYkhuM0ZMRi9TR01KdW9IUkE4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzk0MTI3MjM5CWZpbGU6U0hEQy5hcHAudGFyLmd6CXZlcnNpb246MC4zLjAKK2d2U2kwdXlxUHhkbkxUTUI0VGVWVHRKK0JSQ0VzQTRabzkrTnFEYzNkUmt0aitrbWRWajk4MWxzRS9MUWI0Y2kvaUh5MDZ0bnBzYStUU0FDUXJyQUE9PQo=",
+      "url": "https://api.github.com/repos/Drake0306/Sony-Headphone-PC_Client/releases/assets/723401831"
+    }
+  }
+}

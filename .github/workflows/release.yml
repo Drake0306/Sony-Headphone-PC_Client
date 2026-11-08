@@ -80,16 +80,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release download "${{ github.ref_name }}" --pattern latest.json --output /tmp/latest.json
-          python3 .github/scripts/api-feed.py "${{ github.repository }}" "${{ github.ref_name }}" /tmp/latest.json /tmp/feed.json
-          cp /tmp/feed.json latest.json
-          gh release upload "${{ github.ref_name }}" latest.json --clobber
+          mkdir -p /tmp/feed
+          python3 .github/scripts/api-feed.py "${{ github.repository }}" "${{ github.ref_name }}" /tmp/latest.json /tmp/feed/latest.json
+          gh release upload "${{ github.ref_name }}" /tmp/feed/latest.json --clobber
       - name: Publish the fallback feed on the updates branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin updates
           git checkout -B updates origin/updates
-          cp /tmp/feed.json latest.json
+          cp /tmp/feed/latest.json latest.json
           git add latest.json
           git commit -m "Update feed for ${{ github.ref_name }}" || echo "feed unchanged"
           git push origin updates

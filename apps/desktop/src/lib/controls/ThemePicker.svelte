@@ -21,10 +21,24 @@
   const busy = $derived(isPending(status));
   const reason = $derived(refusedReason(status));
   const outlined = $derived(attempted ?? value);
+  /** The one swatch in the tab order: the chosen theme, else the first. */
+  const stop = $derived(Math.max(0, THEMES.findIndex((t) => t.value === value)));
+
+  // The ARIA radio pattern: arrows move the choice and the focus; wraps.
+  function onkey(event: KeyboardEvent, index: number) {
+    if (off || busy) return;
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+    if (step === undefined) return;
+    event.preventDefault();
+    const next = (index + step + THEMES.length) % THEMES.length;
+    onpick(THEMES[next].value);
+    const buttons = (event.currentTarget as HTMLElement).parentElement?.querySelectorAll("button");
+    buttons?.[next]?.focus();
+  }
 </script>
 
 <div class="picker" class:pending={busy} class:unavailable={off} role="radiogroup" aria-label="Appearance">
-  {#each THEMES as theme (theme.value)}
+  {#each THEMES as theme, i (theme.value)}
     {@const refused = reason !== null && theme.value === outlined}
     <button
       type="button"
@@ -34,8 +48,9 @@
       aria-checked={theme.value === value}
       aria-disabled={off}
       title={refused ? reason : undefined}
-      tabindex={off ? -1 : 0}
+      tabindex={off || i !== stop ? -1 : 0}
       onclick={off ? undefined : () => busy || onpick(theme.value)}
+      onkeydown={(e) => onkey(e, i)}
     >
       {#if theme.kind === "system"}
         <span class="swatch split"><span data-theme="paper"><i></i><b></b></span><span data-theme="ink"><i></i><b></b></span></span>

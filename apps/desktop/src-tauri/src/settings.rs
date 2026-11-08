@@ -34,8 +34,18 @@ pub enum Theme {
     Oled,
 }
 
+/// Deserialises a `Theme`, falling back to the default for an unknown id
+/// instead of failing the whole settings file.
+fn theme_or_default<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Theme, D::Error> {
+    let raw = serde_json::Value::deserialize(d)?;
+    Ok(serde_json::from_value(raw).unwrap_or_default())
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct AppSettings {
+    /// An id this build does not know (from a newer or older build) reads as
+    /// the default theme, so the other settings survive.
+    #[serde(deserialize_with = "theme_or_default")]
     pub theme: Theme,
     pub launch_at_login: bool,
     pub hide_dock_icon: bool,

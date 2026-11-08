@@ -154,3 +154,17 @@ fn every_theme_round_trips_by_its_lowercase_name() {
         assert_eq!(back, theme);
     }
 }
+
+#[test]
+fn an_unknown_theme_id_keeps_the_other_settings() {
+    use shdc_lib::settings::{AppSettings, Theme};
+    let s: AppSettings = serde_json::from_str(
+        r#"{ "theme": "someday", "launch_at_login": true, "hide_dock_icon": false, "show_advanced": true, "auto_check_updates": false }"#,
+    )
+    .unwrap();
+    assert_eq!(s.theme, Theme::Paper, "falls back to the default theme");
+    assert!(s.launch_at_login);
+    assert!(!s.hide_dock_icon);
+    assert!(s.show_advanced);
+    assert!(!s.auto_check_updates);
+}

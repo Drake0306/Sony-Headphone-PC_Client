@@ -95,7 +95,7 @@
   color-scheme: light;
 }
 
-/* Catppuccin Latte (light). */
+/* Catppuccin Latte (light). Accent: Latte's mauve (peach is too faint on its paper). */
 [data-theme="latte"] {
   --paper: #eff1f5;
   --ink: #4c4f69;
@@ -103,7 +103,7 @@
   --muted: #6c6f85;
   --box: #e6e9ef;
   --stripe: #9ca0b0;
-  --ult: #fe640b;
+  --ult: #8839ef;
   --on-ult: #eff1f5;
   color-scheme: light;
 }
@@ -121,7 +121,7 @@
   color-scheme: light;
 }
 
-/* Rosé Pine Dawn (light). */
+/* Rosé Pine Dawn (light). Accent: Dawn's deeper rose (the light rose is too faint on its paper). */
 [data-theme="dawn"] {
   --paper: #faf4ed;
   --ink: #575279;
@@ -129,7 +129,7 @@
   --muted: #797593;
   --box: #fffaf3;
   --stripe: #9893a5;
-  --ult: #d7827e;
+  --ult: #b4637a;
   --on-ult: #faf4ed;
   color-scheme: light;
 }
@@ -147,16 +147,17 @@
   color-scheme: light;
 }
 
-/* Kraft (light): brown packing paper; the accent stays ULT orange. */
+/* Kraft (light): brown packing paper with a brick-red stamp for the accent
+   (ULT orange is near invisible on it). */
 [data-theme="kraft"] {
   --paper: #cfbb94;
   --ink: #231c15;
   --hair: #b39f78;
-  --muted: #665441;
+  --muted: #574634;
   --box: #dccba8;
   --stripe: #8a7656;
-  --ult: #ff6600;
-  --on-ult: #231c15;
+  --ult: #8b1a1a;
+  --on-ult: #f3e9d6;
   color-scheme: light;
 }
 

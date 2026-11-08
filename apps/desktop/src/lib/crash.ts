@@ -38,10 +38,22 @@ export function showCrash(message: string): HTMLElement {
   return box;
 }
 
-/** Shows the crash notice and sends the text to the diagnostics log. */
+let mounted = false;
+
+/** The app has drawn: from now on an uncaught error is logged, not drawn over the page. */
+export function markMounted(): void {
+  mounted = true;
+}
+
+/** For tests: back to the state before mount. */
+export function resetForTests(): void {
+  mounted = false;
+}
+
+/** Logs the error; draws the crash notice too while the app has not mounted yet. */
 export function report(error: unknown): void {
   const message = describe(error);
-  showCrash(message);
+  if (!mounted) showCrash(message);
   invoke("report_frontend_error", { message }).catch(() => {});
 }
 

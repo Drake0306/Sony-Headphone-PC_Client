@@ -3,11 +3,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const invoke = vi.hoisted(() => vi.fn(async () => {}));
 vi.mock("@tauri-apps/api/core", () => ({ invoke }));
 
-import { describe as describeError, installCrashOverlay, report, showCrash } from "./crash";
+import { describe as describeError, installCrashOverlay, markMounted, report, resetForTests, showCrash } from "./crash";
 
 afterEach(() => {
   document.body.innerHTML = "";
   invoke.mockClear();
+  resetForTests();
 });
 
 describe("crash notice", () => {
@@ -42,6 +43,13 @@ describe("crash notice", () => {
     window.dispatchEvent(event);
     expect(document.querySelector(".crash")).toBeNull();
     expect(invoke).toHaveBeenCalledWith("report_frontend_error", { message: expect.stringContaining("late failure") });
+  });
+
+  it("after mount, an uncaught error is logged but no longer drawn over the page", () => {
+    markMounted();
+    report(new Error("handler slipped"));
+    expect(document.querySelector(".crash")).toBeNull();
+    expect(invoke).toHaveBeenCalledWith("report_frontend_error", { message: expect.stringContaining("handler slipped") });
   });
 
   it("report() draws and logs", () => {

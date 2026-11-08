@@ -140,6 +140,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .visible(false)
         .resizable(false)
         .shadow(false)
+        .devtools(devtools_on(app))
         .build()?;
 
     #[cfg(target_os = "macos")]
@@ -293,6 +294,7 @@ pub fn open_main_window(app: &AppHandle) -> tauri::Result<()> {
             .min_inner_size(880.0, 560.0)
             .resizable(true)
             .visible(false)
+            .devtools(devtools_on(app))
             .on_page_load(|window, payload| {
                 crate::diag::log(
                     window.app_handle(),
@@ -372,4 +374,12 @@ pub fn open_inspector(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(MAIN) {
         window.open_devtools();
     }
+}
+
+/// Developer tools (F12, Inspect, the tray's "Web inspector") only while the
+/// Advanced panel is on at launch; the console can invoke every command.
+fn devtools_on(app: &AppHandle) -> bool {
+    app.try_state::<Mutex<AppSettings>>()
+        .and_then(|s| s.lock().ok().map(|s| s.show_advanced))
+        .unwrap_or(false)
 }

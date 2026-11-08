@@ -447,6 +447,7 @@ body.kbd a:focus-visible {
 .crash {
   position: fixed;
   inset: 0;
+  z-index: 1000;
   overflow: auto;
   padding: 32px;
   background: var(--paper, white);

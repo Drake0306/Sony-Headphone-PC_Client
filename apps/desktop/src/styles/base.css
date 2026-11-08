@@ -13,7 +13,7 @@ body {
 }
 
 body.main {
-  background: var(--paper);
+  background: var(--wash), var(--paper);
 }
 
 body {
@@ -63,6 +63,7 @@ body.kbd a:focus-visible {
 .live {
   color: var(--ult);
   font-weight: 600;
+  text-shadow: var(--glow);
 }
 
 .row {
@@ -82,12 +83,15 @@ body.kbd a:focus-visible {
 .big {
   font-size: 40px;
   line-height: 1;
+  color: var(--accent-2);
+  text-shadow: var(--glow);
 }
 
 .big small {
   font-family: "Instrument Sans", system-ui, sans-serif;
   font-size: 13px;
   color: var(--muted);
+  text-shadow: none;
   margin-left: 4px;
   font-weight: 400;
 }
@@ -121,6 +125,7 @@ body.kbd a:focus-visible {
   background: var(--ult);
   color: var(--on-ult);
   font-weight: 500;
+  box-shadow: var(--glow);
 }
 
 .boxes.lg button {
@@ -169,7 +174,7 @@ body.kbd a:focus-visible {
 }
 
 .ticks button.on {
-  background: var(--ink);
+  background: var(--accent-3);
 }
 
 .ticks.pending button.on {

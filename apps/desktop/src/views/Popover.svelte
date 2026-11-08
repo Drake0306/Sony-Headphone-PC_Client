@@ -253,7 +253,7 @@
 <style>
   .pop {
     width: 340px;
-    background: var(--paper);
+    background: var(--wash), var(--paper);
     border: 1px solid var(--hair);
     border-radius: 10px;
     padding: 14px 16px;

@@ -11,7 +11,7 @@ export interface ThemeOption {
   kind: "light" | "dark" | "system";
 }
 
-/** Every theme, in picker order: System, the light ones, then the dark ones. */
+/** Every theme, in picker order: System, the light palettes, the dark palettes, then the flair themes. */
 export const THEMES: readonly ThemeOption[] = [
   { value: "system", label: "System", kind: "system" },
   { value: "paper", label: "Paper", kind: "light" },
@@ -26,6 +26,13 @@ export const THEMES: readonly ThemeOption[] = [
   { value: "gruvbox", label: "Gruvbox", kind: "dark" },
   { value: "tokyo", label: "Tokyo Night", kind: "dark" },
   { value: "oled", label: "OLED Black", kind: "dark" },
+  // Flair: more than a palette (wash, band colours, glow); see tokens.css.
+  { value: "riso", label: "Riso", kind: "light" },
+  { value: "acid", label: "Acid", kind: "light" },
+  { value: "sunset", label: "Sunset", kind: "light" },
+  { value: "spectrum", label: "Spectrum", kind: "light" },
+  { value: "synthwave", label: "Synthwave", kind: "dark" },
+  { value: "aurora", label: "Aurora", kind: "dark" },
 ];
 
 /** True for an id the picker knows (a settings file from a newer build may name another). */

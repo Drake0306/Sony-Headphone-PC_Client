@@ -120,7 +120,7 @@
   .win {
     position: relative;
     height: 100vh;
-    background: var(--paper);
+    background: var(--wash), var(--paper);
   }
 
   .tabs {

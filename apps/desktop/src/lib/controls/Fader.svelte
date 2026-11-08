@@ -53,9 +53,11 @@
     max?: number;
     /** "md" (Sound screen) or "lg" (Advanced equalizer); the height follows the parent. */
     size?: FaderSize;
+    /** Which of the six band colours (1..6) the knob and fill take; flair themes set them apart. */
+    band?: number;
   }
 
-  let { value, label, status, disabled = false, onchange, oncommit, max = 20, size = "md" }: Props = $props();
+  let { value, label, status, disabled = false, onchange, oncommit, max = 20, size = "md", band = 1 }: Props = $props();
 
   const KEY_COMMIT_MS = 150;
   /** Knob height in px; the knob's centre travels the rail minus this. */
@@ -161,7 +163,7 @@
   }
 </script>
 
-<div class="fader" class:inert style={faderVars(size)}>
+<div class="fader" class:inert style={`${faderVars(size)}; --band: var(--band-${band}); --fill: var(--fill-${band})`}>
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="rail"
@@ -259,7 +261,7 @@
     position: absolute;
     left: calc(50% - var(--fader-track) / 2);
     width: var(--fader-track);
-    background: var(--ink);
+    background: var(--fill, var(--ink));
     pointer-events: none;
     transition:
       bottom 120ms ease-out,
@@ -271,7 +273,8 @@
     left: calc(50% - var(--fader-knob-width) / 2);
     width: var(--fader-knob-width);
     height: var(--fader-knob);
-    background: var(--ult);
+    background: var(--band, var(--ult));
+    box-shadow: var(--glow);
     transition: bottom 120ms ease-out;
   }
 

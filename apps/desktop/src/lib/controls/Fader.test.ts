@@ -143,3 +143,13 @@ describe("Fader", () => {
     expect(container.querySelector(".fader .val")!.textContent).toBe("--");
   });
 });
+
+describe("Fader band colour", () => {
+  it("points its knob and fill at the band's colour tokens, the first band by default", () => {
+    const one = render(Fader, props());
+    expect(one.container.querySelector(".fader")!.getAttribute("style")).toContain("--band: var(--band-1); --fill: var(--fill-1)");
+    one.unmount();
+    const four = render(Fader, props({ band: 4 }));
+    expect(four.container.querySelector(".fader")!.getAttribute("style")).toContain("--band: var(--band-4); --fill: var(--fill-4)");
+  });
+});

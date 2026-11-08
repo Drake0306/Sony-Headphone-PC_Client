@@ -121,7 +121,13 @@ export type Theme =
   | "mocha"
   | "gruvbox"
   | "tokyo"
-  | "oled";
+  | "oled"
+  | "synthwave"
+  | "riso"
+  | "acid"
+  | "aurora"
+  | "sunset"
+  | "spectrum";
 
 export interface AppSettings {
   theme: Theme;

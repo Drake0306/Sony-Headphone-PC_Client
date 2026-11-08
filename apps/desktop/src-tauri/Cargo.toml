@@ -1,6 +1,6 @@
 [package]
 name = "shdc"
-version = "0.4.0"
+version = "0.5.0"
 description = "SHDC, Sony Headphone Desktop Client: control Sony ULT WEAR headphones from the menu bar or tray"
 edition.workspace = true
 license.workspace = true

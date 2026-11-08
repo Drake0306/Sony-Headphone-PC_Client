@@ -6,3 +6,10 @@ resolver = "2"
 edition = "2021"
 license = "MIT"
 rust-version = "1.85"
+
+# The `strip` shipped with the current macOS Command Line Tools writes
+# dylibs with a mis-aligned LINKEDIT string pool, which dyld refuses to load;
+# Cargo's default release strip then breaks every proc-macro crate. Keep the
+# debug info instead; the bundle grows a little and builds everywhere.
+[profile.release]
+strip = "none"

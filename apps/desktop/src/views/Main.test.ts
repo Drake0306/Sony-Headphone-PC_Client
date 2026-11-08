@@ -105,3 +105,22 @@ describe("Advanced equalizer and the popover", () => {
     r.unmount();
   });
 });
+
+describe("Main glass bar", () => {
+  it("holds the tabs and the status, and shows its hairline only once the content has scrolled", async () => {
+    const r = render(Main);
+    await waitFor(() => expect(navLabels(r.container)).toContain("Sound"));
+    const bar = r.container.querySelector("header.bar")!;
+    expect(bar).toBeTruthy();
+    expect(bar.querySelector("nav")).toBeTruthy();
+    expect(bar.querySelector(".status")).toBeTruthy();
+    expect(bar.className).not.toContain("scrolled");
+    const main = r.container.querySelector("main")!;
+    Object.defineProperty(main, "scrollTop", { value: 40, configurable: true });
+    await fireEvent.scroll(main);
+    expect(bar.className).toContain("scrolled");
+    Object.defineProperty(main, "scrollTop", { value: 0, configurable: true });
+    await fireEvent.scroll(main);
+    expect(bar.className).not.toContain("scrolled");
+  });
+});

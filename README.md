@@ -205,6 +205,8 @@ cd apps/desktop && pnpm check && pnpm test
 
 ## Debugging
 
+`shdc.log` in the app's log directory (next to `captures/`) records window creation, page loads and any error the page reports; the page shows such an error in place of a blank window. With the Advanced panel on, the tray menu's "Web inspector" opens the main window's developer tools.
+
 `SHDC_FRAME_LOG=1` writes every frame and session log line to `<YYYY-MM-DD-HHMMSS>.log` (time in UTC) in the capture directory: `~/Library/Logs/com.drake0306.hairline/captures/` on macOS, `captures` in the app's `logs` directory under the local data directory on Windows and Linux (for example `%LOCALAPPDATA%\com.drake0306.hairline\logs\captures\`). The probe results and the Record button write there too.
 To record from a running app instead, turn on the Advanced panel and press Record in the frame log. Raw commands are sent from the same screen; the deny-list still applies.
 

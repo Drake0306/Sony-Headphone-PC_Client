@@ -5,19 +5,32 @@
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 use crate::popover;
 
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let quit = MenuItem::with_id(app, "quit", "Quit SHDC", true, None::<&str>)?;
-    #[cfg(not(target_os = "linux"))]
-    let menu = Menu::with_items(app, &[&quit])?;
+    // With the Advanced panel on at launch, the menu also opens the web
+    // inspector of the main window: the way to read a page's console when
+    // the page itself shows nothing.
+    let advanced = app
+        .try_state::<std::sync::Mutex<crate::settings::AppSettings>>()
+        .and_then(|s| s.lock().ok().map(|s| s.show_advanced))
+        .unwrap_or(false);
+    let inspect = advanced
+        .then(|| MenuItem::with_id(app, "inspect", "Web inspector", true, None::<&str>))
+        .transpose()?;
     #[cfg(target_os = "linux")]
-    let menu = {
-        let show = MenuItem::with_id(app, "show", "Show SHDC", true, None::<&str>)?;
-        Menu::with_items(app, &[&show, &quit])?
-    };
+    let show = MenuItem::with_id(app, "show", "Show SHDC", true, None::<&str>)?;
+    let mut items: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = Vec::new();
+    #[cfg(target_os = "linux")]
+    items.push(&show);
+    if let Some(item) = &inspect {
+        items.push(item);
+    }
+    items.push(&quit);
+    let menu = Menu::with_items(app, &items)?;
     // macOS tints the monochrome template icon for the menu bar. Windows and
     // Linux have no template icons, and the black glyph vanishes on a dark
     // taskbar or panel, so they get the full-colour app icon (a dark tile,
@@ -36,6 +49,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id().as_ref() {
             "quit" => app.exit(0),
             "show" => popover::show_popover(app),
+            "inspect" => popover::open_inspector(app),
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {

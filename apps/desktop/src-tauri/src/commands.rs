@@ -426,9 +426,31 @@ pub fn connect(broker: State<'_, Broker>) -> Result<(), String> {
     broker.send(BrokerCmd::Connect)
 }
 
+/// Opens the main window. Async on purpose: a synchronous command runs inside
+/// the calling webview's message callback, and on Windows creating a second
+/// WebView2 there (which spins a nested message loop while the controller
+/// comes up) left the new window white. From the async runtime the work is
+/// posted to the main thread as its own event-loop task.
 #[tauri::command]
-pub fn open_main_window(app: AppHandle) -> Result<(), String> {
-    popover::open_main_window(&app).map_err(|e| e.to_string())
+pub async fn open_main_window(app: AppHandle) -> Result<(), String> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let handle = app.clone();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(popover::open_main_window(&handle).map_err(|e| e.to_string()));
+    })
+    .map_err(|e| e.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || rx.recv())
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|_| "the main window was not created".to_string())?
+}
+
+/// The web page's own uncaught errors, written to the diagnostics log so a
+/// blank window leaves a trace.
+#[tauri::command]
+pub fn report_frontend_error(app: AppHandle, window: tauri::Window, message: String) {
+    let text: String = message.chars().take(4000).collect();
+    crate::diag::log(&app, &format!("page error in {}: {text}", window.label()));
 }
 
 /// Every declared or proven support function of the connected headphones.

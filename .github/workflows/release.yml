@@ -39,6 +39,15 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
         working-directory: apps/desktop
+      - name: Read release notes
+        id: notes
+        shell: bash
+        run: |
+          {
+            echo "body<<HAIRLINE_NOTES"
+            cat .github/release-notes.md
+            echo "HAIRLINE_NOTES"
+          } >> "$GITHUB_OUTPUT"
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -49,7 +58,7 @@ jobs:
           projectPath: apps/desktop
           tagName: ${{ github.ref_name }}
           releaseName: Hairline ${{ github.ref_name }}
-          releaseBodyPath: .github/release-notes.md
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

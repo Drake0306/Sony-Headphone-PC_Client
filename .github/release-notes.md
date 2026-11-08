@@ -2,6 +2,9 @@ Hairline controls Sony ULT WEAR (WH-ULT900N) headphones from the menu bar or tra
 
 Hairline checks this page for updates and offers them in Settings.
 
+## What changed
+Hairline checks this page for updates and offers them in Settings. 0.2.1 exists to prove that: an installed 0.2.0 should offer it.
+
 ## Install on macOS
 1. Open the `.dmg` and drag Hairline to Applications.
 2. Open Hairline once. macOS says it could not verify the app, because it is not signed with an Apple Developer certificate yet. Click Done.

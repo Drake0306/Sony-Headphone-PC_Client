@@ -8,6 +8,7 @@ const backend = vi.hoisted(() => ({
   reject: null as string | null,
   emitOnApply: true,
   hotkeyErrors: {} as Record<string, string>,
+  connected: true,
   handler: null as ((e: { payload: unknown }) => void) | null,
   update: null as ((e: { payload: unknown }) => void) | null,
 }));
@@ -22,7 +23,7 @@ vi.mock("@tauri-apps/api/core", () => ({
     }
     if (cmd === "get_state") {
       const { emptyState } = await import("../lib/state");
-      return { ...emptyState(), connected: true, model: "ULT WEAR" };
+      return { ...emptyState(), connected: backend.connected, model: "ULT WEAR" };
     }
     if (cmd === "runtime_info") return { fake: true, version: "0" };
     if (cmd === "current_version") return "0.2.0";
@@ -127,6 +128,19 @@ describe("Popover mode row", () => {
     emit();
     await waitFor(() => expect(r.queryByText("Alt+Super+N")).toBeNull());
     expect(r.getByText("Open window")).toBeInTheDocument();
+  });
+
+  it("open_window_offered_while_not_connected", async () => {
+    backend.connected = false;
+    try {
+      const r = render(Popover);
+      await waitFor(() => expect(r.getByText("FAKE · Not connected")).toBeInTheDocument());
+      const open = r.getByText("Open window");
+      await fireEvent.click(open.closest("button")!);
+      expect(invoke).toHaveBeenCalledWith("open_main_window");
+    } finally {
+      backend.connected = true;
+    }
   });
 });
 

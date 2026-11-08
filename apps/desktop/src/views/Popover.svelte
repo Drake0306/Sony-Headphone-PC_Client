@@ -191,9 +191,7 @@
       <div class="devices"><LinkList items={devices} /></div>
     {/if}
     {@render updateRow()}
-    <button class="row footer" onclick={() => openMainWindow()}>
-      <span class="lab">Open window</span>{#if !windowRefused}<span class="lab">{windowKeys}</span>{/if}
-    </button>
+    {@render openRow()}
   </div>
 {:else}
   <div class="pop">
@@ -218,8 +216,15 @@
     </div>
     <div class="btnrow"><button class="btn fill" onclick={() => connect()}>Connect</button></div>
     {@render updateRow()}
+    {@render openRow()}
   </div>
 {/if}
+
+{#snippet openRow()}
+  <button class="row footer" onclick={() => openMainWindow()}>
+    <span class="lab">Open window</span>{#if !windowRefused}<span class="lab">{windowKeys}</span>{/if}
+  </button>
+{/snippet}
 
 {#snippet updateRow()}
   {#if $updateVisible}

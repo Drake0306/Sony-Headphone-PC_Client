@@ -137,7 +137,7 @@ Run with the real headphones connected.
 
 ## 10. Windows app (Phase 7a, to do with a Windows machine)
 
-The app builds and its tests pass on Windows CI; it has not been started on a Windows machine or run against the headphones on Windows. Nothing below is verified. Do section 7 (the transport) first.
+The app builds and its tests pass on Windows CI. The owner's first run on a Windows machine (0.3.1, 8 November 2026) showed the tray icon and the popover, but the popover opened far above the taskbar; 0.3.2 places it from the monitor's work area instead of the positioner plugin. Everything below except that first look is unverified. Do section 7 (the transport) first.
 
 - [ ] `SHDC_FAKE=1`: the app starts, the tray icon appears in the notification area, and a left click opens the popover centred above the icon with the `FAKE` label.
 - [ ] The tray icon is visible on both light and dark taskbars.
@@ -146,6 +146,7 @@ The app builds and its tests pass on Windows CI; it has not been started on a Wi
 - [ ] Clicking outside hides the popover (set_focus takes the foreground, so focus loss arrives). Clicking the tray icon while it is open hides it and does not reopen it at once; the next click opens it.
 - [ ] Right click on the tray icon shows Quit, and Quit ends the app.
 - [ ] The popover footer opens the main window; it appears in the taskbar like an ordinary window, and closing it leaves the tray icon running.
+- [ ] With the headphones off, the popover still shows "Open window" under Connect, and it opens the full window.
 - [ ] With the headphones paired and connected, the popover shows battery, noise control and ULT, and a change from the popover takes effect on the headphones.
 - [ ] Devices: the Link list shows no host entry and no "playing" (the Windows audio module does not exist yet).
 - [ ] Scenes: an "App in front" trigger with an executable name (for example `Zoom` for `Zoom.exe`) applies when that app is in front. A "Microphone in use" trigger never fires on Windows yet.

@@ -144,6 +144,14 @@ hairlinectl --json state
 
 `state`, `nc`, `ult`, `volume`, `eq`, `scene`, `scenes` and `battery` are the subcommands. `--json` prints the app's raw answer, and `$HAIRLINE_SOCKET` points it at another socket. It exits with 1 when the app is not running or refuses the request. On Windows it prints that it is not supported yet.
 
+## Install
+
+Builds for macOS and Windows are on the [Releases page](https://github.com/Drake0306/Sony-Headphone-PC_Client/releases).
+
+macOS: open the `.dmg` and drag Hairline to Applications. On first launch, right-click Hairline and choose Open, then Open again. macOS asks because the app is not signed with an Apple Developer certificate yet; after that it opens normally. Pair the headphones in System Settings → Bluetooth first.
+
+Windows: run the `.msi` or the `-setup.exe`. If SmartScreen appears, choose More info → Run anyway. The Windows build compiles and passes its tests but has not been tried with real headphones on Windows.
+
 ## Run it
 
 Prerequisites: Rust stable, Node 22, pnpm 10.

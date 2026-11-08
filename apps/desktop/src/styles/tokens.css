@@ -75,8 +75,8 @@
 }
 
 /* Themes. Each palette block sets the same eight tokens (a flair block also the
-   sixteen flair tokens), and is matched on any element, not only <html>, so a swatch in the picker can carry
-   `data-theme` and paint itself with the theme's own colours. `--ult` is the
+   sixteen flair tokens), and is matched on any element, not only <html>, so a
+   swatch in the picker can carry `data-theme` and paint itself with the theme's own colours. `--ult` is the
    theme's accent, the colour of everything live; `--on-ult` reads on it.
    Keep in sync: the two Ink blocks must carry the same values. */
 

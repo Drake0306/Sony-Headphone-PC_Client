@@ -108,7 +108,7 @@
     display: block;
     width: 100%;
     height: 28px;
-    background: var(--paper);
+    background: var(--wash), var(--paper);
     border: 1px solid var(--hair);
     overflow: hidden;
   }
@@ -145,7 +145,7 @@
   .swatch.split > span {
     position: relative;
     display: block;
-    background: var(--paper);
+    background: var(--wash), var(--paper);
     border: 1px solid var(--hair);
   }
 

@@ -32,6 +32,13 @@ pub enum Theme {
     Gruvbox,
     Tokyo,
     Oled,
+    // The six flair themes (0.5.0).
+    Synthwave,
+    Riso,
+    Acid,
+    Aurora,
+    Sunset,
+    Spectrum,
 }
 
 /// Deserialises a `Theme`, falling back to the default for an unknown id

@@ -138,6 +138,7 @@
       {status}
       disabled={off || bands === null}
       {max}
+      band={i + 1}
       onchange={(v) => change(i, v)}
       oncommit={(v) => settle(i, v)}
     />

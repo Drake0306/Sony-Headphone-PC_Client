@@ -15,13 +15,13 @@ function block(id: string): string {
 }
 
 describe("themes", () => {
-  it("lists thirteen distinct ids with System first", () => {
+  it("lists nineteen distinct ids with System first", () => {
     const ids = THEMES.map((t) => t.value);
-    expect(ids.length).toBe(13);
+    expect(ids.length).toBe(19);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids[0]).toBe("system");
-    expect(THEMES.filter((t) => t.kind === "light").length).toBe(6);
-    expect(THEMES.filter((t) => t.kind === "dark").length).toBe(6);
+    expect(THEMES.filter((t) => t.kind === "light").length).toBe(10);
+    expect(THEMES.filter((t) => t.kind === "dark").length).toBe(8);
   });
 
   it("every theme except System has a tokens.css block with the full token set", () => {
@@ -31,6 +31,20 @@ describe("themes", () => {
       for (const token of REQUIRED) expect(css, `${t.value} sets ${token}`).toContain(`${token}:`);
       expect(css).toContain(t.kind === "dark" ? "color-scheme: dark" : "color-scheme: light");
     }
+  });
+
+  it("a flair theme sets all sixteen flair tokens, a palette theme none, and :root defaults them", () => {
+    const FLAIR = ["--wash", "--accent-2", "--accent-3", "--glow", ...[1, 2, 3, 4, 5, 6].flatMap((n) => [`--band-${n}`, `--fill-${n}`])];
+    const root = TOKENS.match(/:root \{([^}]*)\}/)![1];
+    for (const token of FLAIR) expect(root, `:root defaults ${token}`).toContain(`${token}:`);
+    for (const t of THEMES) {
+      if (t.value === "system") continue;
+      const css = block(t.value);
+      const set = FLAIR.filter((token) => css.includes(`${token}:`)).length;
+      expect([0, FLAIR.length], `${t.value} sets ${set} flair tokens`).toContain(set);
+    }
+    const flair = THEMES.filter((t) => t.value !== "system" && block(t.value).includes("--wash:")).map((t) => t.value);
+    expect(flair.sort()).toEqual(["acid", "aurora", "riso", "spectrum", "sunset", "synthwave"]);
   });
 
   it("tokens.css names no theme the picker lacks", () => {

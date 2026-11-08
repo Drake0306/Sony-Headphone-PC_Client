@@ -1,8 +1,8 @@
 SHDC (Sony Headphone Desktop Client) controls Sony ULT WEAR (WH-ULT900N) headphones from the menu bar or tray: noise control, ambient level, ULT, equalizer, battery, scenes with desktop triggers, hotkeys, an advanced ten-band equalizer with shareable codes, and a command-line tool.
 
 ## What changed
-- Ten new appearance themes next to Paper and Ink, picked from swatches in Settings → Appearance. Light: Latte, Solarized, Dawn, Sepia, Kraft. Dark: Nord, Mocha, Gruvbox, Tokyo Night, OLED Black. Each theme brings its own accent for live controls; Kraft and OLED Black keep ULT orange. System still follows the OS between Paper and Ink.
-- Settings files survive theme ids this build does not know: an unknown id reads as Paper and every other setting stays. Going back to 0.3.2 or older after choosing a new theme is the one exception: those builds reset the settings file when they meet the new id.
+- Six flair themes in Settings → Appearance, after the twelve palettes: Riso, Acid, Sunset, Spectrum (light), Synthwave and Aurora (dark). They go beyond a palette: a gradient or grain washed over the paper, a colour per equalizer band, a second accent for the big numerals, a third for the ambient ticks, and a glow behind live controls on Synthwave and Aurora. Text never sits on the wash alone, and every text colour was checked for contrast.
+- The twelve palette themes are unchanged.
 
 ## Updating from an earlier version
 Settings → Updates → Update now. On a Mac the file in Applications keeps the name it was installed under (for example `Hairline.app`), because the update replaces the contents, not the file; rename it in Finder if you like.

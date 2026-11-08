@@ -44,6 +44,26 @@
      ink and paper), so every scanner reads it. Not redefined for Ink. */
   --qr-dark: #161614;
   --qr-light: #efede6;
+  /* Flair tokens, off in every palette theme: a wash (gradient or texture)
+     laid over the paper, a second accent for the big numerals, a third for
+     the ambient ticks, a glow behind live controls, and a colour per
+     equalizer band (knob) and its fill. A flair theme sets all sixteen. */
+  --wash: none;
+  --accent-2: var(--ink);
+  --accent-3: var(--ink);
+  --glow: none;
+  --band-1: var(--ult);
+  --band-2: var(--ult);
+  --band-3: var(--ult);
+  --band-4: var(--ult);
+  --band-5: var(--ult);
+  --band-6: var(--ult);
+  --fill-1: var(--ink);
+  --fill-2: var(--ink);
+  --fill-3: var(--ink);
+  --fill-4: var(--ink);
+  --fill-5: var(--ink);
+  --fill-6: var(--ink);
   color-scheme: light;
 }
 
@@ -224,4 +244,176 @@
   --ult: #ff6600;
   --on-ult: #161614;
   color-scheme: dark;
+}
+
+/* Flair themes: the palette plus the sixteen flair tokens. The wash never
+   carries text on its own; every surface keeps its paper or box colour. */
+
+/* Synthwave (dark): neon pink and cyan over violet-black, a horizon and a grid. */
+[data-theme="synthwave"] {
+  --paper: #120a1f;
+  --ink: #f6ecff;
+  --hair: #3b2358;
+  --muted: #b592d9;
+  --box: #1a0f2c;
+  --stripe: #7a4fb0;
+  --ult: #ff2d95;
+  --on-ult: #120a1f;
+  --wash: linear-gradient(180deg, rgba(255, 45, 149, 0.28) 0%, rgba(0, 229, 255, 0.18) 38%, rgba(18, 10, 31, 0) 60%), repeating-linear-gradient(90deg, rgba(0, 229, 255, 0.07) 0 1px, transparent 1px 44px), repeating-linear-gradient(180deg, rgba(0, 229, 255, 0.07) 0 1px, transparent 1px 44px);
+  --accent-2: #00e5ff;
+  --accent-3: #ffd166;
+  --glow: 0 0 10px rgba(255, 45, 149, 0.55);
+  --band-1: #ff2d95;
+  --band-2: #ff4fc0;
+  --band-3: #c05cff;
+  --band-4: #7d7bff;
+  --band-5: #3fb8ff;
+  --band-6: #00e5ff;
+  --fill-1: var(--band-1);
+  --fill-2: var(--band-2);
+  --fill-3: var(--band-3);
+  --fill-4: var(--band-4);
+  --fill-5: var(--band-5);
+  --fill-6: var(--band-6);
+  color-scheme: dark;
+}
+/* Riso (light): grainy uncoated stock, riso blue text, fluorescent pink and orange inks. */
+[data-theme="riso"] {
+  --paper: #f3ecdd;
+  --ink: #1f2e8a;
+  --hair: #c9bfab;
+  --muted: #5b5a7e;
+  --box: #f8f3e6;
+  --stripe: #9a92b8;
+  --ult: #ff48b0;
+  --on-ult: #1f2e8a;
+  --wash: radial-gradient(rgba(31, 46, 138, 0.1) 0.6px, transparent 0.7px) 0 0 / 3px 3px, radial-gradient(rgba(255, 72, 176, 0.1) 0.6px, transparent 0.7px) 1px 2px / 4px 4px;
+  --accent-2: #d64400;
+  --accent-3: #ffdd1f;
+  --glow: none;
+  --band-1: #ff48b0;
+  --band-2: #d64400;
+  --band-3: #ff48b0;
+  --band-4: #1f2e8a;
+  --band-5: #d64400;
+  --band-6: #ffdd1f;
+  --fill-1: var(--band-1);
+  --fill-2: var(--band-2);
+  --fill-3: var(--band-3);
+  --fill-4: var(--band-4);
+  --fill-5: var(--band-5);
+  --fill-6: var(--band-6);
+  color-scheme: light;
+}
+/* Acid (light): chartreuse paper, black ink, hot magenta and electric blue. Flat and loud. */
+[data-theme="acid"] {
+  --paper: #d4ff3a;
+  --ink: #0b0b0b;
+  --hair: #8fb81c;
+  --muted: #3f5212;
+  --box: #e3ff74;
+  --stripe: #5f7a16;
+  --ult: #ff00a8;
+  --on-ult: #0b0b0b;
+  --wash: none;
+  --accent-2: #1f3bff;
+  --accent-3: #ff5500;
+  --glow: none;
+  --band-1: #ff00a8;
+  --band-2: #1f3bff;
+  --band-3: #ff00a8;
+  --band-4: #1f3bff;
+  --band-5: #ff00a8;
+  --band-6: #1f3bff;
+  --fill-1: var(--band-1);
+  --fill-2: var(--band-2);
+  --fill-3: var(--band-3);
+  --fill-4: var(--band-4);
+  --fill-5: var(--band-5);
+  --fill-6: var(--band-6);
+  color-scheme: light;
+}
+/* Aurora (dark): deep navy with a mint, teal and violet band across the top. */
+[data-theme="aurora"] {
+  --paper: #06101c;
+  --ink: #e7f2ff;
+  --hair: #1a3147;
+  --muted: #8fb0cf;
+  --box: #0b1b2c;
+  --stripe: #4b6f8e;
+  --ult: #2ee6a6;
+  --on-ult: #06101c;
+  --wash: radial-gradient(60% 40% at 30% 0%, rgba(46, 230, 166, 0.35), transparent 70%), radial-gradient(60% 40% at 70% 10%, rgba(167, 139, 255, 0.3), transparent 70%), radial-gradient(40% 30% at 50% 5%, rgba(25, 179, 214, 0.3), transparent 70%);
+  --accent-2: #a78bff;
+  --accent-3: #19b3d6;
+  --glow: 0 0 10px rgba(46, 230, 166, 0.45);
+  --band-1: #2ee6a6;
+  --band-2: #27d8c0;
+  --band-3: #19b3d6;
+  --band-4: #4f98f0;
+  --band-5: #7f85ff;
+  --band-6: #a78bff;
+  --fill-1: var(--band-1);
+  --fill-2: var(--band-2);
+  --fill-3: var(--band-3);
+  --fill-4: var(--band-4);
+  --fill-5: var(--band-5);
+  --fill-6: var(--band-6);
+  color-scheme: dark;
+}
+/* Sunset (light): peach to coral to plum from top to bottom, plum ink, hot coral live. */
+[data-theme="sunset"] {
+  --paper: #ffe6cc;
+  --ink: #3a1030;
+  --hair: #e8b792;
+  --muted: #7a3a52;
+  --box: #fff3e3;
+  --stripe: #b4647f;
+  --ult: #ff3d6e;
+  --on-ult: #fff3e3;
+  --wash: linear-gradient(180deg, rgba(255, 184, 107, 0.45) 0%, rgba(255, 107, 138, 0.3) 55%, rgba(107, 45, 92, 0.22) 100%);
+  --accent-2: #8e4b00;
+  --accent-3: #6b2d5c;
+  --glow: none;
+  --band-1: #ff8a3d;
+  --band-2: #ff6b4a;
+  --band-3: #ff4f5e;
+  --band-4: #ff3d6e;
+  --band-5: #c93a7a;
+  --band-6: #6b2d5c;
+  --fill-1: var(--band-1);
+  --fill-2: var(--band-2);
+  --fill-3: var(--band-3);
+  --fill-4: var(--band-4);
+  --fill-5: var(--band-5);
+  --fill-6: var(--band-6);
+  color-scheme: light;
+}
+/* Spectrum (light): white paper, black ink, every equalizer band its own hue. */
+[data-theme="spectrum"] {
+  --paper: #fbfbf7;
+  --ink: #111111;
+  --hair: #dededa;
+  --muted: #62625e;
+  --box: #ffffff;
+  --stripe: #9a9a96;
+  --ult: #6f3cff;
+  --on-ult: #ffffff;
+  --wash: none;
+  --accent-2: #00805a;
+  --accent-3: #1e7bff;
+  --glow: none;
+  --band-1: #ff3b30;
+  --band-2: #ff9500;
+  --band-3: #e6b800;
+  --band-4: #00a870;
+  --band-5: #1e7bff;
+  --band-6: #6f3cff;
+  --fill-1: var(--band-1);
+  --fill-2: var(--band-2);
+  --fill-3: var(--band-3);
+  --fill-4: var(--band-4);
+  --fill-5: var(--band-5);
+  --fill-6: var(--band-6);
+  color-scheme: light;
 }

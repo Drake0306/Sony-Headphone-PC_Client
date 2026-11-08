@@ -45,6 +45,9 @@
   import { encodeAdvanced } from "../lib/presetCode";
   import { isPending, PRESET_LOCK_NOTES, presetLock, type DeviceState } from "../lib/state";
 
+  /** Ten bands over the six band colours: 1,1,2,2,3,4,4,5,5,6. */
+  const bandColour = (i: number) => Math.round((i * 5) / 9) + 1;
+
   let { st, onback }: { st: DeviceState; onback: () => void } = $props();
 
   const NOTE =
@@ -261,6 +264,7 @@
         status={busy ? eq.status : "Confirmed"}
         max={SPAN}
         size="lg"
+        band={bandColour(i)}
         onchange={(v) => change(i, v)}
         oncommit={(v) => commit(i, v)}
       />

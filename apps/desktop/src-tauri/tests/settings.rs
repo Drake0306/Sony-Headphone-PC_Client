@@ -146,6 +146,12 @@ fn every_theme_round_trips_by_its_lowercase_name() {
         (Theme::Gruvbox, "gruvbox"),
         (Theme::Tokyo, "tokyo"),
         (Theme::Oled, "oled"),
+        (Theme::Synthwave, "synthwave"),
+        (Theme::Riso, "riso"),
+        (Theme::Acid, "acid"),
+        (Theme::Aurora, "aurora"),
+        (Theme::Sunset, "sunset"),
+        (Theme::Spectrum, "spectrum"),
     ];
     for (theme, name) in all {
         let json = serde_json::to_string(&theme).unwrap();

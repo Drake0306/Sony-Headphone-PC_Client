@@ -31,9 +31,9 @@ describe("update reducer", () => {
   it("records an available release and keeps it through a failure", () => {
     let s = reduce(initial(), available);
     expect(s.available).toEqual({ version: "0.2.1", notes: "Fixes", date: "2026-11-08" });
-    s = reduce(s, { phase: "failed", error: "Could not reach GitHub" });
+    s = reduce(s, { phase: "failed", error: "Could not reach GitHub. Try again in a few minutes." });
     expect(s.available?.version).toBe("0.2.1");
-    expect(s.phase).toEqual({ phase: "failed", error: "Could not reach GitHub" });
+    expect(s.phase).toEqual({ phase: "failed", error: "Could not reach GitHub. Try again in a few minutes." });
   });
 
   it("clears the release when up to date", () => {

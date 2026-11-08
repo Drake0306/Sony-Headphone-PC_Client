@@ -160,6 +160,10 @@ SHDC checks the latest GitHub release for a newer version 15 seconds after it st
 
 When a newer version is out, Settings shows "SHDC 0.x.y is available" with the release notes, and the popover shows "Update available · open SHDC". Later hides that version until SHDC is next started. Update now downloads it with a progress bar, installs it and relaunches SHDC as the new version. On Windows the installer takes over and starts SHDC again when it is done; it may ask for permission. Nothing is downloaded or installed unless you click Update now. Check now in Settings asks at any time.
 
+The feed lives in two places, and the app tries them in order: `latest.json` on the latest GitHub release, then the same file on the repository's `updates` branch, served by raw.githubusercontent.com. The download links inside point at api.github.com, which redirects to the file. This matters because github.com's release download host can fail at one GitHub edge for a while (it returned 504 from India on 8 November 2026) while the API and the file store still answer. The release workflow's `feed` job writes both copies with `.github/scripts/api-feed.py`.
+
+`SHDC_UPDATE_FEED=https://…/latest.json` makes the app check that one feed instead, for testing a staged release. Only https is accepted.
+
 Every update is signed in the release workflow, and SHDC carries the public key. A download whose signature does not match is not installed, and Settings says "Update could not be verified".
 
 To stop the automatic checks, switch off "Check for updates automatically" in Settings. Check now still works. Switching it back on takes effect the next time SHDC starts.

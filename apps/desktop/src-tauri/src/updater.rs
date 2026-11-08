@@ -26,7 +26,10 @@ const FIRST_CHECK: Duration = Duration::from_secs(15);
 const CHECK_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
 
 const NOT_VERIFIED: &str = "Update could not be verified";
-const UNREACHABLE: &str = "Could not reach GitHub";
+const UNREACHABLE: &str = "Could not reach GitHub. Try again in a few minutes.";
+/// Set to one https URL to check another feed instead of the configured
+/// ones (used to test the updater against a staged release).
+pub const FEED_ENV: &str = "SHDC_UPDATE_FEED";
 const MISSING: &str = "The update file is missing from the release";
 /// Progress for a download of unknown size is sent once per this many bytes.
 const STEP_WITHOUT_SIZE: u64 = 1024 * 1024;
@@ -168,8 +171,8 @@ pub struct Background {
     pub forget: bool,
 }
 
-/// Emit `Available` for a newer release and otherwise nothing; a failure is
-/// logged once per run of failures and never shown.
+/// Emit `Available` for a newer release and otherwise nothing; a newer release
+/// is logged, a failure is logged once per run of failures and never shown.
 pub fn background_outcome(
     current: &str,
     result: Result<Option<UpdateInfo>, String>,
@@ -187,13 +190,15 @@ pub fn background_outcome(
         }
         Ok(found) => {
             log.failing = false;
-            let emit = found
-                .filter(|i| is_newer(current, &i.version))
-                .map(Phase::from);
+            let newer = found.filter(|i| is_newer(current, &i.version));
+            let log = newer
+                .as_ref()
+                .map(|i| format!("update {} is available (running {current})", i.version));
+            let emit = newer.map(Phase::from);
             Background {
                 forget: emit.is_none(),
                 emit,
-                log: None,
+                log,
             }
         }
     }
@@ -351,12 +356,13 @@ async fn fetch(
     app: &AppHandle,
 ) -> Result<Option<(Update, UpdateInfo)>, tauri_plugin_updater::Error> {
     let handle = app.clone();
-    let found = app
+    let mut builder = app
         .updater_builder()
-        .on_before_exit(move || before_exit(&handle))
-        .build()?
-        .check()
-        .await?;
+        .on_before_exit(move || before_exit(&handle));
+    if let Some(feed) = feed_override() {
+        builder = builder.endpoints(vec![feed])?;
+    }
+    let found = builder.build()?.check().await?;
     let current = current(app);
     Ok(found
         .map(|u| {
@@ -531,4 +537,18 @@ async fn install(app: &AppHandle) -> Result<(), Phase> {
         app.restart();
     }
     Ok(())
+}
+
+/// The feed named by `SHDC_UPDATE_FEED`, when it is a well-formed https URL.
+/// Anything else is ignored with a line on stderr, so a typo cannot silence
+/// the real feeds.
+pub fn feed_override() -> Option<tauri::Url> {
+    let value = std::env::var(FEED_ENV).ok()?;
+    match tauri::Url::parse(&value) {
+        Ok(url) if url.scheme() == "https" => Some(url),
+        _ => {
+            eprintln!("shdc: ignoring {FEED_ENV}={value:?} (not an https URL)");
+            None
+        }
+    }
 }

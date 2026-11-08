@@ -64,3 +64,32 @@ jobs:
           args: ${{ matrix.args }}
           # latest.json: the feed the installed apps check for updates.
           includeUpdaterJson: true
+
+  # The feed the installed apps read. tauri-action's latest.json names the
+  # github.com download links; this job points them at api.github.com (which
+  # redirects to the file) and publishes the result twice: on the release
+  # itself, and on the `updates` branch for raw.githubusercontent.com, the
+  # app's fallback feed when the github.com download host is failing.
+  feed:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rewrite latest.json with API download links
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download "${{ github.ref_name }}" --pattern latest.json --output /tmp/latest.json
+          python3 .github/scripts/api-feed.py "${{ github.repository }}" "${{ github.ref_name }}" /tmp/latest.json /tmp/feed.json
+          cp /tmp/feed.json latest.json
+          gh release upload "${{ github.ref_name }}" latest.json --clobber
+      - name: Publish the fallback feed on the updates branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin updates
+          git checkout -B updates origin/updates
+          cp /tmp/feed.json latest.json
+          git add latest.json
+          git commit -m "Update feed for ${{ github.ref_name }}" || echo "feed unchanged"
+          git push origin updates

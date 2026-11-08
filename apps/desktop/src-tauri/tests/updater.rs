@@ -19,7 +19,7 @@ fn not_verified() -> Phase {
 
 fn unreachable() -> Phase {
     Phase::Failed {
-        error: "Could not reach GitHub".into(),
+        error: "Could not reach GitHub. Try again in a few minutes.".into(),
     }
 }
 
@@ -159,7 +159,13 @@ fn offline_check_is_silent() {
             date: Some("2026-11-08".into()),
         })
     );
-    assert_eq!((found.log, found.forget), (None, false));
+    assert_eq!(
+        (found.log, found.forget),
+        (
+            Some("update 0.2.1 is available (running 0.2.0)".to_string()),
+            false
+        )
+    );
     // Up to date, or the same version: nothing is emitted (the background
     // never says "up to date"), and a release remembered earlier is forgotten.
     let gone = Background {
@@ -303,4 +309,22 @@ fn base64_decode(s: &str) -> Vec<u8> {
         }
     }
     out
+}
+
+#[test]
+fn feed_override_takes_only_https_urls() {
+    use shdc_lib::updater::{feed_override, FEED_ENV};
+    // One test owns this variable; the others never read it.
+    std::env::remove_var(FEED_ENV);
+    assert_eq!(feed_override(), None);
+    std::env::set_var(FEED_ENV, "http://example.test/latest.json");
+    assert_eq!(feed_override(), None, "plain http is refused");
+    std::env::set_var(FEED_ENV, "not a url");
+    assert_eq!(feed_override(), None);
+    std::env::set_var(FEED_ENV, "https://example.test/feeds/latest.json");
+    assert_eq!(
+        feed_override().map(|u| u.to_string()),
+        Some("https://example.test/feeds/latest.json".to_string())
+    );
+    std::env::remove_var(FEED_ENV);
 }

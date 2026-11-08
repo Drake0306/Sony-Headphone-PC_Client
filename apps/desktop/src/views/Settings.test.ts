@@ -98,9 +98,9 @@ describe("Settings", () => {
     backend.check = { phase: "up_to_date" };
     await fireEvent.click(r.getByRole("button", { name: "Check now" }));
     await waitFor(() => expect(r.getByText("Up to date")).toBeInTheDocument());
-    backend.check = "Could not reach GitHub";
+    backend.check = "Could not reach GitHub. Try again in a few minutes.";
     await fireEvent.click(r.getByRole("button", { name: "Check now" }));
-    await waitFor(() => expect(r.getByText("Could not reach GitHub")).toBeInTheDocument());
+    await waitFor(() => expect(r.getByText("Could not reach GitHub. Try again in a few minutes.")).toBeInTheDocument());
     r.unmount();
   });
 
